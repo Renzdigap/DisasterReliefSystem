@@ -2,40 +2,29 @@
 
 import React from "react";
 
-export function StatusBadge({ status }: { status: string }) {
-  let colorStyle =
-    "bg-slate-100 text-slate-700 border-slate-200";
+export function StatusBadge({ status }: { status?: string }) {
+  const s = status || "Unknown";
+  let color = "bg-slate-100 text-slate-700 border-slate-300";
+  let dotColor = "bg-slate-500";
 
-  switch (status) {
-    case "Active":
-      colorStyle = "bg-rose-50 text-rose-700 border-rose-200";
-      break;
-    case "Pending":
-      colorStyle = "bg-amber-50 text-amber-700 border-amber-200";
-      break;
-    case "Approved":
-      colorStyle = "bg-blue-50 text-blue-700 border-blue-200";
-      break;
-    case "Fulfilled":
-    case "Delivered":
-      colorStyle = "bg-emerald-50 text-emerald-700 border-emerald-200";
-      break;
-    case "In Transit":
-      colorStyle = "bg-indigo-50 text-indigo-700 border-indigo-200";
-      break;
-    case "Resolved":
-      colorStyle = "bg-slate-100 text-slate-600 border-slate-200";
-      break;
-    default:
-      colorStyle = "bg-slate-100 text-slate-700 border-slate-200";
+  if (s === "Active" || s === "Approved" || s === "Delivered" || s === "SUFFICIENT" || s === "Available") {
+    color = "bg-emerald-50 text-emerald-800 border-emerald-300";
+    dotColor = "bg-emerald-500";
+  } else if (s === "Pending" || s === "In Transit" || s === "LOW STOCK" || s === "On Assignment") {
+    color = "bg-amber-50 text-amber-800 border-amber-300";
+    dotColor = "bg-amber-500";
+  } else if (s === "CRITICAL ALERT" || s === "Rejected" || s === "Cancelled") {
+    color = "bg-rose-50 text-rose-800 border-rose-300";
+    dotColor = "bg-rose-500";
+  } else if (s === "Resolved" || s === "Fulfilled") {
+    color = "bg-blue-50 text-blue-800 border-blue-300";
+    dotColor = "bg-blue-500";
   }
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${colorStyle}`}
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
-      {status}
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${color}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+      <span>{s}</span>
     </span>
   );
 }
