@@ -14,9 +14,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   MapPin,
-  Clock,
   Check,
-  Boxes,
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
@@ -47,14 +45,12 @@ export default function OrganizationPortalPage() {
     text: string;
   } | null>(null);
 
-  // 3NF ReliefRequest + RequestItem Form State
   const [selectedEventId, setSelectedEventId] = useState<number>(1);
   const [draftItems, setDraftItems] = useState<RequestLineDraft[]>([
     { goodId: 1, quantity: 100 },
   ]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
 
@@ -83,7 +79,7 @@ export default function OrganizationPortalPage() {
       } catch (err: any) {
         setBanner({
           type: "error",
-          text: err.message || "Failed to load Organization Portal data.",
+          text: err.message || "Failed to load data.",
         });
       } finally {
         setLoading(false);
@@ -135,7 +131,7 @@ export default function OrganizationPortalPage() {
     if (!selectedEventId || validItems.length === 0) {
       setBanner({
         type: "error",
-        text: "Please select an active Disaster Event and at least one relief commodity.",
+        text: "Please select an event and at least one item.",
       });
       return;
     }
@@ -153,7 +149,7 @@ export default function OrganizationPortalPage() {
       });
       setBanner({
         type: "success",
-        text: `Emergency Relief Request #${res.requestId} logged atomically (${validItems.length} RequestItem lines). Queued for Steward approval and dispatch.`,
+        text: `Request #${res.requestId} submitted.`,
       });
       setDraftItems([
         { goodId: data?.goods?.[0]?.goodId || 1, quantity: 100 },
@@ -163,7 +159,7 @@ export default function OrganizationPortalPage() {
     } catch (err: any) {
       setBanner({
         type: "error",
-        text: err.message || "Failed to submit emergency relief request.",
+        text: err.message || "Failed to submit request.",
       });
     } finally {
       setSubmitting(false);
@@ -221,46 +217,42 @@ export default function OrganizationPortalPage() {
     data?.organization?.orgName ||
     session?.orgName ||
     session?.user?.fullName ||
-    "Partner Organization";
+    "Organization";
   const orgLocation =
-    data?.organization?.location || session?.location || "Field Command Sector";
+    data?.organization?.location || session?.location || "Metro Manila";
 
   const navItems: SidebarNavItem[] = [
     {
       id: "request",
-      label: "New Relief Requisition",
+      label: "New Request",
       icon: <ClipboardPlus className="h-4 w-4" />,
-      badge: "3NF",
-      badgeTone: "emerald",
     },
     {
       id: "history",
-      label: "My Requisitions",
+      label: "My Requests",
       icon: <ClipboardList className="h-4 w-4" />,
       badge: requests.length,
     },
     {
       id: "deliveries",
-      label: "Incoming Fleet Dispatches",
+      label: "Deliveries",
       icon: <Truck className="h-4 w-4" />,
       badge: deliveries.length,
-      badgeTone: "amber",
     },
     {
       id: "notifications",
-      label: "Dispatch Alerts",
+      label: "Notifications",
       icon: <Bell className="h-4 w-4" />,
       badge: unreadCount > 0 ? unreadCount : undefined,
-      badgeTone: "rose",
     },
   ];
 
   return (
     <PortalSidebarLayout
       session={session}
-      portalTitle="Partner Organization & LGU Requisition Portal"
-      portalSubtitle={`${orgName} • Jurisdiction: ${orgLocation}`}
-      roleBadge="LGU / Org"
+      portalTitle="Organization Portal"
+      portalSubtitle={`${orgName} • ${orgLocation}`}
+      roleBadge="Organization"
       navItems={navItems}
       activeTab={activeTab}
       onSelectTab={setActiveTab}
@@ -271,13 +263,13 @@ export default function OrganizationPortalPage() {
     >
       {banner && (
         <div
-          className={`rounded-2xl border px-4 py-3.5 flex items-center justify-between text-xs sm:text-sm font-semibold shadow-sm ${
+          className={`rounded-xl border px-4 py-3 flex items-center justify-between text-xs sm:text-sm font-medium ${
             banner.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-900"
               : "bg-rose-50 border-rose-200 text-rose-900"
           }`}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {banner.type === "success" ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
             ) : (
@@ -289,37 +281,29 @@ export default function OrganizationPortalPage() {
             onClick={() => setBanner(null)}
             className="text-xs underline ml-4"
           >
-            Dismiss
+            Close
           </button>
         </div>
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
-            <span>Total Requisitions Filed</span>
-            <div className="h-8 w-8 rounded-xl bg-slate-100 flex items-center justify-center">
-              <ClipboardList className="h-4 w-4 text-slate-800" />
-            </div>
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+            <span>Total Requests</span>
+            <ClipboardList className="h-4 w-4 text-blue-600" />
           </div>
-          <p className="mt-3 text-3xl font-extrabold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-slate-900">
             {requests.length}
-          </p>
-          <p className="mt-1 text-xs font-medium text-amber-600">
-            {requests.filter((r: any) => r.status === "Pending").length}{" "}
-            Awaiting Steward Approval
           </p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
-            <span>Approved &amp; Fulfilled</span>
-            <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center">
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            </div>
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+            <span>Approved</span>
+            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           </div>
-          <p className="mt-3 text-3xl font-extrabold text-emerald-600">
+          <p className="mt-2 text-2xl font-bold text-slate-900">
             {
               requests.filter(
                 (r: any) =>
@@ -327,77 +311,51 @@ export default function OrganizationPortalPage() {
               ).length
             }
           </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Stock allocated from Central Warehouse
-          </p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
-            <span>Incoming Dispatches</span>
-            <div className="h-8 w-8 rounded-xl bg-amber-50 flex items-center justify-center">
-              <Truck className="h-4 w-4 text-amber-600" />
-            </div>
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+            <span>Deliveries</span>
+            <Truck className="h-4 w-4 text-amber-600" />
           </div>
-          <p className="mt-3 text-3xl font-extrabold text-slate-900">
+          <p className="mt-2 text-2xl font-bold text-slate-900">
             {deliveries.length}
           </p>
-          <p className="mt-1 text-xs font-medium text-amber-600">
-            {
-              deliveries.filter((d: any) => d.deliveryStatus === "In Transit")
-                .length
-            }{" "}
-            Currently In Transit
-          </p>
         </div>
 
         <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
-            <span>LGU / NGO Jurisdiction</span>
-            <div className="h-8 w-8 rounded-xl bg-sky-50 flex items-center justify-center">
-              <Building2 className="h-4 w-4 text-sky-600" />
-            </div>
+          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+            <span>Location</span>
+            <Building2 className="h-4 w-4 text-slate-400" />
           </div>
-          <p className="mt-3 text-base font-extrabold text-slate-900 truncate">
-            {orgName}
-          </p>
-          <p className="mt-1 text-xs text-slate-500 flex items-center gap-1 truncate">
-            <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+          <p className="mt-2 text-base font-bold text-slate-900 truncate">
             {orgLocation}
           </p>
         </div>
       </div>
 
-      {/* TAB 1: SUBMIT EMERGENCY RELIEF REQUEST */}
+      {/* TAB 1: NEW REQUEST */}
       {activeTab === "request" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="bg-slate-900 px-6 py-4 text-white">
-              <h2 className="text-sm sm:text-base font-bold">
-                Emergency Relief Requisition Form (3NF Split-Transaction)
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Atomically records request header in{" "}
-                <code className="text-emerald-300">ReliefRequest</code> and
-                itemized lines in{" "}
-                <code className="text-emerald-300">RequestItem</code>.
-              </p>
-            </div>
+          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
+            <h2 className="text-base font-bold text-slate-900 mb-4">
+              Request Relief Goods
+            </h2>
 
-            <form onSubmit={handleRequestSubmit} className="p-6 space-y-5">
+            <form onSubmit={handleRequestSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                  Associated Calamity / Emergency Operation
+                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                  Disaster Event
                 </label>
                 <select
                   value={selectedEventId}
                   onChange={(e) => setSelectedEventId(Number(e.target.value))}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-600 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
                   required
                 >
                   {events.map((ev: any) => (
                     <option key={ev.eventId} value={ev.eventId}>
-                      [{ev.status}] {ev.eventName} — {ev.location}
+                      {ev.eventName} ({ev.location})
                     </option>
                   ))}
                 </select>
@@ -405,16 +363,16 @@ export default function OrganizationPortalPage() {
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                    Requested Relief Commodities (RequestItem Lines)
+                  <label className="block text-xs font-medium text-slate-700">
+                    Requested Items
                   </label>
                   <button
                     type="button"
                     onClick={addDraftLine}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 text-xs font-bold text-emerald-800 transition"
+                    className="inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700 transition"
                   >
                     <Plus className="h-3.5 w-3.5" />
-                    Add Commodity Line
+                    Add Item
                   </button>
                 </div>
 
@@ -425,12 +383,9 @@ export default function OrganizationPortalPage() {
                   return (
                     <div
                       key={index}
-                      className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-slate-50 p-3.5 rounded-xl border border-slate-200"
+                      className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-xl border border-slate-200/70"
                     >
                       <div className="sm:col-span-7">
-                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                          Commodity #{index + 1}
-                        </label>
                         <select
                           value={line.goodId}
                           onChange={(e) =>
@@ -440,44 +395,45 @@ export default function OrganizationPortalPage() {
                               Number(e.target.value)
                             )
                           }
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
                         >
                           {goods.map((g: any) => (
                             <option key={g.goodId} value={g.goodId}>
-                              {g.itemName} ({g.category} — {g.unitOfMeasure})
+                              {g.itemName} ({g.unitOfMeasure})
                             </option>
                           ))}
                         </select>
                       </div>
 
                       <div className="sm:col-span-4">
-                        <label className="block text-[11px] font-semibold text-slate-500 mb-1">
-                          Requested Qty (Avail:{" "}
-                          {stockObj?.currentStock ?? "N/A"})
-                        </label>
-                        <input
-                          type="number"
-                          min={1}
-                          max={1000000}
-                          value={line.quantity}
-                          onChange={(e) =>
-                            updateDraftLine(
-                              index,
-                              "quantity",
-                              Number(e.target.value)
-                            )
-                          }
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 font-semibold"
-                          required
-                        />
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min={1}
+                            max={1000000}
+                            value={line.quantity}
+                            onChange={(e) =>
+                              updateDraftLine(
+                                index,
+                                "quantity",
+                                Number(e.target.value)
+                              )
+                            }
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 font-semibold"
+                            required
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 pointer-events-none">
+                            Avail: {stockObj?.currentStock ?? 0}
+                          </span>
+                        </div>
                       </div>
 
-                      <div className="sm:col-span-1 flex sm:justify-end pt-4">
+                      <div className="sm:col-span-1 flex justify-end">
                         <button
                           type="button"
                           onClick={() => removeDraftLine(index)}
                           disabled={draftItems.length <= 1}
-                          className="rounded-xl p-2 text-rose-600 hover:bg-rose-50 disabled:opacity-30"
+                          className="rounded-lg p-2 text-slate-400 hover:text-rose-600 disabled:opacity-30"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -487,49 +443,38 @@ export default function OrganizationPortalPage() {
                 })}
               </div>
 
-              <div className="pt-3 flex items-center justify-end border-t border-slate-100">
+              <div className="pt-2 flex justify-end">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition disabled:opacity-50"
+                  className="rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
                 >
-                  <ClipboardPlus className="h-4 w-4" />
-                  <span>
-                    {submitting
-                      ? "Submitting Requisition..."
-                      : "Transmit Official Relief Request"}
-                  </span>
+                  {submitting ? "Submitting..." : "Submit Request"}
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Available Central Warehouse Stock */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-4">
-            <div className="border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <Boxes className="h-4 w-4 text-emerald-600" />
-                Central Warehouse Stock Availability
-              </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Live allocatable balances across all relief categories.
-              </p>
-            </div>
-            <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
+          {/* Available Stock */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 space-y-3">
+            <h3 className="text-sm font-bold text-slate-900">
+              Available Warehouse Stock
+            </h3>
+            <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
               {inventory.map((item: any) => (
                 <div
                   key={item.inventoryId}
-                  className="rounded-xl border border-slate-200/80 p-3 flex items-center justify-between bg-slate-50/70"
+                  className="rounded-xl border border-slate-100 p-3 flex items-center justify-between bg-slate-50/50"
                 >
                   <div>
-                    <div className="text-xs font-bold text-slate-900">
+                    <div className="text-xs font-semibold text-slate-900">
                       {item.itemName}
                     </div>
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-[11px] text-slate-400">
                       {item.category}
                     </div>
                   </div>
-                  <div className="text-xs font-extrabold text-emerald-700">
+                  <div className="text-xs font-bold text-slate-800">
                     {item.currentStock.toLocaleString()} {item.unitOfMeasure}
                   </div>
                 </div>
@@ -539,38 +484,30 @@ export default function OrganizationPortalPage() {
         </div>
       )}
 
-      {/* TAB 2: MY RELIEF REQUESTS */}
+      {/* TAB 2: REQUESTS HISTORY */}
       {activeTab === "history" && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                Organization Requisition History &amp; Status
-              </h2>
-              <p className="text-xs text-slate-500">
-                Tracks approval and fulfillment status for all requests filed by{" "}
-                {orgName}.
-              </p>
-            </div>
+            <h2 className="text-base font-bold text-slate-900">My Requests</h2>
 
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
                 <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
-                  placeholder="Search request or item..."
+                  placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="rounded-xl border border-slate-300 pl-9 pr-3 py-1.5 text-xs text-slate-900"
+                  className="rounded-xl border border-slate-200 pl-9 pr-3 py-1.5 text-xs text-slate-900"
                 />
               </div>
               {["ALL", "Pending", "Approved", "Fulfilled"].map((st) => (
                 <button
                   key={st}
                   onClick={() => setStatusFilter(st)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                     statusFilter === st
-                      ? "bg-slate-900 text-white"
+                      ? "bg-blue-600 text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
@@ -583,44 +520,41 @@ export default function OrganizationPortalPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  <th className="py-3.5 px-4">Request ID</th>
-                  <th className="py-3.5 px-4">Calamity Event</th>
-                  <th className="py-3.5 px-4">Date Filed</th>
-                  <th className="py-3.5 px-4">Requested Line Items (3NF)</th>
-                  <th className="py-3.5 px-4">Approval Status</th>
+                <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold uppercase text-slate-400">
+                  <th className="py-3 px-4">ID</th>
+                  <th className="py-3 px-4">Disaster Event</th>
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Items</th>
+                  <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-500">
-                      No relief requisitions match your filter.
+                    <td colSpan={5} className="py-8 text-center text-slate-400">
+                      No requests found.
                     </td>
                   </tr>
                 ) : (
                   filteredRequests.map((r: any) => (
-                    <tr key={r.requestId} className="hover:bg-slate-50/80">
-                      <td className="py-3.5 px-4 font-bold text-slate-900">
-                        #REQ-{r.requestId}
+                    <tr key={r.requestId} className="hover:bg-slate-50/60">
+                      <td className="py-3.5 px-4 font-semibold text-slate-900">
+                        #{r.requestId}
                       </td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-800">
+                      <td className="py-3.5 px-4 font-medium text-slate-800">
                         {r.eventName}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600">
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="h-3.5 w-3.5 text-slate-400" />
-                          {r.requestDate}
-                        </span>
+                      <td className="py-3.5 px-4 text-slate-500">
+                        {r.requestDate}
                       </td>
                       <td className="py-3.5 px-4">
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-1">
                           {(r.items || []).map((it: any, idx: number) => (
                             <span
                               key={idx}
-                              className="inline-flex items-center rounded-lg bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800"
+                              className="rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700"
                             >
-                              {it.itemName}: {it.quantity} {it.unitOfMeasure}
+                              {it.itemName} ({it.quantity} {it.unitOfMeasure})
                             </span>
                           ))}
                         </div>
@@ -637,54 +571,50 @@ export default function OrganizationPortalPage() {
         </div>
       )}
 
-      {/* TAB 3: INCOMING FLEET DELIVERIES */}
+      {/* TAB 3: DELIVERIES */}
       {activeTab === "deliveries" && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100">
             <h2 className="text-base font-bold text-slate-900">
-              Incoming Fleet Deliveries &amp; Logistics Tracker
+              Incoming Deliveries
             </h2>
-            <p className="text-xs text-slate-500">
-              Real-time dispatch assignments from the Central Warehouse to{" "}
-              {orgName}.
-            </p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  <th className="py-3.5 px-4">Delivery ID</th>
-                  <th className="py-3.5 px-4">Linked Request</th>
-                  <th className="py-3.5 px-4">Assigned Field Volunteer</th>
-                  <th className="py-3.5 px-4">Destination Sector</th>
-                  <th className="py-3.5 px-4">Dispatch Date</th>
-                  <th className="py-3.5 px-4">Logistics Status</th>
+                <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold uppercase text-slate-400">
+                  <th className="py-3 px-4">ID</th>
+                  <th className="py-3 px-4">Request</th>
+                  <th className="py-3 px-4">Volunteer Driver</th>
+                  <th className="py-3 px-4">Destination</th>
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {deliveries.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-slate-500">
-                      No fleet dispatches assigned to your organization yet.
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
+                      No deliveries assigned yet.
                     </td>
                   </tr>
                 ) : (
                   deliveries.map((del: any) => (
-                    <tr key={del.deliveryId} className="hover:bg-slate-50/80">
-                      <td className="py-3.5 px-4 font-bold text-slate-900">
-                        #DEL-{del.deliveryId}
+                    <tr key={del.deliveryId} className="hover:bg-slate-50/60">
+                      <td className="py-3.5 px-4 font-semibold text-slate-900">
+                        #{del.deliveryId}
                       </td>
-                      <td className="py-3.5 px-4 font-semibold text-slate-800">
+                      <td className="py-3.5 px-4 font-medium text-slate-800">
                         Request #{del.requestId}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-700 font-medium">
+                      <td className="py-3.5 px-4 text-slate-700">
                         {del.volunteerName}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600">
+                      <td className="py-3.5 px-4 text-slate-500">
                         {del.location}
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600">
+                      <td className="py-3.5 px-4 text-slate-500">
                         {del.dispatchDate}
                       </td>
                       <td className="py-3.5 px-4">
@@ -704,16 +634,12 @@ export default function OrganizationPortalPage() {
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100">
             <h2 className="text-base font-bold text-slate-900">
-              Organization Dispatch &amp; Approval Alerts
+              Notifications
             </h2>
-            <p className="text-xs text-slate-500">
-              System notifications for requisition approvals and fleet
-              deliveries.
-            </p>
           </div>
           <div className="divide-y divide-slate-100">
             {notifications.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
+              <div className="p-8 text-center text-xs text-slate-400">
                 No notifications found.
               </div>
             ) : (
@@ -721,14 +647,14 @@ export default function OrganizationPortalPage() {
                 <div
                   key={n.notificationId}
                   className={`p-4 flex items-center justify-between gap-4 ${
-                    n.isRead ? "bg-white" : "bg-emerald-50/40"
+                    n.isRead ? "bg-white" : "bg-blue-50/40"
                   }`}
                 >
-                  <div className="space-y-1">
-                    <p className="text-xs sm:text-sm font-semibold text-slate-900">
+                  <div className="space-y-0.5">
+                    <p className="text-xs sm:text-sm font-medium text-slate-900">
                       {n.message}
                     </p>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-slate-400">
                       {n.dateSent
                         ? new Date(n.dateSent).toLocaleString()
                         : "Just now"}
@@ -739,7 +665,7 @@ export default function OrganizationPortalPage() {
                       onClick={() =>
                         handleMarkNotificationRead(n.notificationId)
                       }
-                      className="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 shrink-0"
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-700 shrink-0"
                     >
                       <Check className="h-3.5 w-3.5 text-emerald-600" />
                       Mark Read

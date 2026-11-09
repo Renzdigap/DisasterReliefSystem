@@ -244,63 +244,58 @@ export default function AdminPortalPage() {
   const navItems: SidebarNavItem[] = [
     {
       id: "overview",
-      label: "Executive Overview",
+      label: "Overview",
       icon: <AlertTriangle className="h-4 w-4" />,
     },
     {
       id: "events",
-      label: "Disaster Events",
+      label: "Disasters",
       icon: <AlertTriangle className="h-4 w-4" />,
       badge: metrics.activeDisasters ?? 0,
-      badgeTone: "rose",
     },
     {
       id: "requests",
-      label: "Relief Requests",
+      label: "Requests",
       icon: <Building2 className="h-4 w-4" />,
       badge: metrics.pendingRequests ?? 0,
-      badgeTone: "amber",
     },
     {
       id: "donations",
-      label: "Donations Ledger",
+      label: "Donations",
       icon: <HeartHandshake className="h-4 w-4" />,
       badge: metrics.totalDonations ?? 0,
-      badgeTone: "emerald",
     },
     {
       id: "inventory",
-      label: "Warehouse Inventory",
+      label: "Inventory",
       icon: <Package className="h-4 w-4" />,
       badge: metrics.reliefGoodsCount ?? 0,
     },
     {
       id: "deliveries",
-      label: "Fleet Deliveries",
+      label: "Deliveries",
       icon: <Truck className="h-4 w-4" />,
       badge: deliveries.length,
     },
     {
       id: "stakeholders",
-      label: "Master Stakeholders",
+      label: "Users",
       icon: <Users className="h-4 w-4" />,
       badge: donors.length + organizations.length + volunteers.length,
     },
     {
       id: "reports",
-      label: "Analytical Reports (3)",
+      label: "Reports",
       icon: <FileBarChart className="h-4 w-4" />,
-      badge: "3",
-      badgeTone: "emerald",
     },
   ];
 
   return (
     <PortalSidebarLayout
       session={session}
-      portalTitle="DRRMS Administrator Operations Console"
-      portalSubtitle="Master Data Steward & Resource Allocation Control Center"
-      roleBadge="Admin Steward"
+      portalTitle="Admin Dashboard"
+      portalSubtitle="Relief Operations & Resource Management"
+      roleBadge="Admin"
       navItems={navItems}
       activeTab={activeTab}
       onSelectTab={(id: AdminTab) => {
@@ -312,7 +307,7 @@ export default function AdminPortalPage() {
       syncing={syncing}
     >
       {toast && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-semibold text-emerald-900 shadow-sm flex items-center gap-2.5 no-print">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-medium text-emerald-900 flex items-center gap-2 no-print">
           <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
           <span>{toast}</span>
         </div>
@@ -321,74 +316,56 @@ export default function AdminPortalPage() {
       {/* Executive KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 no-print">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="text-xs font-medium text-slate-500">
             Active Disasters
           </div>
-          <div className="text-2xl font-extrabold text-rose-600 mt-1.5">
+          <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.activeDisasters ?? 0}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">
-            Master Event Registry
-          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <div className="text-xs font-medium text-slate-500">
             Pending Requests
           </div>
-          <div className="text-2xl font-extrabold text-amber-600 mt-1.5">
+          <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.pendingRequests ?? 0}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">
-            Awaiting Steward Approval
-          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Logged Donations
+          <div className="text-xs font-medium text-slate-500">
+            Donations
           </div>
-          <div className="text-2xl font-extrabold text-emerald-600 mt-1.5">
+          <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.totalDonations ?? 0}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">
-            3NF Inflow Pledges
-          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Master Relief Goods
+          <div className="text-xs font-medium text-slate-500">
+            Relief Items
           </div>
-          <div className="text-2xl font-extrabold text-slate-900 mt-1.5">
+          <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.reliefGoodsCount ?? 0}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">
-            Standardized SKUs
-          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Field Volunteers
+          <div className="text-xs font-medium text-slate-500">
+            Volunteers
           </div>
-          <div className="text-2xl font-extrabold text-sky-600 mt-1.5">
+          <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.registeredVolunteers ?? 0}
           </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">
-            Active Fleet Drivers
-          </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-            Fulfilled Deliveries
+          <div className="text-xs font-medium text-slate-500">
+            Deliveries Done
           </div>
-          <div className="text-2xl font-extrabold text-emerald-700 mt-1.5">
+          <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.completedDeliveries ?? 0}
-          </div>
-          <div className="text-[10px] text-slate-400 mt-0.5">
-            Verified Dispatches
           </div>
         </div>
       </div>
@@ -396,13 +373,10 @@ export default function AdminPortalPage() {
         {/* TAB 1: OVERVIEW */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-900 mb-1">
-                Pending Relief Requests Queue (Steward Action Required)
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-900 mb-3">
+                Pending Requests
               </h3>
-              <p className="text-xs text-slate-500 mb-3">
-                Approving a request atomically deducts requested items from Warehouse Inventory
-              </p>
               <div className="divide-y divide-slate-100">
                 {requests
                   .filter((r) => r.status === "Pending")
@@ -413,14 +387,13 @@ export default function AdminPortalPage() {
                       className="py-3 flex items-center justify-between gap-3 text-xs"
                     >
                       <div>
-                        <div className="font-bold text-slate-800">
+                        <div className="font-semibold text-slate-800">
                           #{r.requestId} • {r.orgName}
                         </div>
                         <div className="text-slate-500">
-                          Event: {r.eventName} ({r.requestDate})
+                          {r.eventName} ({r.requestDate})
                         </div>
-                        <div className="text-[11px] text-slate-600 mt-0.5">
-                          Items:{" "}
+                        <div className="text-[11px] text-slate-500 mt-0.5">
                           {(r.items || [])
                             .map((i: any) => `${i.itemName} (${i.quantity})`)
                             .join(", ")}
@@ -430,22 +403,19 @@ export default function AdminPortalPage() {
                         onClick={() =>
                           handleUpdateRequestStatus(r.requestId, "Approved")
                         }
-                        className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shrink-0"
+                        className="rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white shrink-0"
                       >
-                        Approve &amp; Deduct Stock
+                        Approve
                       </button>
                     </div>
                   ))}
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-900 mb-1">
-                Warehouse Stock &amp; Replenishment Alerts
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+              <h3 className="text-sm font-bold text-slate-900 mb-3">
+                Warehouse Stock
               </h3>
-              <p className="text-xs text-slate-500 mb-3">
-                Derived operational balances monitored against minimum threshold
-              </p>
               <div className="divide-y divide-slate-100">
                 {inventory.slice(0, 6).map((inv) => {
                   const low = inv.currentStock <= 200;
@@ -455,26 +425,22 @@ export default function AdminPortalPage() {
                       className="py-2.5 flex items-center justify-between text-xs"
                     >
                       <div>
-                        <span className="font-bold text-slate-800">
+                        <span className="font-semibold text-slate-800">
                           {inv.itemName}
                         </span>
                         <span className="text-slate-400 ml-2">
-                          [{inv.category}]
+                          {inv.category}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900">
+                        <span className="font-semibold text-slate-900">
                           {inv.currentStock} {inv.unitOfMeasure}
                         </span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                            low
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
-                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          }`}
-                        >
-                          {low ? "LOW STOCK" : "SUFFICIENT"}
-                        </span>
+                        {low && (
+                          <span className="rounded-full bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold">
+                            Low
+                          </span>
+                        )}
                       </div>
                     </div>
                   );
