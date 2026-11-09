@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -13,7 +19,6 @@ import {
   Trash2,
   CheckCircle2,
   AlertTriangle,
-  MapPin,
   Check,
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
@@ -29,6 +34,15 @@ import {
 interface RequestLineDraft {
   goodId: number;
   quantity: number;
+}
+
+function getPortalRouteForRole(role?: string): string {
+  const r = (role || "").toLowerCase();
+  if (r === "admin" || r === "manager") return "/admin";
+  if (r === "donor") return "/donor";
+  if (r === "organization") return "/organization";
+  if (r === "volunteer") return "/volunteer";
+  return "/";
 }
 
 export default function OrganizationPortalPage() {
@@ -50,9 +64,26 @@ export default function OrganizationPortalPage() {
     { goodId: 1, quantity: 100 },
   ]);
   const [submitting, setSubmitting] = useState(false);
+  const hasInitDefaultsRef = useRef(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  const initDefaultsFromPayload = (payload: any) => {
+    if (hasInitDefaultsRef.current) return;
+    if (payload?.events?.length > 0 || payload?.goods?.length > 0) {
+      hasInitDefaultsRef.current = true;
+      if (payload.events?.length > 0) {
+        const firstActive =
+          payload.events.find((ev: any) => ev.status === "Active") ||
+          payload.events[0];
+        setSelectedEventId(firstActive.eventId);
+      }
+      if (payload.goods?.length > 0) {
+        setDraftItems([{ goodId: payload.goods[0].goodId, quantity: 100 }]);
+      }
+    }
+  };
 
   const loadOrgPortal = useCallback(
     async (userId: number, isBackground = false) => {
@@ -61,6 +92,7 @@ export default function OrganizationPortalPage() {
         const cached = getCachedData<any>(cacheKey);
         if (cached) {
           setData(cached);
+          initDefaultsFromPayload(cached);
           setLoading(false);
         }
       } else {
@@ -73,9 +105,7 @@ export default function OrganizationPortalPage() {
         );
         setData(fresh);
         setCachedData(cacheKey, fresh);
-        if (fresh.events?.length > 0 && selectedEventId === 1) {
-          setSelectedEventId(fresh.events[0].eventId);
-        }
+        initDefaultsFromPayload(fresh);
       } catch (err: any) {
         setBanner({
           type: "error",
@@ -86,13 +116,18 @@ export default function OrganizationPortalPage() {
         setRefreshing(false);
       }
     },
-    [selectedEventId]
+    []
   );
 
   useEffect(() => {
     const saved = getSavedSession();
     if (!saved || !saved.user) {
       router.replace("/");
+      return;
+    }
+    const role = (saved.user.role || "").toLowerCase();
+    if (role !== "organization") {
+      router.replace(getPortalRouteForRole(role));
       return;
     }
     setSession(saved);
@@ -114,9 +149,10 @@ export default function OrganizationPortalPage() {
     field: "goodId" | "quantity",
     value: number
   ) => {
+    const safeValue = Number.isFinite(value) ? value : 0;
     setDraftItems((prev) =>
       prev.map((item, idx) =>
-        idx === index ? { ...item, [field]: value } : item
+        idx === index ? { ...item, [field]: safeValue } : item
       )
     );
   };
@@ -125,13 +161,20 @@ export default function OrganizationPortalPage() {
     e.preventDefault();
     if (!session?.user) return;
 
-    const validItems = draftItems.filter(
-      (it) => it.goodId > 0 && it.quantity > 0
+    const mergedMap = new Map<number, number>();
+    for (const it of draftItems) {
+      if (it.goodId > 0 && Number.isInteger(it.quantity) && it.quantity > 0) {
+        mergedMap.set(it.goodId, (mergedMap.get(it.goodId) || 0) + it.quantity);
+      }
+    }
+    const validItems = Array.from(mergedMap.entries()).map(
+      ([goodId, quantity]) => ({ goodId, quantity })
     );
+
     if (!selectedEventId || validItems.length === 0) {
       setBanner({
         type: "error",
-        text: "Please select an event and at least one item.",
+        text: "Please select a disaster event and enter at least one item with quantity > 0.",
       });
       return;
     }
@@ -149,7 +192,7 @@ export default function OrganizationPortalPage() {
       });
       setBanner({
         type: "success",
-        text: `Request #${res.requestId} submitted.`,
+        text: `Request #${res.requestId} submitted and queued for Steward approval.`,
       });
       setDraftItems([
         { goodId: data?.goods?.[0]?.goodId || 1, quantity: 100 },
@@ -190,6 +233,16 @@ export default function OrganizationPortalPage() {
     () => notifications.filter((n: any) => !n.isRead).length,
     [notifications]
   );
+
+  const requestedTotalsByGood = useMemo(() => {
+    const totals = new Map<number, number>();
+    for (const line of draftItems) {
+      if (line.goodId > 0 && line.quantity > 0) {
+        totals.set(line.goodId, (totals.get(line.goodId) || 0) + line.quantity);
+      }
+    }
+    return totals;
+  }, [draftItems]);
 
   const filteredRequests = useMemo(() => {
     return requests.filter((r: any) => {
@@ -263,6 +316,8 @@ export default function OrganizationPortalPage() {
     >
       {banner && (
         <div
+          role={banner.type === "error" ? "alert" : "status"}
+          aria-live="polite"
           className={`rounded-xl border px-4 py-3 flex items-center justify-between text-xs sm:text-sm font-medium ${
             banner.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-900"
@@ -278,6 +333,7 @@ export default function OrganizationPortalPage() {
             <span>{banner.text}</span>
           </div>
           <button
+            type="button"
             onClick={() => setBanner(null)}
             className="text-xs underline ml-4"
           >
@@ -344,10 +400,15 @@ export default function OrganizationPortalPage() {
 
             <form onSubmit={handleRequestSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label
+                  htmlFor="org-event-select"
+                  className="block text-xs font-medium text-slate-700 mb-1.5"
+                >
                   Disaster Event
                 </label>
                 <select
+                  id="org-event-select"
+                  name="eventId"
                   value={selectedEventId}
                   onChange={(e) => setSelectedEventId(Number(e.target.value))}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
@@ -355,7 +416,7 @@ export default function OrganizationPortalPage() {
                 >
                   {events.map((ev: any) => (
                     <option key={ev.eventId} value={ev.eventId}>
-                      {ev.eventName} ({ev.location})
+                      {ev.eventName} ({ev.location}) [{ev.status}]
                     </option>
                   ))}
                 </select>
@@ -380,64 +441,87 @@ export default function OrganizationPortalPage() {
                   const stockObj = inventory.find(
                     (i: any) => i.goodId === line.goodId
                   );
+                  const avail = stockObj?.currentStock ?? 0;
+                  const totalForGood = requestedTotalsByGood.get(line.goodId) || 0;
+                  const exceedsStock = totalForGood > avail;
                   return (
                     <div
                       key={index}
-                      className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center bg-slate-50 p-3 rounded-xl border border-slate-200/70"
+                      className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200/70"
                     >
-                      <div className="sm:col-span-7">
-                        <select
-                          value={line.goodId}
-                          onChange={(e) =>
-                            updateDraftLine(
-                              index,
-                              "goodId",
-                              Number(e.target.value)
-                            )
-                          }
-                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-                        >
-                          {goods.map((g: any) => (
-                            <option key={g.goodId} value={g.goodId}>
-                              {g.itemName} ({g.unitOfMeasure})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="sm:col-span-4">
-                        <div className="relative">
-                          <input
-                            type="number"
-                            min={1}
-                            max={1000000}
-                            value={line.quantity}
+                      <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                        <div className="sm:col-span-7">
+                          <select
+                            aria-label={`Requested item ${index + 1}`}
+                            value={line.goodId}
                             onChange={(e) =>
                               updateDraftLine(
                                 index,
-                                "quantity",
+                                "goodId",
                                 Number(e.target.value)
                               )
                             }
-                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 font-semibold"
-                            required
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 pointer-events-none">
-                            Avail: {stockObj?.currentStock ?? 0}
-                          </span>
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
+                          >
+                            {goods.map((g: any) => (
+                              <option key={g.goodId} value={g.goodId}>
+                                {g.itemName} ({g.unitOfMeasure})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-4">
+                          <div className="relative">
+                            <input
+                              aria-label={`Requested quantity for item ${index + 1}`}
+                              type="number"
+                              min={1}
+                              max={1000000}
+                              step={1}
+                              value={line.quantity || ""}
+                              onChange={(e) =>
+                                updateDraftLine(
+                                  index,
+                                  "quantity",
+                                  Number(e.target.value)
+                                )
+                              }
+                              className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 font-semibold ${
+                                exceedsStock
+                                  ? "border-amber-400"
+                                  : "border-slate-200"
+                              }`}
+                              required
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-slate-400 pointer-events-none">
+                              Avail: {avail}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="sm:col-span-1 flex justify-end">
+                          <button
+                            type="button"
+                            aria-label={`Remove requested item ${index + 1}`}
+                            onClick={() => removeDraftLine(index)}
+                            disabled={draftItems.length <= 1}
+                            className="rounded-lg p-2 text-slate-400 hover:text-rose-600 disabled:opacity-30"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
-
-                      <div className="sm:col-span-1 flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => removeDraftLine(index)}
-                          disabled={draftItems.length <= 1}
-                          className="rounded-lg p-2 text-slate-400 hover:text-rose-600 disabled:opacity-30"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+                      {exceedsStock && (
+                        <p className="text-[11px] font-medium text-amber-700 flex items-center gap-1 px-1">
+                          <AlertTriangle className="h-3 w-3 shrink-0" />
+                          <span>
+                            Requested quantity ({totalForGood}) exceeds current
+                            warehouse stock ({avail}). Approval may wait for
+                            replenishment.
+                          </span>
+                        </p>
+                      )}
                     </div>
                   );
                 })}
@@ -494,7 +578,8 @@ export default function OrganizationPortalPage() {
               <div className="relative">
                 <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search my requests"
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -504,6 +589,7 @@ export default function OrganizationPortalPage() {
               {["ALL", "Pending", "Approved", "Fulfilled"].map((st) => (
                 <button
                   key={st}
+                  type="button"
                   onClick={() => setStatusFilter(st)}
                   className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                     statusFilter === st
@@ -517,15 +603,20 @@ export default function OrganizationPortalPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="My relief requests table"
+            className="overflow-x-auto"
+          >
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold uppercase text-slate-400">
-                  <th className="py-3 px-4">ID</th>
-                  <th className="py-3 px-4">Disaster Event</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Items</th>
-                  <th className="py-3 px-4">Status</th>
+                  <th scope="col" className="py-3 px-4">ID</th>
+                  <th scope="col" className="py-3 px-4">Disaster Event</th>
+                  <th scope="col" className="py-3 px-4">Date</th>
+                  <th scope="col" className="py-3 px-4">Items</th>
+                  <th scope="col" className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -580,16 +671,21 @@ export default function OrganizationPortalPage() {
             </h2>
           </div>
 
-          <div className="overflow-x-auto">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Incoming deliveries table"
+            className="overflow-x-auto"
+          >
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold uppercase text-slate-400">
-                  <th className="py-3 px-4">ID</th>
-                  <th className="py-3 px-4">Request</th>
-                  <th className="py-3 px-4">Volunteer Driver</th>
-                  <th className="py-3 px-4">Destination</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Status</th>
+                  <th scope="col" className="py-3 px-4">ID</th>
+                  <th scope="col" className="py-3 px-4">Request</th>
+                  <th scope="col" className="py-3 px-4">Volunteer Driver</th>
+                  <th scope="col" className="py-3 px-4">Destination</th>
+                  <th scope="col" className="py-3 px-4">Date</th>
+                  <th scope="col" className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -662,6 +758,7 @@ export default function OrganizationPortalPage() {
                   </div>
                   {!n.isRead && (
                     <button
+                      type="button"
                       onClick={() =>
                         handleMarkNotificationRead(n.notificationId)
                       }

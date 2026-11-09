@@ -1,102 +1,94 @@
 # National Disaster Relief & Resource Distribution Management System (NDRDMS)
 
-> **IT 161 – Information Management: Class Project 1 (Phase I)**  
-> Operational Information System Development with PostgreSQL & JDBC
+> **IT 161 – Information Management: Class Project 1**  
+> Full-Stack Operational Information System with Next.js TypeScript, Java JDBC REST API, and Supabase Cloud PostgreSQL 15
 
 ---
 
 ## 📌 Project Overview
-The **National Disaster Relief & Resource Distribution Management System (NDRDMS)** is a comprehensive Java-based database application designed to support end-to-end humanitarian disaster coordination. It allows emergency response agencies, donors, local government units (LGUs), and field volunteers to manage disaster events, facilitate split-transaction donations, track community aid requests, and oversee logistics fleet dispatches.
+The **National Disaster Relief & Resource Distribution Management System (NDRDMS / DRRMS)** is a full-stack humanitarian relief coordination platform. It enables emergency operations administrators, citizens/donors, partner organizations/LGUs, and field volunteers to register disaster events, submit multi-item split-transaction pledges and relief requests, manage central warehouse inventory atomically, track fleet deliveries, and generate operational analytics reports.
 
-Behind the system is a fully normalized **Third Normal Form (3NF) relational database** hosted on **Supabase Cloud PostgreSQL**, interfaced natively using **Java Database Connectivity (JDBC)**.
+Behind both the **Next.js TypeScript web portal (`web/`)** and the **Java Swing desktop client (`disasterrelief.gui`)** is a normalized **Third Normal Form (3NF) PostgreSQL 15 database** hosted on **Supabase**, powered by a **Java JDBC HTTP REST API (`disasterrelief.api.ApiServer`)**.
+
+---
+
+## 🛠️ Full-Stack Architecture
+* **Frontend (Vercel):** Next.js 14 (App Router), React 18, TypeScript, Tailwind CSS (`web/`)
+* **Backend API (Render / Docker):** Java 17+ built-in `com.sun.net.httpserver.HttpServer` (`disasterrelief.api.ApiServer`, Port `8080`) using PostgreSQL JDBC (`lib/postgresql-42.7.3.jar`)
+* **Database (Supabase):** PostgreSQL 15 Pooler (Port `6543`)
+* **Resilient Proxy Fallback:** `web/app/api/proxy/[...path]/route.ts` forwards requests to `JAVA_API_URL` and automatically falls back to direct PostgreSQL (`pg`) execution if the Render Java container is cold-starting.
+* **Desktop Client (Optional):** Java Swing GUI (`disasterrelief.gui.main.Main`)
 
 ---
 
 ## 🚀 Key Features
-
-* **Role-Based Portals:**
-  * **Command Center / Admin Operations Portal:** Full system CRUD, real-time analytics dashboard, user account management, disaster zone monitoring, and operational reporting.
-  * **Citizen & Donor Portal:** Public transparency feed, multi-item donation builder, personal historical contribution tracking.
-  * **Organization & Partner Portal:** Community relief request submission, item request management, historical tracking.
-  * **Field Volunteer Portal:** Dispatch assignment tracking, availability status toggle, vehicle selection, emergency contact management.
-* **Database Normalization (3NF):**
-  * Solves multi-valued dependencies via split parent-child transaction tables (`Donation` $\rightarrow$ `DonationItem`, `ReliefRequest` $\rightarrow$ `RequestItem`).
-* **Complete CRUD Operations:**
-  * Real SQL `INSERT`, `SELECT`, `UPDATE`, and `DELETE` with cascade referential integrity across all major entities.
-* **Three (3) Meaningful Operational Reports:**
-  * **Disaster Relief Operational Summary:** Multi-table `JOIN` aggregating active and resolved disaster incidents with live donation, request, and delivery counts.
-  * **Warehouse Inventory & Replenishment Alert:** Tracks stock levels against donations/requests with automated threshold health alerts (`CRITICAL ALERT`, `LOW STOCK`, `SUFFICIENT`).
-  * **Donor Contribution & Impact Audit Ledger:** Audits individual and corporate donors, total contributions, events supported, and donated volume.
-* **Security & Input Validation:**
-  * SHA-256 Base64 password hashing.
-  * Parameterized `PreparedStatement`s across all DAOs to prevent SQL injection.
-  * Rigorous format validation for contact numbers, quantities, and required fields.
-
----
-
-## 🛠️ Technology Stack
-* **Language & Runtime:** Java (JDK 23 / 24)
-* **IDE:** Eclipse IDE / VS Code / IntelliJ IDEA
-* **Database Engine:** PostgreSQL 15 on Supabase Cloud
-* **Connectivity:** PostgreSQL JDBC Driver (`postgresql-42.7.3.jar`)
-* **Build System:** Apache Maven (`pom.xml`)
-* **GUI Framework:** Java Swing (Modern Flat Web / SaaS Design System with Custom Components)
+* **Role-Based Portals (`/admin`, `/donor`, `/organization`, `/volunteer`):**
+  * **Admin Operations Console:** Disaster registry CRUD, request approval with strict warehouse stock verification, donation verification & atomic stock credit, inventory audit adjustments, approved-request fleet dispatch, user directory, notifications, and 3 exportable/printable reports.
+  * **Citizen & Donor Portal:** Multi-item donation builder, live warehouse stock visibility, donation history filtering, disaster list, and notifications.
+  * **Organization & Partner Portal:** Community relief request builder with warehouse stock warnings, request tracking, incoming delivery status, and notifications.
+  * **Field Volunteer Portal:** Assigned delivery status workflow (`Pending` -> `In Transit` -> `Delivered`, automatically marking linked requests `Fulfilled`), vehicle/availability profile editing, and notifications.
+* **Database Normalization (3NF) & ACID Integrity:**
+  * Split parent-child tables (`Donation` → `DonationItem`, `ReliefRequest` → `RequestItem`).
+  * Transactional `FOR UPDATE` stock checks prevent negative warehouse inventory balances and non-Approved dispatches.
+* **Security & Validation:**
+  * SHA-256 Base64 password hashing and parameterized SQL (`PreparedStatement` / `$1..$n` bindings).
+  * Self-registration (`POST /api/auth/register`) restricted to `Donor`, `Organization`, and `Volunteer` roles with password minimum length checks.
 
 ---
 
 ## 🗄️ Database Architecture (13 Normalized Tables)
-
-1. `UserAccount`: Master user authentication and role mapping (SHA-256 password hash).
-2. `Donor`: Donor profile entity (Individual / Corporate classification).
+1. `UserAccount`: Master user authentication and role mapping (`Admin`, `Donor`, `Organization`, `Volunteer`, `Manager`).
+2. `Donor`: Donor profile entity (`Individual` / `Corporate`).
 3. `Organization`: Humanitarian agencies, partner NGOs, and LGUs.
-4. `Volunteer`: Field responders, transport modes, and availability states.
-5. `DisasterEvent`: Monitored natural disaster incidents and response zones.
+4. `Volunteer`: Field responders, vehicle types, and availability status.
+5. `DisasterEvent`: Monitored disaster incidents (`Active` / `Resolved`).
 6. `ReliefGood`: Master catalog of relief goods across categories.
-7. `Inventory`: Central warehouse stock tracking for relief items.
-8. `Donation`: Donation event transaction header.
-9. `DonationItem`: Transaction line-items mapping goods and quantities.
-10. `ReliefRequest`: Aid request header submitted by organizations.
-11. `RequestItem`: Transaction line-items for requested goods and quantities.
-12. `Delivery`: Logistics fleet dispatch linking volunteers to approved requests.
-13. `Notification`: Operational audit trail and alert notification messages.
+7. `Inventory`: Central warehouse stock levels linked to `ReliefGood`.
+8. `Donation`: Donation transaction header.
+9. `DonationItem`: Line-items mapping goods and donated quantities.
+10. `ReliefRequest`: Community aid request header submitted by organizations.
+11. `RequestItem`: Line-items for requested goods and quantities.
+12. `Delivery`: Fleet dispatch linking volunteers to `Approved` relief requests.
+13. `Notification`: Operational audit trail and user alert messages.
 
 ---
 
 ## 🔑 Login Credentials
 
-All sample accounts use the following credentials (also available in [`credentials.txt`](credentials.txt)):
+Sample accounts in Supabase (also listed in [`credentials.txt`](credentials.txt)):
 
-| Role | Username | Password | Default Portal |
+| Role | Username | Password | Portal |
 | :--- | :--- | :--- | :--- |
-| **System Administrator** | `admin` | `admin123` | Admin Operations Portal |
-| **Donor (Individual / Corporate)** | `donor1` to `donor10` | `pass123` | Citizen & Donor Portal |
-| **Field Volunteer** | `vol1` to `vol10` | `pass123` | Field Volunteer Portal |
-| **Partner Organization / LGU** | `org1` to `org10` | `pass123` | Organization & Partner Portal |
+| **System Administrator** | `admin` | `admin123` | `/admin` |
+| **Donor (Individual / Corporate)** | `donor1` to `donor10` | `pass123` | `/donor` |
+| **Partner Organization / LGU** | `org1` to `org10` | `pass123` | `/organization` |
+| **Field Volunteer** | `vol1` to `vol10` | `pass123` | `/volunteer` |
 
 ---
 
-## 🏃 Running the Application
+## 🏃 Running the Application Locally
 
-### Option A: In Eclipse IDE
-1. Open Eclipse IDE.
-2. Select **File > Import... > Existing Projects into Workspace** (or **Existing Maven Projects**).
-3. Browse and select the `DisasterReliefSystem` folder.
-4. Right-click the project, select **Run As > Java Application**.
-5. Choose `disasterrelief.gui.main.LoginFrame` as the main class.
+### Option 1: Full-Stack Web App + Java JDBC Server (Windows)
+1. Double-click **`start-all.bat`** (or run `run-api.bat` and `run-web.bat` in separate terminals).
+   * Java JDBC REST API launches on `http://localhost:8080`
+   * Next.js TypeScript portal launches on `http://localhost:3000` (runs `npm install` automatically if needed)
+   * Both `run-api.bat` and `run.bat` auto-detect JDK on `PATH` or Eclipse Embedded JDK / Adoptium installations.
+2. Open **`http://localhost:3000`** in your browser.
 
-### Option B: From Command Line / Terminal
-```bash
-# Compile with PostgreSQL JDBC driver
-javac -cp "lib/postgresql-42.7.3.jar" -d bin src/main/java/disasterrelief/**/*.java
-
-# Launch the Application
-java -cp "bin;lib/postgresql-42.7.3.jar" disasterrelief.gui.main.LoginFrame
-```
+### Option 2: Java Swing Desktop Client
+* Double-click **`run.bat`** (or in Eclipse IDE, right-click `disasterrelief.gui.main.Main` → **Run As → Java Application**).
 
 ---
 
-## 📄 Project Documentation & Defense Guide
-* Full documentation and presentation defense walkthrough is available in:
-  * [`IT161_Phase1_Project_Documentation_and_Defense_Guide.pdf`](IT161_Phase1_Project_Documentation_and_Defense_Guide.pdf)
-  * [`credentials.txt`](credentials.txt)
-  * [`src/main/resources/database/disaster_relief_schema_postgres.sql`](src/main/resources/database/disaster_relief_schema_postgres.sql)
+## ☁️ Cloud Deployment Overview
+* **Java API (Render):** Deploy the root repository using [`Dockerfile`](Dockerfile) and [`render.yaml`](render.yaml) on port `8080`.
+* **Web Frontend (Vercel):** Set the Root Directory to `web`, framework Next.js, and configure environment variables from [`web/.env.example`](web/.env.example):
+  * `JAVA_API_URL` (your Render URL, e.g. `https://drrms-java-jdbc-api.onrender.com`)
+  * `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` (Supabase Pooler connection)
+
+---
+
+## 📄 Reference Files
+* [`IT161_Phase1_Project_Documentation_and_Defense_Guide.pdf`](IT161_Phase1_Project_Documentation_and_Defense_Guide.pdf)
+* [`credentials.txt`](credentials.txt)
+* [`src/main/resources/database/disaster_relief_schema_postgres.sql`](src/main/resources/database/disaster_relief_schema_postgres.sql)

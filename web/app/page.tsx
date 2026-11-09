@@ -49,11 +49,15 @@ export default function LoginPage() {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
+    if (!username.trim() || !password) {
+      setErrorMsg("Username and password are required.");
+      return;
+    }
     setSubmitting(true);
     try {
       const session = await apiFetch<UserSession>("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password }),
       });
       saveSession(session);
       routeByRole(session);
@@ -68,6 +72,7 @@ export default function LoginPage() {
     setUsername(demoUser);
     setPassword(demoPass);
     setErrorMsg("");
+    setSuccessMsg("");
     setSubmitting(true);
     try {
       const session = await apiFetch<UserSession>("/api/auth/login", {
@@ -87,26 +92,33 @@ export default function LoginPage() {
     e.preventDefault();
     setErrorMsg("");
     setSuccessMsg("");
+    if (regPassword.length < 4) {
+      setErrorMsg("Password must be at least 4 characters long.");
+      return;
+    }
     setSubmitting(true);
     try {
       await apiFetch("/api/auth/register", {
         method: "POST",
         body: JSON.stringify({
-          username: regUsername,
+          username: regUsername.trim(),
           password: regPassword,
-          fullName: regFullName,
-          contactInfo: regContactInfo,
+          fullName: regFullName.trim(),
+          contactInfo: regContactInfo.trim(),
           role: regRole,
           donorType: regDonorType,
-          orgName: regOrgName || regFullName,
-          location: regLocation,
+          orgName: (regOrgName || regFullName).trim(),
+          location: regLocation.trim(),
           vehicleType: regVehicleType,
         }),
       });
       setSuccessMsg("Account created! Signing you in...");
       const session = await apiFetch<UserSession>("/api/auth/login", {
         method: "POST",
-        body: JSON.stringify({ username: regUsername, password: regPassword }),
+        body: JSON.stringify({
+          username: regUsername.trim(),
+          password: regPassword,
+        }),
       });
       saveSession(session);
       routeByRole(session);
@@ -177,14 +189,22 @@ export default function LoginPage() {
           </div>
 
           {errorMsg && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2">
+            <div
+              role="alert"
+              aria-live="assertive"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
+            >
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2">
+            <div
+              role="status"
+              aria-live="polite"
+              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
+            >
               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
               <span>{successMsg}</span>
             </div>
@@ -193,28 +213,49 @@ export default function LoginPage() {
           {mode === "login" ? (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label
+                  htmlFor="login-username"
+                  className="block text-xs font-medium text-slate-700 mb-1.5"
+                >
                   Username
                 </label>
                 <input
+                  id="login-username"
+                  name="username"
                   type="text"
                   required
+                  autoComplete="username"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (errorMsg) setErrorMsg("");
+                  }}
                   placeholder="Enter username"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label
+                  htmlFor="login-password"
+                  className="block text-xs font-medium text-slate-700 mb-1.5"
+                >
                   Password
                 </label>
                 <input
+                  id="login-password"
+                  name="password"
                   type="password"
                   required
+                  autoComplete="current-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (errorMsg) setErrorMsg("");
+                  }}
                   placeholder="Enter password"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none transition"
                 />
@@ -232,10 +273,15 @@ export default function LoginPage() {
           ) : (
             <form onSubmit={handleRegister} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
+                <label
+                  htmlFor="reg-role"
+                  className="block text-xs font-medium text-slate-700 mb-1"
+                >
                   Role
                 </label>
                 <select
+                  id="reg-role"
+                  name="role"
                   value={regRole}
                   onChange={(e) => setRegRole(e.target.value as any)}
                   className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs font-medium bg-white"
@@ -248,49 +294,83 @@ export default function LoginPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label
+                    htmlFor="reg-username"
+                    className="block text-xs font-medium text-slate-700 mb-1"
+                  >
                     Username
                   </label>
                   <input
+                    id="reg-username"
+                    name="username"
                     type="text"
                     required
+                    autoComplete="username"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck={false}
                     value={regUsername}
                     onChange={(e) => setRegUsername(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label
+                    htmlFor="reg-password"
+                    className="block text-xs font-medium text-slate-700 mb-1"
+                  >
                     Password
                   </label>
                   <input
+                    id="reg-password"
+                    name="password"
                     type="password"
                     required
+                    minLength={4}
+                    autoComplete="new-password"
+                    aria-describedby="reg-password-help"
                     value={regPassword}
                     onChange={(e) => setRegPassword(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
                   />
+                  <span
+                    id="reg-password-help"
+                    className="text-[10px] text-slate-400"
+                  >
+                    At least 4 characters.
+                  </span>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label
+                    htmlFor="reg-fullname"
+                    className="block text-xs font-medium text-slate-700 mb-1"
+                  >
                     Full Name
                   </label>
                   <input
+                    id="reg-fullname"
+                    name="fullName"
                     type="text"
                     required
+                    autoComplete="name"
                     value={regFullName}
                     onChange={(e) => setRegFullName(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label
+                    htmlFor="reg-contact"
+                    className="block text-xs font-medium text-slate-700 mb-1"
+                  >
                     Phone / Email
                   </label>
                   <input
+                    id="reg-contact"
+                    name="contactInfo"
                     type="text"
                     required
                     value={regContactInfo}
@@ -302,10 +382,15 @@ export default function LoginPage() {
 
               {regRole === "Donor" && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label
+                    htmlFor="reg-donor-type"
+                    className="block text-xs font-medium text-slate-700 mb-1"
+                  >
                     Donor Type
                   </label>
                   <select
+                    id="reg-donor-type"
+                    name="donorType"
                     value={regDonorType}
                     onChange={(e) => setRegDonorType(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs bg-white"
@@ -319,10 +404,15 @@ export default function LoginPage() {
               {regRole === "Organization" && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                    <label
+                      htmlFor="reg-org-name"
+                      className="block text-xs font-medium text-slate-700 mb-1"
+                    >
                       Organization Name
                     </label>
                     <input
+                      id="reg-org-name"
+                      name="orgName"
                       type="text"
                       required
                       value={regOrgName}
@@ -331,10 +421,15 @@ export default function LoginPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-700 mb-1">
+                    <label
+                      htmlFor="reg-location"
+                      className="block text-xs font-medium text-slate-700 mb-1"
+                    >
                       Location
                     </label>
                     <input
+                      id="reg-location"
+                      name="location"
                       type="text"
                       required
                       value={regLocation}
@@ -347,10 +442,15 @@ export default function LoginPage() {
 
               {regRole === "Volunteer" && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                  <label
+                    htmlFor="reg-vehicle"
+                    className="block text-xs font-medium text-slate-700 mb-1"
+                  >
                     Vehicle
                   </label>
                   <select
+                    id="reg-vehicle"
+                    name="vehicleType"
                     value={regVehicleType}
                     onChange={(e) => setRegVehicleType(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs bg-white"
@@ -382,8 +482,9 @@ export default function LoginPage() {
             <div className="grid grid-cols-4 gap-2">
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => handleQuickDemo("admin", "admin123")}
-                className="flex flex-col items-center gap-1 rounded-xl border border-slate-200/80 hover:border-blue-500 hover:bg-blue-50/50 py-2 px-1 transition"
+                className="flex flex-col items-center gap-1 rounded-xl border border-slate-200/80 hover:border-blue-500 hover:bg-blue-50/50 disabled:opacity-50 py-2 px-1 transition"
               >
                 <ShieldCheck className="h-4 w-4 text-blue-600" />
                 <span className="text-[11px] font-semibold text-slate-700">
@@ -393,8 +494,9 @@ export default function LoginPage() {
 
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => handleQuickDemo("donor1", "pass123")}
-                className="flex flex-col items-center gap-1 rounded-xl border border-slate-200/80 hover:border-rose-500 hover:bg-rose-50/50 py-2 px-1 transition"
+                className="flex flex-col items-center gap-1 rounded-xl border border-slate-200/80 hover:border-rose-500 hover:bg-rose-50/50 disabled:opacity-50 py-2 px-1 transition"
               >
                 <HeartHandshake className="h-4 w-4 text-rose-500" />
                 <span className="text-[11px] font-semibold text-slate-700">
@@ -404,8 +506,9 @@ export default function LoginPage() {
 
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => handleQuickDemo("org1", "pass123")}
-                className="flex flex-col items-center gap-1 rounded-xl border border-slate-200/80 hover:border-orange-500 hover:bg-orange-50/50 py-2 px-1 transition"
+                className="flex flex-col items-center gap-1 rounded-xl border border-slate-200/80 hover:border-orange-500 hover:bg-orange-50/50 disabled:opacity-50 py-2 px-1 transition"
               >
                 <Building2 className="h-4 w-4 text-orange-500" />
                 <span className="text-[11px] font-semibold text-slate-700">
@@ -415,8 +518,9 @@ export default function LoginPage() {
 
               <button
                 type="button"
+                disabled={submitting}
                 onClick={() => handleQuickDemo("vol1", "pass123")}
-                className="flex flex-col items-center gap-1 rounded-xl border border-slate-200/80 hover:border-emerald-500 hover:bg-emerald-50/50 py-2 px-1 transition"
+                className="flex flex-col items-center gap-1 rounded-xl border border-slate-200/80 hover:border-emerald-500 hover:bg-emerald-50/50 disabled:opacity-50 py-2 px-1 transition"
               >
                 <Truck className="h-4 w-4 text-emerald-600" />
                 <span className="text-[11px] font-semibold text-slate-700">

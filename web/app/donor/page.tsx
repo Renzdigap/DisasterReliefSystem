@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   HeartHandshake,
@@ -12,7 +18,6 @@ import {
   Plus,
   Trash2,
   CheckCircle2,
-  Clock,
   MapPin,
   Boxes,
   Check,
@@ -31,6 +36,15 @@ import {
 interface LineItemDraft {
   goodId: number;
   quantity: number;
+}
+
+function getPortalRouteForRole(role?: string): string {
+  const r = (role || "").toLowerCase();
+  if (r === "admin" || r === "manager") return "/admin";
+  if (r === "donor") return "/donor";
+  if (r === "organization") return "/organization";
+  if (r === "volunteer") return "/volunteer";
+  return "/";
 }
 
 export default function DonorPortalPage() {
@@ -52,6 +66,7 @@ export default function DonorPortalPage() {
     { goodId: 1, quantity: 50 },
   ]);
   const [submitting, setSubmitting] = useState(false);
+  const hasInitDraftRef = useRef(false);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -63,6 +78,10 @@ export default function DonorPortalPage() {
         const cached = getCachedData<any>(cacheKey);
         if (cached) {
           setData(cached);
+          if (!hasInitDraftRef.current && cached.goods?.length > 0) {
+            hasInitDraftRef.current = true;
+            setDraftItems([{ goodId: cached.goods[0].goodId, quantity: 50 }]);
+          }
           setLoading(false);
         }
       } else {
@@ -75,11 +94,8 @@ export default function DonorPortalPage() {
         );
         setData(fresh);
         setCachedData(cacheKey, fresh);
-        if (
-          fresh.goods?.length > 0 &&
-          draftItems.length === 1 &&
-          draftItems[0].goodId === 1
-        ) {
+        if (!hasInitDraftRef.current && fresh.goods?.length > 0) {
+          hasInitDraftRef.current = true;
           setDraftItems([{ goodId: fresh.goods[0].goodId, quantity: 50 }]);
         }
       } catch (err: any) {
@@ -92,13 +108,18 @@ export default function DonorPortalPage() {
         setRefreshing(false);
       }
     },
-    [draftItems]
+    []
   );
 
   useEffect(() => {
     const saved = getSavedSession();
     if (!saved || !saved.user) {
       router.replace("/");
+      return;
+    }
+    const role = (saved.user.role || "").toLowerCase();
+    if (role !== "donor") {
+      router.replace(getPortalRouteForRole(role));
       return;
     }
     setSession(saved);
@@ -120,9 +141,10 @@ export default function DonorPortalPage() {
     field: "goodId" | "quantity",
     value: number
   ) => {
+    const safeValue = Number.isFinite(value) ? value : 0;
     setDraftItems((prev) =>
       prev.map((item, idx) =>
-        idx === index ? { ...item, [field]: value } : item
+        idx === index ? { ...item, [field]: safeValue } : item
       )
     );
   };
@@ -131,13 +153,20 @@ export default function DonorPortalPage() {
     e.preventDefault();
     if (!session?.user) return;
 
-    const validItems = draftItems.filter(
-      (it) => it.goodId > 0 && it.quantity > 0
+    const mergedMap = new Map<number, number>();
+    for (const it of draftItems) {
+      if (it.goodId > 0 && Number.isInteger(it.quantity) && it.quantity > 0) {
+        mergedMap.set(it.goodId, (mergedMap.get(it.goodId) || 0) + it.quantity);
+      }
+    }
+    const validItems = Array.from(mergedMap.entries()).map(
+      ([goodId, quantity]) => ({ goodId, quantity })
     );
+
     if (validItems.length === 0) {
       setBanner({
         type: "error",
-        text: "Please add at least one item.",
+        text: "Please enter at least one item with a valid quantity greater than 0.",
       });
       return;
     }
@@ -155,7 +184,7 @@ export default function DonorPortalPage() {
       });
       setBanner({
         type: "success",
-        text: `Donation #${res.donationId} submitted.`,
+        text: `Donation #${res.donationId} submitted and awaiting Steward verification.`,
       });
       setDraftItems([
         { goodId: data?.goods?.[0]?.goodId || 1, quantity: 50 },
@@ -270,6 +299,8 @@ export default function DonorPortalPage() {
     >
       {banner && (
         <div
+          role={banner.type === "error" ? "alert" : "status"}
+          aria-live="polite"
           className={`rounded-xl border px-4 py-3 flex items-center justify-between text-xs sm:text-sm font-medium ${
             banner.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-900"
@@ -285,6 +316,7 @@ export default function DonorPortalPage() {
             <span>{banner.text}</span>
           </div>
           <button
+            type="button"
             onClick={() => setBanner(null)}
             className="text-xs underline ml-4"
           >
@@ -346,10 +378,15 @@ export default function DonorPortalPage() {
 
             <form onSubmit={handlePledgeSubmit} className="space-y-5">
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1.5">
+                <label
+                  htmlFor="donor-event-select"
+                  className="block text-xs font-medium text-slate-700 mb-1.5"
+                >
                   Disaster Event
                 </label>
                 <select
+                  id="donor-event-select"
+                  name="eventId"
                   value={selectedEventId}
                   onChange={(e) => setSelectedEventId(Number(e.target.value))}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
@@ -357,7 +394,7 @@ export default function DonorPortalPage() {
                   <option value={0}>General Relief Fund</option>
                   {events.map((ev: any) => (
                     <option key={ev.eventId} value={ev.eventId}>
-                      {ev.eventName} ({ev.location})
+                      {ev.eventName} ({ev.location}) [{ev.status}]
                     </option>
                   ))}
                 </select>
@@ -389,6 +426,7 @@ export default function DonorPortalPage() {
                     >
                       <div className="sm:col-span-7">
                         <select
+                          aria-label={`Donation item ${index + 1}`}
                           value={line.goodId}
                           onChange={(e) =>
                             updateDraftLine(
@@ -410,10 +448,12 @@ export default function DonorPortalPage() {
                       <div className="sm:col-span-4">
                         <div className="relative">
                           <input
+                            aria-label={`Quantity for item ${index + 1}`}
                             type="number"
                             min={1}
                             max={1000000}
-                            value={line.quantity}
+                            step={1}
+                            value={line.quantity || ""}
                             onChange={(e) =>
                               updateDraftLine(
                                 index,
@@ -433,6 +473,7 @@ export default function DonorPortalPage() {
                       <div className="sm:col-span-1 flex justify-end">
                         <button
                           type="button"
+                          aria-label={`Remove item ${index + 1}`}
                           onClick={() => removeDraftLine(index)}
                           disabled={draftItems.length <= 1}
                           className="rounded-lg p-2 text-slate-400 hover:text-rose-600 disabled:opacity-30"
@@ -508,7 +549,8 @@ export default function DonorPortalPage() {
               <div className="relative">
                 <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search my donations"
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -519,6 +561,7 @@ export default function DonorPortalPage() {
               {["ALL", "Pending", "Approved"].map((st) => (
                 <button
                   key={st}
+                  type="button"
                   onClick={() => setStatusFilter(st)}
                   className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                     statusFilter === st
@@ -532,15 +575,20 @@ export default function DonorPortalPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="My donations table"
+            className="overflow-x-auto"
+          >
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold uppercase text-slate-400">
-                  <th className="py-3 px-4">ID</th>
-                  <th className="py-3 px-4">Disaster Event</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Items</th>
-                  <th className="py-3 px-4">Status</th>
+                  <th scope="col" className="py-3 px-4">ID</th>
+                  <th scope="col" className="py-3 px-4">Disaster Event</th>
+                  <th scope="col" className="py-3 px-4">Date</th>
+                  <th scope="col" className="py-3 px-4">Items</th>
+                  <th scope="col" className="py-3 px-4">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -611,6 +659,7 @@ export default function DonorPortalPage() {
 
               <div className="pt-3 border-t border-slate-100 flex justify-end">
                 <button
+                  type="button"
                   onClick={() => {
                     setSelectedEventId(ev.eventId);
                     setActiveTab("pledge");
@@ -658,6 +707,7 @@ export default function DonorPortalPage() {
                   </div>
                   {!n.isRead && (
                     <button
+                      type="button"
                       onClick={() =>
                         handleMarkNotificationRead(n.notificationId)
                       }

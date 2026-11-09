@@ -6,11 +6,11 @@ import java.sql.SQLException;
 
 public class DatabaseConnection {
     // Supports environment variables for Render/production deployment with fallback to Supabase Pooler
-    private static final String HOST = getEnvOrDefault("DB_HOST", "aws-0-ap-northeast-2.pooler.supabase.com");
+    private static final String HOST = getEnvOrDefault("DB_HOST", "aws-0-ap-south-1.pooler.supabase.com");
     private static final String PORT = getEnvOrDefault("DB_PORT", "6543");
     private static final String DB_NAME = getEnvOrDefault("DB_NAME", "postgres");
-    private static final String USER = getEnvOrDefault("DB_USER", "postgres.jkhvrohsrihmkyxzrhyw");
-    private static final String PASS = getEnvOrDefault("DB_PASS", "DisasterReliefSystem");
+    private static final String USER = getEnvOrDefault("DB_USER", "postgres.sfcynookqsnhuamosvvq");
+    private static final String PASS = getEnvOrDefault("DB_PASS", "renzAldrean");
 
     // prepareThreshold=0 ensures compatibility with Supabase PgBouncer Transaction Pooler on port 6543
     private static final String URL = "jdbc:postgresql://" + HOST + ":" + PORT + "/" + DB_NAME + "?prepareThreshold=0&sslmode=require";

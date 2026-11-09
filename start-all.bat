@@ -1,5 +1,6 @@
 @echo off
 title Launch DRRMS (Local Web + Java JDBC)
+cd /d "%~dp0"
 echo ==================================================================
 echo   Disaster Risk Reduction and Relief Management System (DRRMS)
 echo   Launching Local Java JDBC REST Server + Next.js Web Portal...

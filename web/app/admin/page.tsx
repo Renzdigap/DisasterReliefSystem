@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
@@ -14,12 +14,15 @@ import {
   CheckCircle2,
   Printer,
   Download,
-  RefreshCw,
   Users,
   Bell,
+  Trash2,
+  Check,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
-import { PortalShellSkeleton } from "@/components/SkeletonUI";
+import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
 import {
   apiFetch,
   getCachedData,
@@ -36,21 +39,96 @@ type AdminTab =
   | "inventory"
   | "deliveries"
   | "stakeholders"
+  | "notifications"
   | "reports";
+
+type DeleteTarget =
+  | { kind: "event"; id: number; label: string }
+  | { kind: "request"; id: number; label: string }
+  | { kind: "donation"; id: number; label: string }
+  | { kind: "inventory"; id: number; label: string }
+  | { kind: "delivery"; id: number; label: string };
+
+const PAGE_SIZE = 7;
+
+function getPortalRouteForRole(role?: string): string {
+  const r = (role || "").toLowerCase();
+  if (r === "admin" || r === "manager") return "/admin";
+  if (r === "donor") return "/donor";
+  if (r === "organization") return "/organization";
+  if (r === "volunteer") return "/volunteer";
+  return "/";
+}
+
+function PaginationControls({
+  totalItems,
+  page,
+  pageSize,
+  onPageChange,
+}: {
+  totalItems: number;
+  page: number;
+  pageSize: number;
+  onPageChange: (nextPage: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  if (totalItems === 0) return null;
+
+  const start = (safePage - 1) * pageSize + 1;
+  const end = Math.min(totalItems, safePage * pageSize);
+
+  return (
+    <div className="px-4 py-3 border-t border-slate-200 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-600">
+      <span>
+        Showing <strong>{start}</strong>–<strong>{end}</strong> of{" "}
+        <strong>{totalItems}</strong> records
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onPageChange(safePage - 1)}
+          disabled={safePage <= 1}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 px-2.5 py-1 font-semibold text-slate-700"
+        >
+          <ChevronLeft className="h-3.5 w-3.5" />
+          Prev
+        </button>
+        <span className="font-semibold text-slate-700 px-1">
+          Page {safePage} of {totalPages}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange(safePage + 1)}
+          disabled={safePage >= totalPages}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 disabled:opacity-40 px-2.5 py-1 font-semibold text-slate-700"
+        >
+          Next
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function AdminPortalPage() {
   const router = useRouter();
   const [session, setSession] = useState<UserSession | null>(null);
-  const [data, setData] = useState<any>(() => getCachedData("admin_overview"));
-  const [loading, setLoading] = useState<boolean>(
-    () => !getCachedData("admin_overview")
-  );
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 7;
+
+  // Action busy key + toast banner
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Forms state
   const [newEventName, setNewEventName] = useState("");
@@ -59,49 +137,150 @@ export default function AdminPortalPage() {
   const [newItemCategory, setNewItemCategory] = useState("Food");
   const [newItemUnit, setNewItemUnit] = useState("Packs");
   const [newItemStock, setNewItemStock] = useState(500);
+  const [stockEdits, setStockEdits] = useState<Record<number, string>>({});
   const [dispatchReqId, setDispatchReqId] = useState<number>(0);
   const [dispatchVolId, setDispatchVolId] = useState<number>(0);
   const [activeReport, setActiveReport] = useState<
     "operationalSummary" | "inventoryHealth" | "donorImpact"
   >("operationalSummary");
-  const [toast, setToast] = useState("");
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    setTimeout(() => setToast(""), 4000);
-  };
+  // Delete confirmation modal
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const pendingDeleteRef = useRef<DeleteTarget | null>(null);
+  const confirmDialogRef = useRef<HTMLDialogElement | null>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement | null>(null);
 
-  const refreshData = async () => {
-    setSyncing(true);
-    try {
-      const fresh = await apiFetch("/api/admin/overview");
-      setData(fresh);
-      setCachedData("admin_overview", fresh);
-    } catch (e: any) {
-      showToast(e.message || "Sync failed");
-    } finally {
-      setLoading(false);
-      setSyncing(false);
-    }
-  };
+  const showToast = useCallback(
+    (text: string, type: "success" | "error" = "success") => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      setToast({ type, text });
+      toastTimerRef.current = setTimeout(() => {
+        setToast(null);
+      }, 5000);
+    },
+    []
+  );
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  const refreshData = useCallback(
+    async (isBackground = false) => {
+      if (!isBackground) {
+        const cached = getCachedData<any>("admin_overview");
+        if (cached) {
+          setData(cached);
+          setLoading(false);
+        }
+      } else {
+        setSyncing(true);
+      }
+
+      try {
+        const fresh = await apiFetch<any>("/api/admin/overview");
+        setData(fresh);
+        setCachedData("admin_overview", fresh);
+      } catch (e: any) {
+        showToast(e.message || "Failed to load admin overview.", "error");
+      } finally {
+        setLoading(false);
+        setSyncing(false);
+      }
+    },
+    [showToast]
+  );
 
   useEffect(() => {
     const s = getSavedSession();
-    if (!s) {
-      router.push("/");
+    if (!s || !s.user) {
+      router.replace("/");
+      return;
+    }
+    const role = (s.user.role || "").toLowerCase();
+    if (role !== "admin" && role !== "manager") {
+      router.replace(getPortalRouteForRole(role));
       return;
     }
     setSession(s);
-    refreshData();
-  }, []);
+    refreshData(false);
+  }, [router, refreshData]);
 
   useEffect(() => {
     setPage(1);
   }, [activeTab, searchQuery, statusFilter]);
 
-  if (loading && !data) {
-    return <PortalShellSkeleton title="Loading Admin Operations Console" />;
-  }
+  const executeDeleteTarget = useCallback(
+    async (target: DeleteTarget) => {
+      const key = `delete-${target.kind}-${target.id}`;
+      setBusyKey(key);
+      try {
+        if (target.kind === "event") {
+          await apiFetch(`/api/events?id=${target.id}`, { method: "DELETE" });
+          showToast(`Deleted disaster event #${target.id}.`);
+        } else if (target.kind === "request") {
+          await apiFetch(`/api/requests?id=${target.id}`, { method: "DELETE" });
+          showToast(`Deleted relief request #${target.id}.`);
+        } else if (target.kind === "donation") {
+          await apiFetch(`/api/donations?id=${target.id}`, { method: "DELETE" });
+          showToast(`Deleted donation #${target.id}.`);
+        } else if (target.kind === "inventory") {
+          await apiFetch(`/api/inventory?id=${target.id}`, {
+            method: "DELETE",
+          });
+          showToast(`Deleted ${target.label} from catalog.`);
+        } else if (target.kind === "delivery") {
+          await apiFetch(`/api/deliveries?id=${target.id}`, {
+            method: "DELETE",
+          });
+          showToast(`Deleted delivery #${target.id}.`);
+        }
+        await refreshData(true);
+      } catch (err: any) {
+        showToast(err.message || "Delete failed.", "error");
+      } finally {
+        setBusyKey(null);
+      }
+    },
+    [refreshData, showToast]
+  );
+
+  // Hook native <dialog> close event reliably in React 18
+  useEffect(() => {
+    const dialog = confirmDialogRef.current;
+    if (!dialog) return;
+
+    const handleNativeClose = () => {
+      const action = dialog.returnValue;
+      dialog.returnValue = "";
+      const target = pendingDeleteRef.current;
+      pendingDeleteRef.current = null;
+      setDeleteTarget(null);
+      if (action === "delete" && target) {
+        void executeDeleteTarget(target);
+      }
+    };
+
+    dialog.addEventListener("close", handleNativeClose);
+    return () => {
+      dialog.removeEventListener("close", handleNativeClose);
+    };
+  }, [executeDeleteTarget, loading]);
+
+  const openDeleteConfirm = (target: DeleteTarget) => {
+    pendingDeleteRef.current = target;
+    setDeleteTarget(target);
+    const dialog = confirmDialogRef.current;
+    if (dialog) {
+      dialog.returnValue = "";
+      if (!dialog.open) {
+        dialog.showModal();
+      }
+      cancelBtnRef.current?.focus();
+    }
+  };
 
   const metrics = data?.metrics || {};
   const events: any[] = data?.events || [];
@@ -112,115 +291,348 @@ export default function AdminPortalPage() {
   const volunteers: any[] = data?.volunteers || [];
   const organizations: any[] = data?.organizations || [];
   const donors: any[] = data?.donors || [];
+  const users: any[] = data?.users || [];
+  const notifications: any[] = data?.notifications || [];
   const reports = data?.reports || {};
 
-  // Actions
+  const unreadCount = useMemo(
+    () => notifications.filter((n) => !n.isRead).length,
+    [notifications]
+  );
+
+  const pendingRequestsList = useMemo(
+    () => requests.filter((r) => r.status === "Pending"),
+    [requests]
+  );
+
+  const approvedRequestsForDispatch = useMemo(
+    () => requests.filter((r) => r.status === "Approved"),
+    [requests]
+  );
+
+  const filteredEvents = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return events.filter(
+      (ev) =>
+        (statusFilter === "ALL" || ev.status === statusFilter) &&
+        (!q ||
+          (ev.eventName || "").toLowerCase().includes(q) ||
+          (ev.location || "").toLowerCase().includes(q) ||
+          String(ev.eventId).includes(q))
+    );
+  }, [events, statusFilter, searchQuery]);
+
+  const filteredRequests = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return requests.filter(
+      (r) =>
+        (statusFilter === "ALL" || r.status === statusFilter) &&
+        (!q ||
+          String(r.requestId).includes(q) ||
+          (r.orgName || "").toLowerCase().includes(q) ||
+          (r.eventName || "").toLowerCase().includes(q))
+    );
+  }, [requests, statusFilter, searchQuery]);
+
+  const filteredDonations = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return donations.filter(
+      (d) =>
+        (statusFilter === "ALL" || d.status === statusFilter) &&
+        (!q ||
+          String(d.donationId).includes(q) ||
+          (d.donorName || "").toLowerCase().includes(q) ||
+          (d.eventName || "").toLowerCase().includes(q))
+    );
+  }, [donations, statusFilter, searchQuery]);
+
+  const filteredInventory = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return inventory.filter((inv) => {
+      const health =
+        inv.currentStock <= 200
+          ? "CRITICAL ALERT"
+          : inv.currentStock <= 1000
+          ? "LOW STOCK"
+          : "SUFFICIENT";
+      const matchesStatus = statusFilter === "ALL" || health === statusFilter;
+      const matchesSearch =
+        !q ||
+        String(inv.goodId).includes(q) ||
+        (inv.itemName || "").toLowerCase().includes(q) ||
+        (inv.category || "").toLowerCase().includes(q);
+      return matchesStatus && matchesSearch;
+    });
+  }, [inventory, statusFilter, searchQuery]);
+
+  const filteredDeliveries = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return deliveries.filter(
+      (d) =>
+        (statusFilter === "ALL" || d.deliveryStatus === statusFilter) &&
+        (!q ||
+          String(d.deliveryId).includes(q) ||
+          String(d.requestId).includes(q) ||
+          (d.orgName || "").toLowerCase().includes(q) ||
+          (d.location || "").toLowerCase().includes(q) ||
+          (d.volunteerName || "").toLowerCase().includes(q))
+    );
+  }, [deliveries, statusFilter, searchQuery]);
+
+  const filteredUsers = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return users.filter(
+      (u) =>
+        (statusFilter === "ALL" ||
+          (u.role || "").toLowerCase() === statusFilter.toLowerCase()) &&
+        (!q ||
+          String(u.userId).includes(q) ||
+          (u.fullName || "").toLowerCase().includes(q) ||
+          (u.username || "").toLowerCase().includes(q) ||
+          (u.contactInfo || "").toLowerCase().includes(q))
+    );
+  }, [users, statusFilter, searchQuery]);
+
+  if (loading && !data) {
+    return <PortalShellSkeleton title="Loading Admin Operations Console" />;
+  }
+
+  // Action handlers with strict try/catch and busy guards
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newEventName || !newEventLocation) return;
-    await apiFetch("/api/events", {
-      method: "POST",
-      body: JSON.stringify({
-        eventName: newEventName,
-        location: newEventLocation,
-        status: "Active",
-      }),
-    });
-    setNewEventName("");
-    setNewEventLocation("");
-    showToast("Master Disaster Event registered.");
-    refreshData();
+    const name = newEventName.trim();
+    const loc = newEventLocation.trim();
+    if (!name || !loc) {
+      showToast("Event name and affected location are required.", "error");
+      return;
+    }
+    setBusyKey("create-event");
+    try {
+      await apiFetch("/api/events", {
+        method: "POST",
+        body: JSON.stringify({
+          eventName: name,
+          location: loc,
+          status: "Active",
+        }),
+      });
+      setNewEventName("");
+      setNewEventLocation("");
+      showToast("Master Disaster Event registered.");
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to register event.", "error");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const handleToggleEventStatus = async (ev: any) => {
     const next = ev.status === "Active" ? "Resolved" : "Active";
-    await apiFetch("/api/events", {
-      method: "PUT",
-      body: JSON.stringify({ eventId: ev.eventId, status: next }),
-    });
-    showToast(`Event #${ev.eventId} transitioned to ${next}.`);
-    refreshData();
+    setBusyKey(`event-${ev.eventId}`);
+    try {
+      await apiFetch("/api/events", {
+        method: "PUT",
+        body: JSON.stringify({ eventId: ev.eventId, status: next }),
+      });
+      showToast(`Event #${ev.eventId} transitioned to ${next}.`);
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to update event status.", "error");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const handleUpdateRequestStatus = async (reqId: number, status: string) => {
-    await apiFetch("/api/requests", {
-      method: "PUT",
-      body: JSON.stringify({ requestId: reqId, status }),
-    });
-    showToast(
-      `Request #${reqId} marked ${status} (Warehouse inventory synchronized atomically).`
-    );
-    refreshData();
+    setBusyKey(`request-${reqId}`);
+    try {
+      await apiFetch("/api/requests", {
+        method: "PUT",
+        body: JSON.stringify({ requestId: reqId, status }),
+      });
+      showToast(
+        `Request #${reqId} marked ${status} (Warehouse inventory synchronized atomically).`
+      );
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to update relief request.", "error");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const handleUpdateDonationStatus = async (donId: number, status: string) => {
-    await apiFetch("/api/donations", {
-      method: "PUT",
-      body: JSON.stringify({ donationId: donId, status }),
-    });
-    showToast(
-      `Donation #${donId} marked ${status} (Warehouse stock credited atomically).`
-    );
-    refreshData();
+    setBusyKey(`donation-${donId}`);
+    try {
+      await apiFetch("/api/donations", {
+        method: "PUT",
+        body: JSON.stringify({ donationId: donId, status }),
+      });
+      showToast(
+        `Donation #${donId} marked ${status} (Warehouse stock credited atomically).`
+      );
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to verify donation.", "error");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const handleAddInventoryItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemName) return;
-    await apiFetch("/api/inventory", {
-      method: "POST",
-      body: JSON.stringify({
-        itemName: newItemName,
-        category: newItemCategory,
-        unitOfMeasure: newItemUnit,
-        currentStock: Number(newItemStock),
-      }),
-    });
-    setNewItemName("");
-    showToast("Master ReliefGood & Initial Stock added.");
-    refreshData();
+    const itemName = newItemName.trim();
+    const unit = newItemUnit.trim();
+    const stock = Number(newItemStock);
+    if (!itemName || !unit) {
+      showToast("Commodity name and unit of measure are required.", "error");
+      return;
+    }
+    if (!Number.isInteger(stock) || stock < 0) {
+      showToast("Opening stock must be a non-negative integer.", "error");
+      return;
+    }
+    setBusyKey("create-inventory");
+    try {
+      await apiFetch("/api/inventory", {
+        method: "POST",
+        body: JSON.stringify({
+          itemName,
+          category: newItemCategory,
+          unitOfMeasure: unit,
+          currentStock: stock,
+        }),
+      });
+      setNewItemName("");
+      showToast("Master ReliefGood & Initial Stock added.");
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to add commodity.", "error");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const handleAdjustStock = async (inv: any, delta: number) => {
     const updated = Math.max(0, Number(inv.currentStock) + delta);
-    await apiFetch("/api/inventory", {
-      method: "PUT",
-      body: JSON.stringify({
-        inventoryId: inv.inventoryId,
-        currentStock: updated,
-      }),
-    });
-    showToast(`Updated ${inv.itemName} balance to ${updated} ${inv.unitOfMeasure}.`);
-    refreshData();
+    setBusyKey(`inv-${inv.inventoryId}`);
+    try {
+      await apiFetch("/api/inventory", {
+        method: "PUT",
+        body: JSON.stringify({
+          inventoryId: inv.inventoryId,
+          currentStock: updated,
+        }),
+      });
+      setStockEdits((prev) => ({
+        ...prev,
+        [inv.inventoryId]: String(updated),
+      }));
+      showToast(
+        `Updated ${inv.itemName} balance to ${updated} ${inv.unitOfMeasure}.`
+      );
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to adjust warehouse stock.", "error");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleSetCustomStock = async (inv: any) => {
+    const raw = stockEdits[inv.inventoryId];
+    if (raw === undefined || raw.trim() === "") return;
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      showToast("Stock balance must be a whole number >= 0.", "error");
+      return;
+    }
+    setBusyKey(`inv-${inv.inventoryId}`);
+    try {
+      await apiFetch("/api/inventory", {
+        method: "PUT",
+        body: JSON.stringify({
+          inventoryId: inv.inventoryId,
+          currentStock: parsed,
+        }),
+      });
+      showToast(
+        `Adjusted ${inv.itemName} balance to ${parsed} ${inv.unitOfMeasure}.`
+      );
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to update warehouse stock.", "error");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const handleCreateDelivery = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!dispatchReqId) return;
-    await apiFetch("/api/deliveries", {
-      method: "POST",
-      body: JSON.stringify({
-        requestId: Number(dispatchReqId),
-        volunteerId: dispatchVolId ? Number(dispatchVolId) : null,
-        deliveryStatus: "In Transit",
-      }),
-    });
-    showToast(`Delivery dispatched for Request #${dispatchReqId}.`);
-    refreshData();
+    if (!dispatchReqId) {
+      showToast("Please select an Approved relief request to dispatch.", "error");
+      return;
+    }
+    setBusyKey("create-delivery");
+    try {
+      await apiFetch("/api/deliveries", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId: Number(dispatchReqId),
+          volunteerId: dispatchVolId ? Number(dispatchVolId) : null,
+          deliveryStatus: "In Transit",
+        }),
+      });
+      const dispatchedId = dispatchReqId;
+      setDispatchReqId(0);
+      setDispatchVolId(0);
+      showToast(`Delivery dispatched for Request #${dispatchedId}.`);
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to dispatch delivery.", "error");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const handleUpdateDeliveryStatus = async (delId: number, status: string) => {
-    await apiFetch("/api/deliveries", {
-      method: "PUT",
-      body: JSON.stringify({ deliveryId: delId, deliveryStatus: status }),
-    });
-    showToast(`Delivery #${delId} updated to ${status}.`);
-    refreshData();
+    setBusyKey(`delivery-${delId}`);
+    try {
+      await apiFetch("/api/deliveries", {
+        method: "PUT",
+        body: JSON.stringify({ deliveryId: delId, deliveryStatus: status }),
+      });
+      showToast(`Delivery #${delId} updated to ${status}.`);
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to update delivery status.", "error");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleMarkNotificationRead = async (notificationId: number) => {
+    setBusyKey(`notif-${notificationId}`);
+    try {
+      await apiFetch("/api/notifications/read", {
+        method: "PUT",
+        body: JSON.stringify({ notificationId }),
+      });
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to mark notification read.", "error");
+    } finally {
+      setBusyKey(null);
+    }
   };
 
   const exportReportCsv = () => {
     const rows = reports[activeReport] || [];
-    if (!rows.length) return;
+    if (!rows.length) {
+      showToast("No report rows available to export.", "error");
+      return;
+    }
     const headers = Object.keys(rows[0]);
     const csv = [
       headers.join(","),
@@ -239,6 +651,13 @@ export default function AdminPortalPage() {
       .toISOString()
       .slice(0, 10)}.csv`;
     a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const slicePage = <T,>(items: T[]) => {
+    const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+    const safePage = Math.min(Math.max(1, page), totalPages);
+    return items.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
   };
 
   const navItems: SidebarNavItem[] = [
@@ -281,7 +700,13 @@ export default function AdminPortalPage() {
       id: "stakeholders",
       label: "Users",
       icon: <Users className="h-4 w-4" />,
-      badge: donors.length + organizations.length + volunteers.length,
+      badge: users.length || donors.length + organizations.length + volunteers.length,
+    },
+    {
+      id: "notifications",
+      label: "Notifications",
+      icon: <Bell className="h-4 w-4" />,
+      badge: unreadCount > 0 ? unreadCount : undefined,
     },
     {
       id: "reports",
@@ -290,12 +715,14 @@ export default function AdminPortalPage() {
     },
   ];
 
+  const isBusy = busyKey !== null;
+
   return (
     <PortalSidebarLayout
       session={session}
       portalTitle="Admin Dashboard"
       portalSubtitle="Relief Operations & Resource Management"
-      roleBadge="Admin"
+      roleBadge={session?.user?.role || "Admin"}
       navItems={navItems}
       activeTab={activeTab}
       onSelectTab={(id: AdminTab) => {
@@ -303,13 +730,40 @@ export default function AdminPortalPage() {
         setSearchQuery("");
         setStatusFilter("ALL");
       }}
-      onSync={refreshData}
+      unreadCount={unreadCount}
+      onOpenNotifications={() => {
+        setActiveTab("notifications");
+        setSearchQuery("");
+        setStatusFilter("ALL");
+      }}
+      onSync={() => refreshData(true)}
       syncing={syncing}
     >
       {toast && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-medium text-emerald-900 flex items-center gap-2 no-print">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{toast}</span>
+        <div
+          role={toast.type === "error" ? "alert" : "status"}
+          aria-live="polite"
+          className={`rounded-xl border px-4 py-3 text-xs sm:text-sm font-medium flex items-center justify-between gap-3 no-print ${
+            toast.type === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-rose-200 bg-rose-50 text-rose-900"
+          }`}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {toast.type === "success" ? (
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+            )}
+            <span>{toast.text}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="text-xs underline shrink-0"
+          >
+            Close
+          </button>
         </div>
       )}
 
@@ -334,27 +788,21 @@ export default function AdminPortalPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">
-            Donations
-          </div>
+          <div className="text-xs font-medium text-slate-500">Donations</div>
           <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.totalDonations ?? 0}
           </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">
-            Relief Items
-          </div>
+          <div className="text-xs font-medium text-slate-500">Relief Items</div>
           <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.reliefGoodsCount ?? 0}
           </div>
         </div>
 
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">
-            Volunteers
-          </div>
+          <div className="text-xs font-medium text-slate-500">Volunteers</div>
           <div className="text-2xl font-bold text-slate-900 mt-1.5">
             {metrics.registeredVolunteers ?? 0}
           </div>
@@ -370,134 +818,696 @@ export default function AdminPortalPage() {
         </div>
       </div>
 
-        {/* TAB 1: OVERVIEW */}
-        {activeTab === "overview" && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-900 mb-3">
+      {/* TAB 1: OVERVIEW */}
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-slate-900">
                 Pending Requests
-              </h3>
-              <div className="divide-y divide-slate-100">
-                {requests
-                  .filter((r) => r.status === "Pending")
-                  .slice(0, 5)
-                  .map((r) => (
-                    <div
-                      key={r.requestId}
-                      className="py-3 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div>
-                        <div className="font-semibold text-slate-800">
-                          #{r.requestId} • {r.orgName}
-                        </div>
-                        <div className="text-slate-500">
-                          {r.eventName} ({r.requestDate})
-                        </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">
-                          {(r.items || [])
-                            .map((i: any) => `${i.itemName} (${i.quantity})`)
-                            .join(", ")}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() =>
-                          handleUpdateRequestStatus(r.requestId, "Approved")
-                        }
-                        className="rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-semibold text-white shrink-0"
-                      >
-                        Approve
-                      </button>
-                    </div>
-                  ))}
-              </div>
+              </h2>
+              <button
+                type="button"
+                onClick={() => setActiveTab("requests")}
+                className="text-xs font-semibold text-blue-600 hover:underline"
+              >
+                View all
+              </button>
             </div>
-
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-900 mb-3">
-                Warehouse Stock
-              </h3>
+            {pendingRequestsList.length === 0 ? (
+              <div className="py-8 text-center text-xs text-slate-400">
+                All relief requests have been reviewed.
+              </div>
+            ) : (
               <div className="divide-y divide-slate-100">
-                {inventory.slice(0, 6).map((inv) => {
-                  const low = inv.currentStock <= 200;
-                  return (
-                    <div
-                      key={inv.inventoryId}
-                      className="py-2.5 flex items-center justify-between text-xs"
-                    >
-                      <div>
-                        <span className="font-semibold text-slate-800">
-                          {inv.itemName}
-                        </span>
-                        <span className="text-slate-400 ml-2">
-                          {inv.category}
-                        </span>
+                {pendingRequestsList.slice(0, 5).map((r) => (
+                  <div
+                    key={r.requestId}
+                    className="py-3 flex items-center justify-between gap-3 text-xs"
+                  >
+                    <div>
+                      <div className="font-semibold text-slate-800">
+                        #{r.requestId} • {r.orgName}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900">
-                          {inv.currentStock} {inv.unitOfMeasure}
-                        </span>
-                        {low && (
-                          <span className="rounded-full bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold">
-                            Low
-                          </span>
-                        )}
+                      <div className="text-slate-500">
+                        {r.eventName} ({r.requestDate})
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">
+                        {(r.items || [])
+                          .map((i: any) => `${i.itemName} (${i.quantity})`)
+                          .join(", ")}
                       </div>
                     </div>
-                  );
-                })}
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() =>
+                        handleUpdateRequestStatus(r.requestId, "Approved")
+                      }
+                      className="rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1.5 text-xs font-semibold text-white shrink-0"
+                    >
+                      {busyKey === `request-${r.requestId}`
+                        ? "Saving..."
+                        : "Approve"}
+                    </button>
+                  </div>
+                ))}
               </div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-slate-900">
+                Warehouse Stock
+              </h2>
+              <button
+                type="button"
+                onClick={() => setActiveTab("inventory")}
+                className="text-xs font-semibold text-blue-600 hover:underline"
+              >
+                Manage inventory
+              </button>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {inventory.slice(0, 6).map((inv) => {
+                const low = inv.currentStock <= 200;
+                return (
+                  <div
+                    key={inv.inventoryId}
+                    className="py-2.5 flex items-center justify-between text-xs"
+                  >
+                    <div>
+                      <span className="font-semibold text-slate-800">
+                        {inv.itemName}
+                      </span>
+                      <span className="text-slate-400 ml-2">{inv.category}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-900">
+                        {inv.currentStock} {inv.unitOfMeasure}
+                      </span>
+                      {low && (
+                        <span className="rounded-full bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold">
+                          Low
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* TAB 2: DISASTER EVENTS */}
-        {activeTab === "events" && (
-          <div className="space-y-5">
-            <form
-              onSubmit={handleCreateEvent}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col sm:flex-row items-end gap-3"
-            >
-              <div className="flex-1 w-full">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  New Disaster Event Name (Master Registry)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newEventName}
-                  onChange={(e) => setNewEventName(e.target.value)}
-                  placeholder="e.g. Super Typhoon Pepito"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
-                />
-              </div>
-              <div className="flex-1 w-full">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Affected Province / Region
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newEventLocation}
-                  onChange={(e) => setNewEventLocation(e.target.value)}
-                  placeholder="e.g. Ilocos Norte / Cagayan Valley"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
-                />
-              </div>
-              <button
-                type="submit"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-[#002060] hover:bg-[#1F4E79] px-4 py-2 text-xs font-bold text-white shrink-0"
+      {/* TAB 2: DISASTER EVENTS */}
+      {activeTab === "events" && (
+        <div className="space-y-5">
+          <form
+            onSubmit={handleCreateEvent}
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col sm:flex-row items-end gap-3"
+          >
+            <div className="flex-1 w-full">
+              <label
+                htmlFor="new-event-name"
+                className="block text-xs font-semibold text-slate-700 mb-1"
               >
-                <Plus className="h-3.5 w-3.5" />
-                Register Event
-              </button>
-            </form>
+                New Disaster Event Name (Master Registry)
+              </label>
+              <input
+                id="new-event-name"
+                name="eventName"
+                type="text"
+                required
+                value={newEventName}
+                onChange={(e) => setNewEventName(e.target.value)}
+                placeholder="e.g. Super Typhoon Pepito"
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
+              />
+            </div>
+            <div className="flex-1 w-full">
+              <label
+                htmlFor="new-event-location"
+                className="block text-xs font-semibold text-slate-700 mb-1"
+              >
+                Affected Province / Region
+              </label>
+              <input
+                id="new-event-location"
+                name="location"
+                type="text"
+                required
+                value={newEventLocation}
+                onChange={(e) => setNewEventLocation(e.target.value)}
+                placeholder="e.g. Ilocos Norte / Cagayan Valley"
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isBusy}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#002060] hover:bg-[#1F4E79] disabled:opacity-50 px-4 py-2 text-xs font-bold text-white shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {busyKey === "create-event" ? "Saving..." : "Register Event"}
+            </button>
+          </form>
 
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  {["ALL", "Active", "Resolved"].map((st) => (
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {["ALL", "Active", "Resolved"].map((st) => (
+                  <button
+                    key={st}
+                    type="button"
+                    onClick={() => setStatusFilter(st)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                      statusFilter === st
+                        ? "bg-[#002060] text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="search"
+                  aria-label="Search disaster events or locations"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search events or locations..."
+                  className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+                />
+              </div>
+            </div>
+
+            <div
+              tabIndex={0}
+              role="region"
+              aria-label="Disaster events table"
+              className="overflow-x-auto"
+            >
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                  <tr>
+                    <th scope="col" className="p-3">
+                      ID
+                    </th>
+                    <th scope="col" className="p-3">
+                      Disaster Event Name
+                    </th>
+                    <th scope="col" className="p-3">
+                      Location
+                    </th>
+                    <th scope="col" className="p-3">
+                      Start Date
+                    </th>
+                    <th scope="col" className="p-3">
+                      Status
+                    </th>
+                    <th scope="col" className="p-3 text-right">
+                      Governance Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredEvents.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-6 text-center text-slate-400">
+                        No matching disaster events found.
+                      </td>
+                    </tr>
+                  ) : (
+                    slicePage(filteredEvents).map((ev) => (
+                      <tr key={ev.eventId} className="hover:bg-slate-50">
+                        <td className="p-3 font-bold">#{ev.eventId}</td>
+                        <td className="p-3 font-semibold text-slate-900">
+                          {ev.eventName}
+                        </td>
+                        <td className="p-3 text-slate-600">{ev.location}</td>
+                        <td className="p-3 text-slate-500">{ev.startDate}</td>
+                        <td className="p-3">
+                          <StatusBadge status={ev.status} />
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleToggleEventStatus(ev)}
+                              className="rounded-lg border border-slate-300 hover:bg-slate-100 disabled:opacity-50 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                            >
+                              Mark{" "}
+                              {ev.status === "Active" ? "Resolved" : "Active"}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              aria-label={`Delete event #${ev.eventId}`}
+                              onClick={() =>
+                                openDeleteConfirm({
+                                  kind: "event",
+                                  id: ev.eventId,
+                                  label: `Disaster Event #${ev.eventId} (${ev.eventName})`,
+                                })
+                              }
+                              className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1.5"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <PaginationControls
+              totalItems={filteredEvents.length}
+              page={page}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: RELIEF REQUESTS */}
+      {activeTab === "requests" && (
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {["ALL", "Pending", "Approved", "Fulfilled"].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setStatusFilter(st)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                    statusFilter === st
+                      ? "bg-[#002060] text-white"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="search"
+                aria-label="Search relief requests by organization or disaster"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search organization or disaster..."
+                className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+              />
+            </div>
+          </div>
+
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Relief requests table"
+            className="overflow-x-auto"
+          >
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th scope="col" className="p-3">
+                    Req ID
+                  </th>
+                  <th scope="col" className="p-3">
+                    Requesting Organization
+                  </th>
+                  <th scope="col" className="p-3">
+                    Disaster Event
+                  </th>
+                  <th scope="col" className="p-3">
+                    3NF Line Items (RequestItem)
+                  </th>
+                  <th scope="col" className="p-3">
+                    Date
+                  </th>
+                  <th scope="col" className="p-3">
+                    Status
+                  </th>
+                  <th scope="col" className="p-3 text-right">
+                    Steward Allocation
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredRequests.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-6 text-center text-slate-400">
+                      No matching relief requests found.
+                    </td>
+                  </tr>
+                ) : (
+                  slicePage(filteredRequests).map((r) => (
+                    <tr key={r.requestId} className="hover:bg-slate-50">
+                      <td className="p-3 font-bold">#{r.requestId}</td>
+                      <td className="p-3 font-semibold text-slate-900">
+                        {r.orgName}
+                      </td>
+                      <td className="p-3 text-slate-600">{r.eventName}</td>
+                      <td className="p-3 text-slate-700">
+                        {(r.items || []).map((it: any, idx: number) => (
+                          <span
+                            key={it.requestItemId || idx}
+                            className="inline-block rounded bg-slate-100 border border-slate-200 px-2 py-0.5 mr-1 mb-1 text-[11px]"
+                          >
+                            {it.itemName}: <b>{it.quantity}</b> {it.unitOfMeasure}
+                          </span>
+                        ))}
+                      </td>
+                      <td className="p-3 text-slate-500">{r.requestDate}</td>
+                      <td className="p-3">
+                        <StatusBadge status={r.status} />
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          {r.status === "Pending" && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() =>
+                                handleUpdateRequestStatus(
+                                  r.requestId,
+                                  "Approved"
+                                )
+                              }
+                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-2.5 py-1 text-xs font-bold text-white"
+                            >
+                              {busyKey === `request-${r.requestId}`
+                                ? "Saving..."
+                                : "Approve & Deduct"}
+                            </button>
+                          )}
+                          {r.status === "Approved" && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() =>
+                                handleUpdateRequestStatus(
+                                  r.requestId,
+                                  "Fulfilled"
+                                )
+                              }
+                              className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] disabled:opacity-50 px-2.5 py-1 text-xs font-bold text-white"
+                            >
+                              {busyKey === `request-${r.requestId}`
+                                ? "Saving..."
+                                : "Mark Fulfilled"}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            aria-label={`Delete request #${r.requestId}`}
+                            onClick={() =>
+                              openDeleteConfirm({
+                                kind: "request",
+                                id: r.requestId,
+                                label: `Relief Request #${r.requestId} (${r.orgName})`,
+                              })
+                            }
+                            className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1.5"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <PaginationControls
+            totalItems={filteredRequests.length}
+            page={page}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
+
+      {/* TAB 4: DONATIONS LEDGER */}
+      {activeTab === "donations" && (
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              {["ALL", "Pending", "Approved"].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setStatusFilter(st)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                    statusFilter === st
+                      ? "bg-[#002060] text-white"
+                      : "bg-slate-100 text-slate-600"
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <input
+                type="search"
+                aria-label="Search donations by donor or event"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search donor or event..."
+                className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+              />
+            </div>
+          </div>
+
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Donations ledger table"
+            className="overflow-x-auto"
+          >
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                <tr>
+                  <th scope="col" className="p-3">
+                    ID
+                  </th>
+                  <th scope="col" className="p-3">
+                    Donor Name
+                  </th>
+                  <th scope="col" className="p-3">
+                    Target Disaster Event
+                  </th>
+                  <th scope="col" className="p-3">
+                    Donated Items (DonationItem)
+                  </th>
+                  <th scope="col" className="p-3">
+                    Date
+                  </th>
+                  <th scope="col" className="p-3">
+                    Status
+                  </th>
+                  <th scope="col" className="p-3 text-right">
+                    Steward Verification
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredDonations.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="p-6 text-center text-slate-400">
+                      No matching donations found.
+                    </td>
+                  </tr>
+                ) : (
+                  slicePage(filteredDonations).map((d) => (
+                    <tr key={d.donationId} className="hover:bg-slate-50">
+                      <td className="p-3 font-bold">#{d.donationId}</td>
+                      <td className="p-3 font-semibold text-slate-900">
+                        {d.donorName}
+                      </td>
+                      <td className="p-3 text-slate-600">{d.eventName}</td>
+                      <td className="p-3">
+                        {(d.items || []).map((it: any, idx: number) => (
+                          <span
+                            key={it.itemId || idx}
+                            className="inline-block rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 mr-1 mb-1 text-[11px] text-emerald-900"
+                          >
+                            {it.itemName}: <b>+{it.quantity}</b>{" "}
+                            {it.unitOfMeasure}
+                          </span>
+                        ))}
+                      </td>
+                      <td className="p-3 text-slate-500">{d.donationDate}</td>
+                      <td className="p-3">
+                        <StatusBadge status={d.status} />
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="inline-flex items-center gap-1.5">
+                          {d.status === "Pending" && (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() =>
+                                handleUpdateDonationStatus(
+                                  d.donationId,
+                                  "Approved"
+                                )
+                              }
+                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-3 py-1 text-xs font-bold text-white"
+                            >
+                              {busyKey === `donation-${d.donationId}`
+                                ? "Saving..."
+                                : "Verify & Credit Stock"}
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            disabled={isBusy}
+                            aria-label={`Delete donation #${d.donationId}`}
+                            onClick={() =>
+                              openDeleteConfirm({
+                                kind: "donation",
+                                id: d.donationId,
+                                label: `Donation #${d.donationId} by ${d.donorName}`,
+                              })
+                            }
+                            className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1.5"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <PaginationControls
+            totalItems={filteredDonations.length}
+            page={page}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
+
+      {/* TAB 5: WAREHOUSE INVENTORY & MASTER CATALOG */}
+      {activeTab === "inventory" && (
+        <div className="space-y-5">
+          <form
+            onSubmit={handleAddInventoryItem}
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm grid grid-cols-1 sm:grid-cols-6 gap-3 items-end"
+          >
+            <div className="sm:col-span-2">
+              <label
+                htmlFor="new-good-name"
+                className="block text-xs font-semibold text-slate-700 mb-1"
+              >
+                Master ReliefGood Name
+              </label>
+              <input
+                id="new-good-name"
+                name="itemName"
+                type="text"
+                required
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                placeholder="e.g. Family Hygiene Kit"
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="new-good-category"
+                className="block text-xs font-semibold text-slate-700 mb-1"
+              >
+                Category
+              </label>
+              <select
+                id="new-good-category"
+                name="category"
+                value={newItemCategory}
+                onChange={(e) => setNewItemCategory(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
+              >
+                <option value="Food">Food</option>
+                <option value="Water">Water</option>
+                <option value="Medicine">Medicine</option>
+                <option value="Non-Food">Non-Food</option>
+                <option value="Shelter">Shelter</option>
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="new-good-unit"
+                className="block text-xs font-semibold text-slate-700 mb-1"
+              >
+                Unit of Measure
+              </label>
+              <input
+                id="new-good-unit"
+                name="unitOfMeasure"
+                type="text"
+                required
+                value={newItemUnit}
+                onChange={(e) => setNewItemUnit(e.target.value)}
+                placeholder="Packs"
+                className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="new-good-stock"
+                className="block text-xs font-semibold text-slate-700 mb-1"
+              >
+                Opening Stock
+              </label>
+              <input
+                id="new-good-stock"
+                name="currentStock"
+                type="number"
+                min={0}
+                step={1}
+                required
+                value={newItemStock}
+                onChange={(e) => setNewItemStock(Number(e.target.value))}
+                className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isBusy}
+              className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] disabled:opacity-50 py-2 px-4 text-xs font-bold text-white"
+            >
+              {busyKey === "create-inventory" ? "Adding..." : "+ Add Commodity"}
+            </button>
+          </form>
+
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {["ALL", "CRITICAL ALERT", "LOW STOCK", "SUFFICIENT"].map(
+                  (st) => (
                     <button
                       key={st}
+                      type="button"
                       onClick={() => setStatusFilter(st)}
                       className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
                         statusFilter === st
@@ -507,213 +1517,238 @@ export default function AdminPortalPage() {
                     >
                       {st}
                     </button>
-                  ))}
-                </div>
-                <div className="relative">
-                  <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search events or locations..."
-                    className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
-                  />
-                </div>
+                  )
+                )}
               </div>
+              <div className="relative">
+                <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="search"
+                  aria-label="Search inventory commodities"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search commodity or category..."
+                  className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+                />
+              </div>
+            </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+            <div
+              tabIndex={0}
+              role="region"
+              aria-label="Warehouse inventory table"
+              className="overflow-x-auto"
+            >
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                  <tr>
+                    <th scope="col" className="p-3">
+                      Good ID
+                    </th>
+                    <th scope="col" className="p-3">
+                      Commodity Name
+                    </th>
+                    <th scope="col" className="p-3">
+                      Category
+                    </th>
+                    <th scope="col" className="p-3">
+                      Operational Stock Balance
+                    </th>
+                    <th scope="col" className="p-3">
+                      Health Status
+                    </th>
+                    <th scope="col" className="p-3 text-right">
+                      Manual Audit Adjustment
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredInventory.length === 0 ? (
                     <tr>
-                      <th className="p-3">ID</th>
-                      <th className="p-3">Disaster Event Name</th>
-                      <th className="p-3">Location</th>
-                      <th className="p-3">Start Date</th>
-                      <th className="p-3">Status</th>
-                      <th className="p-3 text-right">Governance Action</th>
+                      <td
+                        colSpan={6}
+                        className="p-6 text-center text-slate-400"
+                      >
+                        No matching inventory items found.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {events
-                      .filter(
-                        (ev) =>
-                          (statusFilter === "ALL" ||
-                            ev.status === statusFilter) &&
-                          (ev.eventName
-                            .toLowerCase()
-                            .includes(searchQuery.toLowerCase()) ||
-                            ev.location
-                              .toLowerCase()
-                              .includes(searchQuery.toLowerCase()))
-                      )
-                      .slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-                      .map((ev) => (
-                        <tr key={ev.eventId} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold">#{ev.eventId}</td>
+                  ) : (
+                    slicePage(filteredInventory).map((inv) => {
+                      const healthLabel =
+                        inv.currentStock <= 200
+                          ? "CRITICAL ALERT"
+                          : inv.currentStock <= 1000
+                          ? "LOW STOCK"
+                          : "SUFFICIENT";
+                      const customVal =
+                        stockEdits[inv.inventoryId] ?? String(inv.currentStock);
+                      return (
+                        <tr key={inv.inventoryId} className="hover:bg-slate-50">
+                          <td className="p-3 font-bold">#{inv.goodId}</td>
                           <td className="p-3 font-semibold text-slate-900">
-                            {ev.eventName}
+                            {inv.itemName}
                           </td>
-                          <td className="p-3 text-slate-600">{ev.location}</td>
-                          <td className="p-3 text-slate-500">{ev.startDate}</td>
+                          <td className="p-3 text-slate-600">{inv.category}</td>
+                          <td className="p-3 font-bold text-slate-900">
+                            {inv.currentStock} {inv.unitOfMeasure}
+                          </td>
                           <td className="p-3">
-                            <span
-                              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                                ev.status === "Active"
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : "bg-slate-100 text-slate-600 border border-slate-200"
-                              }`}
-                            >
-                              {ev.status}
-                            </span>
+                            <StatusBadge status={healthLabel} />
                           </td>
                           <td className="p-3 text-right">
-                            <button
-                              onClick={() => handleToggleEventStatus(ev)}
-                              className="rounded-lg border border-slate-300 hover:bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700"
-                            >
-                              Mark {ev.status === "Active" ? "Resolved" : "Active"}
-                            </button>
+                            <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleAdjustStock(inv, 100)}
+                                className="rounded border border-slate-300 hover:bg-slate-100 disabled:opacity-50 px-2 py-1 text-[11px] font-bold"
+                              >
+                                +100
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy || inv.currentStock <= 0}
+                                onClick={() => handleAdjustStock(inv, -100)}
+                                className="rounded border border-slate-300 hover:bg-slate-100 disabled:opacity-50 px-2 py-1 text-[11px] font-bold"
+                              >
+                                -100
+                              </button>
+                              <input
+                                type="number"
+                                min={0}
+                                step={1}
+                                aria-label={`Exact stock balance for ${inv.itemName}`}
+                                value={customVal}
+                                onChange={(e) =>
+                                  setStockEdits((prev) => ({
+                                    ...prev,
+                                    [inv.inventoryId]: e.target.value,
+                                  }))
+                                }
+                                className="w-20 rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold"
+                              />
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleSetCustomStock(inv)}
+                                className="rounded bg-slate-800 hover:bg-slate-900 disabled:opacity-50 px-2 py-1 text-[11px] font-bold text-white"
+                              >
+                                Set
+                              </button>
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                aria-label={`Delete ${inv.itemName}`}
+                                onClick={() =>
+                                  openDeleteConfirm({
+                                    kind: "inventory",
+                                    id: inv.inventoryId,
+                                    label: `${inv.itemName} (#${inv.goodId})`,
+                                  })
+                                }
+                                className="rounded border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
-                      ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 3: RELIEF REQUESTS */}
-        {activeTab === "requests" && (
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {["ALL", "Pending", "Approved", "Fulfilled"].map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => setStatusFilter(st)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
-                      statusFilter === st
-                        ? "bg-[#002060] text-white"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {st}
-                  </button>
-                ))}
-              </div>
-              <div className="relative">
-                <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search organization or disaster..."
-                  className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
-                />
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3">Req ID</th>
-                    <th className="p-3">Requesting Organization</th>
-                    <th className="p-3">Disaster Event</th>
-                    <th className="p-3">3NF Line Items (RequestItem)</th>
-                    <th className="p-3">Date</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3 text-right">Steward Allocation</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {requests
-                    .filter(
-                      (r) =>
-                        (statusFilter === "ALL" || r.status === statusFilter) &&
-                        ((r.orgName || "")
-                          .toLowerCase()
-                          .includes(searchQuery.toLowerCase()) ||
-                          (r.eventName || "")
-                            .toLowerCase()
-                            .includes(searchQuery.toLowerCase()))
-                    )
-                    .map((r) => (
-                      <tr key={r.requestId} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold">#{r.requestId}</td>
-                        <td className="p-3 font-semibold text-slate-900">
-                          {r.orgName}
-                        </td>
-                        <td className="p-3 text-slate-600">{r.eventName}</td>
-                        <td className="p-3 text-slate-700">
-                          {(r.items || []).map((it: any) => (
-                            <span
-                              key={it.requestItemId}
-                              className="inline-block rounded bg-slate-100 border border-slate-200 px-2 py-0.5 mr-1 mb-1 text-[11px]"
-                            >
-                              {it.itemName}: <b>{it.quantity}</b> {it.unitOfMeasure}
-                            </span>
-                          ))}
-                        </td>
-                        <td className="p-3 text-slate-500">{r.requestDate}</td>
-                        <td className="p-3">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                              r.status === "Pending"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : r.status === "Approved"
-                                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            }`}
-                          >
-                            {r.status}
-                          </span>
-                        </td>
-                        <td className="p-3 text-right space-x-1.5">
-                          {r.status === "Pending" && (
-                            <button
-                              onClick={() =>
-                                handleUpdateRequestStatus(
-                                  r.requestId,
-                                  "Approved"
-                                )
-                              }
-                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 text-xs font-bold text-white"
-                            >
-                              Approve &amp; Deduct
-                            </button>
-                          )}
-                          {r.status === "Approved" && (
-                            <button
-                              onClick={() =>
-                                handleUpdateRequestStatus(
-                                  r.requestId,
-                                  "Fulfilled"
-                                )
-                              }
-                              className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] px-2.5 py-1 text-xs font-bold text-white"
-                            >
-                              Mark Fulfilled
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
 
-        {/* TAB 4: DONATIONS LEDGER */}
-        {activeTab === "donations" && (
+            <PaginationControls
+              totalItems={filteredInventory.length}
+              page={page}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* TAB 6: DELIVERIES */}
+      {activeTab === "deliveries" && (
+        <div className="space-y-5">
+          <form
+            onSubmit={handleCreateDelivery}
+            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
+          >
+            <div>
+              <label
+                htmlFor="dispatch-request-id"
+                className="block text-xs font-semibold text-slate-700 mb-1"
+              >
+                Select Approved Relief Request
+              </label>
+              <select
+                id="dispatch-request-id"
+                name="requestId"
+                required
+                value={dispatchReqId}
+                onChange={(e) => setDispatchReqId(Number(e.target.value))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
+              >
+                {approvedRequestsForDispatch.length === 0 ? (
+                  <option value={0}>
+                    No Approved requests awaiting dispatch
+                  </option>
+                ) : (
+                  <>
+                    <option value={0}>-- Choose Approved Request --</option>
+                    {approvedRequestsForDispatch.map((r) => (
+                      <option key={r.requestId} value={r.requestId}>
+                        Req #{r.requestId} — {r.orgName} ({r.eventName})
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="dispatch-volunteer-id"
+                className="block text-xs font-semibold text-slate-700 mb-1"
+              >
+                Assign Field Volunteer Driver
+              </label>
+              <select
+                id="dispatch-volunteer-id"
+                name="volunteerId"
+                value={dispatchVolId}
+                onChange={(e) => setDispatchVolId(Number(e.target.value))}
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
+              >
+                <option value={0}>-- Unassigned / Select Volunteer --</option>
+                {volunteers.map((v) => (
+                  <option key={v.volunteerId} value={v.volunteerId}>
+                    {v.volunteerName} ({v.vehicleType} •{" "}
+                    {v.isAvailable ? "Available" : "Busy"})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="submit"
+              disabled={isBusy || approvedRequestsForDispatch.length === 0}
+              className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] disabled:opacity-50 py-2 px-4 text-xs font-bold text-white"
+            >
+              {busyKey === "create-delivery"
+                ? "Dispatching..."
+                : "Dispatch Fleet Delivery"}
+            </button>
+          </form>
+
           <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                {["ALL", "Pending", "Approved"].map((st) => (
+                {["ALL", "Pending", "In Transit", "Delivered"].map((st) => (
                   <button
                     key={st}
+                    type="button"
                     onClick={() => setStatusFilter(st)}
                     className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
                       statusFilter === st
@@ -728,342 +1763,153 @@ export default function AdminPortalPage() {
               <div className="relative">
                 <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search deliveries by recipient, volunteer, or location"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search donor or event..."
+                  placeholder="Search organization, volunteer..."
                   className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
                 />
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <div
+              tabIndex={0}
+              role="region"
+              aria-label="Fleet deliveries table"
+              className="overflow-x-auto"
+            >
               <table className="w-full text-left text-xs">
                 <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                   <tr>
-                    <th className="p-3">ID</th>
-                    <th className="p-3">Donor Name</th>
-                    <th className="p-3">Target Disaster Event</th>
-                    <th className="p-3">Donated Items (DonationItem)</th>
-                    <th className="p-3">Date</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3 text-right">Steward Verification</th>
+                    <th scope="col" className="p-3">
+                      Delivery ID
+                    </th>
+                    <th scope="col" className="p-3">
+                      Request ID
+                    </th>
+                    <th scope="col" className="p-3">
+                      Recipient Organization &amp; Destination
+                    </th>
+                    <th scope="col" className="p-3">
+                      Assigned Volunteer
+                    </th>
+                    <th scope="col" className="p-3">
+                      Dispatch Date
+                    </th>
+                    <th scope="col" className="p-3">
+                      Status
+                    </th>
+                    <th scope="col" className="p-3 text-right">
+                      Update Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {donations
-                    .filter(
-                      (d) =>
-                        (statusFilter === "ALL" || d.status === statusFilter) &&
-                        ((d.donorName || "")
-                          .toLowerCase()
-                          .includes(searchQuery.toLowerCase()) ||
-                          (d.eventName || "")
-                            .toLowerCase()
-                            .includes(searchQuery.toLowerCase()))
-                    )
-                    .map((d) => (
-                      <tr key={d.donationId} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold">#{d.donationId}</td>
-                        <td className="p-3 font-semibold text-slate-900">
-                          {d.donorName}
-                        </td>
-                        <td className="p-3 text-slate-600">{d.eventName}</td>
+                  {filteredDeliveries.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="p-6 text-center text-slate-400"
+                      >
+                        No matching deliveries found.
+                      </td>
+                    </tr>
+                  ) : (
+                    slicePage(filteredDeliveries).map((d) => (
+                      <tr key={d.deliveryId} className="hover:bg-slate-50">
+                        <td className="p-3 font-bold">#{d.deliveryId}</td>
+                        <td className="p-3 font-semibold">Req #{d.requestId}</td>
                         <td className="p-3">
-                          {(d.items || []).map((it: any) => (
-                            <span
-                              key={it.itemId}
-                              className="inline-block rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 mr-1 mb-1 text-[11px] text-emerald-900"
-                            >
-                              {it.itemName}: <b>+{it.quantity}</b> {it.unitOfMeasure}
-                            </span>
-                          ))}
+                          <div className="font-semibold text-slate-900">
+                            {d.orgName}
+                          </div>
+                          <div className="text-[11px] text-slate-500">
+                            {d.location}
+                          </div>
                         </td>
-                        <td className="p-3 text-slate-500">{d.donationDate}</td>
+                        <td className="p-3 text-slate-700">{d.volunteerName}</td>
+                        <td className="p-3 text-slate-500">{d.dispatchDate}</td>
                         <td className="p-3">
-                          <span
-                            className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                              d.status === "Approved"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-amber-50 text-amber-700 border border-amber-200"
-                            }`}
-                          >
-                            {d.status}
-                          </span>
+                          <StatusBadge status={d.deliveryStatus} />
                         </td>
                         <td className="p-3 text-right">
-                          {d.status === "Pending" && (
+                          <div className="inline-flex items-center gap-1.5">
+                            {d.deliveryStatus === "Pending" && (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() =>
+                                  handleUpdateDeliveryStatus(
+                                    d.deliveryId,
+                                    "In Transit"
+                                  )
+                                }
+                                className="rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 px-2.5 py-1 text-xs font-bold text-white"
+                              >
+                                Start Transit
+                              </button>
+                            )}
+                            {d.deliveryStatus !== "Delivered" && (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() =>
+                                  handleUpdateDeliveryStatus(
+                                    d.deliveryId,
+                                    "Delivered"
+                                  )
+                                }
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-2.5 py-1 text-xs font-bold text-white"
+                              >
+                                {busyKey === `delivery-${d.deliveryId}`
+                                  ? "Saving..."
+                                  : "Mark Delivered"}
+                              </button>
+                            )}
                             <button
+                              type="button"
+                              disabled={isBusy}
+                              aria-label={`Delete delivery #${d.deliveryId}`}
                               onClick={() =>
-                                handleUpdateDonationStatus(
-                                  d.donationId,
-                                  "Approved"
-                                )
+                                openDeleteConfirm({
+                                  kind: "delivery",
+                                  id: d.deliveryId,
+                                  label: `Delivery #${d.deliveryId} for Request #${d.requestId}`,
+                                })
                               }
-                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1 text-xs font-bold text-white"
+                              className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1.5"
                             >
-                              Verify &amp; Credit Stock
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
-                          )}
+                          </div>
                         </td>
                       </tr>
-                    ))}
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+
+            <PaginationControls
+              totalItems={filteredDeliveries.length}
+              page={page}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
           </div>
-        )}
+        </div>
+      )}
 
-        {/* TAB 5: WAREHOUSE INVENTORY & MASTER CATALOG */}
-        {activeTab === "inventory" && (
-          <div className="space-y-5">
-            <form
-              onSubmit={handleAddInventoryItem}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm grid grid-cols-1 sm:grid-cols-5 gap-3 items-end"
-            >
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Master ReliefGood Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newItemName}
-                  onChange={(e) => setNewItemName(e.target.value)}
-                  placeholder="e.g. Family Hygiene Kit"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Category
-                </label>
-                <select
-                  value={newItemCategory}
-                  onChange={(e) => setNewItemCategory(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
-                >
-                  <option value="Food">Food</option>
-                  <option value="Water">Water</option>
-                  <option value="Medicine">Medicine</option>
-                  <option value="Non-Food">Non-Food</option>
-                  <option value="Shelter">Shelter</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Unit &amp; Opening Stock
-                </label>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={newItemUnit}
-                    onChange={(e) => setNewItemUnit(e.target.value)}
-                    placeholder="Packs"
-                    className="w-1/2 rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                  />
-                  <input
-                    type="number"
-                    min={0}
-                    value={newItemStock}
-                    onChange={(e) => setNewItemStock(Number(e.target.value))}
-                    className="w-1/2 rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-                  />
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] py-2 px-4 text-xs font-bold text-white"
-              >
-                + Add Commodity
-              </button>
-            </form>
-
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3">Good ID (Master PK)</th>
-                    <th className="p-3">Commodity Name</th>
-                    <th className="p-3">Category</th>
-                    <th className="p-3">Operational Stock Balance</th>
-                    <th className="p-3">Health Status</th>
-                    <th className="p-3 text-right">Manual Audit Adjustment</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {inventory.map((inv) => (
-                    <tr key={inv.inventoryId} className="hover:bg-slate-50">
-                      <td className="p-3 font-bold">#{inv.goodId}</td>
-                      <td className="p-3 font-semibold text-slate-900">
-                        {inv.itemName}
-                      </td>
-                      <td className="p-3 text-slate-600">{inv.category}</td>
-                      <td className="p-3 font-bold text-slate-900">
-                        {inv.currentStock} {inv.unitOfMeasure}
-                      </td>
-                      <td className="p-3">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                            inv.currentStock <= 200
-                              ? "bg-rose-50 text-rose-700 border border-rose-200"
-                              : inv.currentStock <= 1000
-                              ? "bg-amber-50 text-amber-700 border border-amber-200"
-                              : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          }`}
-                        >
-                          {inv.currentStock <= 200
-                            ? "CRITICAL ALERT"
-                            : inv.currentStock <= 1000
-                            ? "LOW STOCK"
-                            : "SUFFICIENT"}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right space-x-1.5">
-                        <button
-                          onClick={() => handleAdjustStock(inv, 100)}
-                          className="rounded border border-slate-300 hover:bg-slate-100 px-2 py-1 text-[11px] font-bold"
-                        >
-                          +100
-                        </button>
-                        <button
-                          onClick={() => handleAdjustStock(inv, -100)}
-                          className="rounded border border-slate-300 hover:bg-slate-100 px-2 py-1 text-[11px] font-bold"
-                        >
-                          -100
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 6: DELIVERIES */}
-        {activeTab === "deliveries" && (
-          <div className="space-y-5">
-            <form
-              onSubmit={handleCreateDelivery}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
-            >
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Select Relief Request to Dispatch
-                </label>
-                <select
-                  required
-                  value={dispatchReqId}
-                  onChange={(e) => setDispatchReqId(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
-                >
-                  <option value={0}>-- Choose Approved/Pending Request --</option>
-                  {requests.map((r) => (
-                    <option key={r.requestId} value={r.requestId}>
-                      Req #{r.requestId} — {r.orgName} ({r.eventName}) [{r.status}]
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Assign Field Volunteer Driver
-                </label>
-                <select
-                  value={dispatchVolId}
-                  onChange={(e) => setDispatchVolId(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
-                >
-                  <option value={0}>-- Unassigned / Select Volunteer --</option>
-                  {volunteers.map((v) => (
-                    <option key={v.volunteerId} value={v.volunteerId}>
-                      {v.volunteerName} ({v.vehicleType} •{" "}
-                      {v.isAvailable ? "Available" : "Busy"})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="submit"
-                className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] py-2 px-4 text-xs font-bold text-white"
-              >
-                Dispatch Fleet Delivery
-              </button>
-            </form>
-
-            <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3">Delivery ID</th>
-                    <th className="p-3">Request ID</th>
-                    <th className="p-3">Recipient Organization &amp; Destination</th>
-                    <th className="p-3">Assigned Volunteer</th>
-                    <th className="p-3">Dispatch Date</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3 text-right">Update Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {deliveries.map((d) => (
-                    <tr key={d.deliveryId} className="hover:bg-slate-50">
-                      <td className="p-3 font-bold">#{d.deliveryId}</td>
-                      <td className="p-3 font-semibold">Req #{d.requestId}</td>
-                      <td className="p-3">
-                        <div className="font-semibold text-slate-900">
-                          {d.orgName}
-                        </div>
-                        <div className="text-[11px] text-slate-500">
-                          {d.location}
-                        </div>
-                      </td>
-                      <td className="p-3 text-slate-700">{d.volunteerName}</td>
-                      <td className="p-3 text-slate-500">{d.dispatchDate}</td>
-                      <td className="p-3">
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                            d.deliveryStatus === "Delivered"
-                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                              : d.deliveryStatus === "In Transit"
-                              ? "bg-blue-50 text-blue-700 border border-blue-200"
-                              : "bg-amber-50 text-amber-700 border border-amber-200"
-                          }`}
-                        >
-                          {d.deliveryStatus}
-                        </span>
-                      </td>
-                      <td className="p-3 text-right space-x-1.5">
-                        {d.deliveryStatus !== "Delivered" && (
-                          <button
-                            onClick={() =>
-                              handleUpdateDeliveryStatus(
-                                d.deliveryId,
-                                "Delivered"
-                              )
-                            }
-                            className="rounded-lg bg-emerald-600 hover:bg-emerald-700 px-2.5 py-1 text-xs font-bold text-white"
-                          >
-                            Mark Delivered
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 7: MASTER STAKEHOLDERS */}
-        {activeTab === "stakeholders" && (
+      {/* TAB 7: MASTER STAKEHOLDERS & SYSTEM USERS */}
+      {activeTab === "stakeholders" && (
+        <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">
+              <h2 className="text-sm font-bold text-slate-900 mb-2">
                 Partner Organizations &amp; LGUs ({organizations.length})
-              </h3>
-              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+              </h2>
+              <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {organizations.map((o) => (
                   <div key={o.orgId} className="py-2 text-xs">
                     <div className="font-bold text-slate-800">
@@ -1076,10 +1922,10 @@ export default function AdminPortalPage() {
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">
+              <h2 className="text-sm font-bold text-slate-900 mb-2">
                 Registered Donors ({donors.length})
-              </h3>
-              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+              </h2>
+              <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {donors.map((d) => (
                   <div
                     key={d.donorId}
@@ -1097,10 +1943,10 @@ export default function AdminPortalPage() {
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <h3 className="text-sm font-bold text-slate-900 mb-2">
+              <h2 className="text-sm font-bold text-slate-900 mb-2">
                 Field Volunteers ({volunteers.length})
-              </h3>
-              <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+              </h2>
+              <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {volunteers.map((v) => (
                   <div
                     key={v.volunteerId}
@@ -1126,88 +1972,285 @@ export default function AdminPortalPage() {
               </div>
             </div>
           </div>
-        )}
 
-        {/* TAB 8: ANALYTICAL REPORTS (ReportDAO) */}
-        {activeTab === "reports" && (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
-              <div className="flex flex-wrap gap-2">
-                <button
-                  onClick={() => setActiveReport("operationalSummary")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                    activeReport === "operationalSummary"
-                      ? "bg-[#002060] text-white"
-                      : "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  Report 1: Disaster Operational Summary
-                </button>
-                <button
-                  onClick={() => setActiveReport("inventoryHealth")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                    activeReport === "inventoryHealth"
-                      ? "bg-[#002060] text-white"
-                      : "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  Report 2: Warehouse Stock &amp; Replenishment Alert
-                </button>
-                <button
-                  onClick={() => setActiveReport("donorImpact")}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
-                    activeReport === "donorImpact"
-                      ? "bg-[#002060] text-white"
-                      : "bg-slate-100 text-slate-700"
-                  }`}
-                >
-                  Report 3: Donor Contribution &amp; Impact Ledger
-                </button>
+          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  System User Accounts ({filteredUsers.length})
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Master UserAccount directory across all roles
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={exportReportCsv}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Export CSV
-                </button>
-                <button
-                  onClick={() => window.print()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  Print Report
-                </button>
+              <div className="flex flex-wrap items-center gap-2">
+                {["ALL", "Admin", "Donor", "Organization", "Volunteer"].map(
+                  (role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => setStatusFilter(role)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                        statusFilter === role
+                          ? "bg-[#002060] text-white"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {role}
+                    </button>
+                  )
+                )}
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="search"
+                    aria-label="Search system user accounts"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search user, username..."
+                    className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-52"
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-4 border-b border-slate-200 pb-3">
-                <div className="text-xs font-bold text-[#002060] uppercase">
-                  Official Decision-Support Analytical Output (ReportDAO)
-                </div>
-                <h3 className="text-base font-bold text-slate-900">
-                  {activeReport === "operationalSummary" &&
-                    "Report 1: Disaster Relief Operational Summary (Multi-Table SQL JOIN & GROUP BY)"}
-                  {activeReport === "inventoryHealth" &&
-                    "Report 2: Warehouse Stock Status & Replenishment Alert Report"}
-                  {activeReport === "donorImpact" &&
-                    "Report 3: Donor Contribution & Impact Audit Ledger"}
-                </h3>
-              </div>
+            <div
+              tabIndex={0}
+              role="region"
+              aria-label="System user accounts table"
+              className="overflow-x-auto"
+            >
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+                  <tr>
+                    <th scope="col" className="p-3">
+                      User ID
+                    </th>
+                    <th scope="col" className="p-3">
+                      Full Name
+                    </th>
+                    <th scope="col" className="p-3">
+                      Username
+                    </th>
+                    <th scope="col" className="p-3">
+                      Role
+                    </th>
+                    <th scope="col" className="p-3">
+                      Contact Info
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={5}
+                        className="p-6 text-center text-slate-400"
+                      >
+                        No matching user accounts found.
+                      </td>
+                    </tr>
+                  ) : (
+                    slicePage(filteredUsers).map((u) => (
+                      <tr key={u.userId} className="hover:bg-slate-50">
+                        <td className="p-3 font-bold">#{u.userId}</td>
+                        <td className="p-3 font-semibold text-slate-900">
+                          {u.fullName}
+                        </td>
+                        <td className="p-3 font-mono text-slate-600">
+                          {u.username}
+                        </td>
+                        <td className="p-3">
+                          <span className="inline-block rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                            {u.role}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-500">
+                          {u.contactInfo || "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
 
-              {activeReport === "operationalSummary" && (
+            <PaginationControls
+              totalItems={filteredUsers.length}
+              page={page}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* TAB 8: NOTIFICATIONS */}
+      {activeTab === "notifications" && (
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900">
+              System Audit &amp; Notification Feed
+            </h2>
+            <span className="text-xs font-medium text-slate-500">
+              {unreadCount} unread
+            </span>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {notifications.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-400">
+                No notifications recorded yet.
+              </div>
+            ) : (
+              slicePage(notifications).map((n) => (
+                <div
+                  key={n.notificationId}
+                  className={`p-4 flex items-center justify-between gap-4 ${
+                    n.isRead ? "bg-white" : "bg-blue-50/40"
+                  }`}
+                >
+                  <div className="space-y-0.5 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-slate-900">
+                      {n.message}
+                    </p>
+                    <p className="text-[11px] text-slate-400">
+                      User #{n.userId} •{" "}
+                      {n.dateSent
+                        ? new Date(n.dateSent).toLocaleString()
+                        : "Just now"}
+                    </p>
+                  </div>
+                  {!n.isRead && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() =>
+                        handleMarkNotificationRead(n.notificationId)
+                      }
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 px-3 py-1.5 text-xs font-medium text-slate-700 shrink-0"
+                    >
+                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      Mark Read
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          <PaginationControls
+            totalItems={notifications.length}
+            page={page}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
+
+      {/* TAB 9: ANALYTICAL REPORTS (ReportDAO) */}
+      {activeTab === "reports" && (
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveReport("operationalSummary")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                  activeReport === "operationalSummary"
+                    ? "bg-[#002060] text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                Report 1: Disaster Operational Summary
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveReport("inventoryHealth")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                  activeReport === "inventoryHealth"
+                    ? "bg-[#002060] text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                Report 2: Warehouse Stock &amp; Replenishment Alert
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveReport("donorImpact")}
+                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                  activeReport === "donorImpact"
+                    ? "bg-[#002060] text-white"
+                    : "bg-slate-100 text-slate-700"
+                }`}
+              >
+                Report 3: Donor Contribution &amp; Impact Ledger
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={exportReportCsv}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white"
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print Report
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 border-b border-slate-200 pb-3">
+              <div className="text-xs font-bold text-[#002060] uppercase">
+                Official Decision-Support Analytical Output (ReportDAO)
+              </div>
+              <h2 className="text-base font-bold text-slate-900">
+                {activeReport === "operationalSummary" &&
+                  "Report 1: Disaster Relief Operational Summary (Multi-Table SQL JOIN & GROUP BY)"}
+                {activeReport === "inventoryHealth" &&
+                  "Report 2: Warehouse Stock Status & Replenishment Alert Report"}
+                {activeReport === "donorImpact" &&
+                  "Report 3: Donor Contribution & Impact Audit Ledger"}
+              </h2>
+            </div>
+
+            {activeReport === "operationalSummary" && (
+              <div
+                tabIndex={0}
+                role="region"
+                aria-label="Disaster operational summary report table"
+                className="overflow-x-auto"
+              >
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="p-2.5">Event ID</th>
-                      <th className="p-2.5">Disaster Event</th>
-                      <th className="p-2.5">Location</th>
-                      <th className="p-2.5">Status</th>
-                      <th className="p-2.5">Total Donations</th>
-                      <th className="p-2.5">Total Aid Requests</th>
-                      <th className="p-2.5">Dispatched Deliveries</th>
+                      <th scope="col" className="p-2.5">
+                        Event ID
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Disaster Event
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Location
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Status
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Total Donations
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Total Aid Requests
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Dispatched Deliveries
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1230,19 +2273,40 @@ export default function AdminPortalPage() {
                     ))}
                   </tbody>
                 </table>
-              )}
+              </div>
+            )}
 
-              {activeReport === "inventoryHealth" && (
+            {activeReport === "inventoryHealth" && (
+              <div
+                tabIndex={0}
+                role="region"
+                aria-label="Warehouse stock health report table"
+                className="overflow-x-auto"
+              >
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="p-2.5">Good ID</th>
-                      <th className="p-2.5">Relief Item</th>
-                      <th className="p-2.5">Category</th>
-                      <th className="p-2.5">Current Warehouse Stock</th>
-                      <th className="p-2.5">Cumulative Donated</th>
-                      <th className="p-2.5">Cumulative Requested</th>
-                      <th className="p-2.5">Stock Health Alert</th>
+                      <th scope="col" className="p-2.5">
+                        Good ID
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Relief Item
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Category
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Current Warehouse Stock
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Cumulative Donated
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Cumulative Requested
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Stock Health Alert
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1261,35 +2325,46 @@ export default function AdminPortalPage() {
                           -{r.totalRequestedQty}
                         </td>
                         <td className="p-2.5">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                              r.stockHealth === "CRITICAL ALERT"
-                                ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                : r.stockHealth === "LOW STOCK"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                            }`}
-                          >
-                            {r.stockHealth}
-                          </span>
+                          <StatusBadge status={r.stockHealth} />
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
+              </div>
+            )}
 
-              {activeReport === "donorImpact" && (
+            {activeReport === "donorImpact" && (
+              <div
+                tabIndex={0}
+                role="region"
+                aria-label="Donor impact ledger report table"
+                className="overflow-x-auto"
+              >
                 <table className="w-full text-left text-xs">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="p-2.5">Donor ID</th>
-                      <th className="p-2.5">Donor Name</th>
-                      <th className="p-2.5">Classification</th>
-                      <th className="p-2.5">Contact Info</th>
-                      <th className="p-2.5">Donations Count</th>
-                      <th className="p-2.5">Events Supported</th>
-                      <th className="p-2.5">Total Items Donated</th>
+                      <th scope="col" className="p-2.5">
+                        Donor ID
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Donor Name
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Classification
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Contact Info
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Donations Count
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Events Supported
+                      </th>
+                      <th scope="col" className="p-2.5">
+                        Total Items Donated
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1308,10 +2383,51 @@ export default function AdminPortalPage() {
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Native top-layer modal delete confirmation */}
+      <dialog
+        ref={confirmDialogRef}
+        aria-labelledby="confirm-delete-title"
+        aria-describedby="confirm-delete-desc"
+        className="p-0 rounded-2xl border border-slate-200 bg-white shadow-xl max-w-md w-[calc(100%-2rem)] m-auto text-slate-900"
+      >
+        <div className="p-6 space-y-4">
+          <div className="space-y-1.5">
+            <h2
+              id="confirm-delete-title"
+              className="text-base font-bold text-slate-900"
+            >
+              Confirm Record Deletion
+            </h2>
+            <p id="confirm-delete-desc" className="text-xs text-slate-600">
+              {deleteTarget
+                ? `Are you sure you want to permanently remove ${deleteTarget.label}? Cascading child items linked in PostgreSQL will also be removed.`
+                : "Are you sure you want to delete this record?"}
+            </p>
+          </div>
+          <form method="dialog" className="flex justify-end gap-2 pt-2">
+            <button
+              ref={cancelBtnRef}
+              value="cancel"
+              autoFocus
+              className="rounded-xl border border-slate-300 bg-white hover:bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700"
+            >
+              Cancel
+            </button>
+            <button
+              value="delete"
+              className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs font-semibold text-white"
+            >
+              Delete Record
+            </button>
+          </form>
+        </div>
+      </dialog>
     </PortalSidebarLayout>
   );
 }

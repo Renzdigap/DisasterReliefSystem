@@ -24,6 +24,15 @@ import {
   UserSession,
 } from "@/lib/api";
 
+function getPortalRouteForRole(role?: string): string {
+  const r = (role || "").toLowerCase();
+  if (r === "admin" || r === "manager") return "/admin";
+  if (r === "donor") return "/donor";
+  if (r === "organization") return "/organization";
+  if (r === "volunteer") return "/volunteer";
+  return "/";
+}
+
 export default function VolunteerPortalPage() {
   const router = useRouter();
   const [session, setSession] = useState<UserSession | null>(null);
@@ -98,6 +107,11 @@ export default function VolunteerPortalPage() {
       router.replace("/");
       return;
     }
+    const role = (saved.user.role || "").toLowerCase();
+    if (role !== "volunteer") {
+      router.replace(getPortalRouteForRole(role));
+      return;
+    }
     setSession(saved);
     loadVolunteerPortal(saved.user.userId);
   }, [router, loadVolunteerPortal]);
@@ -142,8 +156,8 @@ export default function VolunteerPortalPage() {
         method: "PUT",
         body: JSON.stringify({
           userId: session.user.userId,
-          fullName,
-          contactInfo,
+          fullName: fullName.trim(),
+          contactInfo: contactInfo.trim(),
           vehicleType,
           isAvailable,
         }),
@@ -241,6 +255,8 @@ export default function VolunteerPortalPage() {
     >
       {banner && (
         <div
+          role={banner.type === "error" ? "alert" : "status"}
+          aria-live="polite"
           className={`rounded-xl border px-4 py-3 flex items-center justify-between text-xs sm:text-sm font-medium ${
             banner.type === "success"
               ? "bg-emerald-50 border-emerald-200 text-emerald-900"
@@ -256,6 +272,7 @@ export default function VolunteerPortalPage() {
             <span>{banner.text}</span>
           </div>
           <button
+            type="button"
             onClick={() => setBanner(null)}
             className="text-xs underline ml-4"
           >
@@ -332,7 +349,8 @@ export default function VolunteerPortalPage() {
               <div className="relative">
                 <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search assigned deliveries"
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -342,6 +360,7 @@ export default function VolunteerPortalPage() {
               {["ALL", "Pending", "In Transit", "Delivered"].map((st) => (
                 <button
                   key={st}
+                  type="button"
                   onClick={() => setStatusFilter(st)}
                   className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
                     statusFilter === st
@@ -355,17 +374,22 @@ export default function VolunteerPortalPage() {
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Assigned deliveries table"
+            className="overflow-x-auto"
+          >
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-semibold uppercase text-slate-400">
-                  <th className="py-3 px-4">ID</th>
-                  <th className="py-3 px-4">Request</th>
-                  <th className="py-3 px-4">Recipient</th>
-                  <th className="py-3 px-4">Location</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Status</th>
-                  <th className="py-3 px-4 text-right">Action</th>
+                  <th scope="col" className="py-3 px-4">ID</th>
+                  <th scope="col" className="py-3 px-4">Request</th>
+                  <th scope="col" className="py-3 px-4">Recipient</th>
+                  <th scope="col" className="py-3 px-4">Location</th>
+                  <th scope="col" className="py-3 px-4">Date</th>
+                  <th scope="col" className="py-3 px-4">Status</th>
+                  <th scope="col" className="py-3 px-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
@@ -403,6 +427,7 @@ export default function VolunteerPortalPage() {
                         <div className="inline-flex items-center gap-2">
                           {del.deliveryStatus === "Pending" && (
                             <button
+                              type="button"
                               onClick={() =>
                                 handleUpdateDeliveryStatus(
                                   del.deliveryId,
@@ -417,6 +442,7 @@ export default function VolunteerPortalPage() {
                           )}
                           {del.deliveryStatus !== "Delivered" ? (
                             <button
+                              type="button"
                               onClick={() =>
                                 handleUpdateDeliveryStatus(
                                   del.deliveryId,
@@ -455,11 +481,17 @@ export default function VolunteerPortalPage() {
 
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              <label
+                htmlFor="vol-fullname"
+                className="block text-xs font-medium text-slate-700 mb-1.5"
+              >
                 Full Name
               </label>
               <input
+                id="vol-fullname"
+                name="fullName"
                 type="text"
+                autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3.5 py-2 text-sm text-slate-900"
@@ -468,10 +500,15 @@ export default function VolunteerPortalPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              <label
+                htmlFor="vol-contact"
+                className="block text-xs font-medium text-slate-700 mb-1.5"
+              >
                 Contact Info
               </label>
               <input
+                id="vol-contact"
+                name="contactInfo"
                 type="text"
                 value={contactInfo}
                 onChange={(e) => setContactInfo(e.target.value)}
@@ -481,10 +518,15 @@ export default function VolunteerPortalPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1.5">
+              <label
+                htmlFor="vol-vehicle"
+                className="block text-xs font-medium text-slate-700 mb-1.5"
+              >
                 Vehicle Type
               </label>
               <select
+                id="vol-vehicle"
+                name="vehicleType"
                 value={vehicleType}
                 onChange={(e) => setVehicleType(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-900"
@@ -498,8 +540,13 @@ export default function VolunteerPortalPage() {
             </div>
 
             <div className="pt-1">
-              <label className="flex items-center gap-2.5 cursor-pointer">
+              <label
+                htmlFor="vol-available"
+                className="flex items-center gap-2.5 cursor-pointer"
+              >
                 <input
+                  id="vol-available"
+                  name="isAvailable"
                   type="checkbox"
                   checked={isAvailable}
                   onChange={(e) => setIsAvailable(e.target.checked)}
@@ -557,6 +604,7 @@ export default function VolunteerPortalPage() {
                   </div>
                   {!n.isRead && (
                     <button
+                      type="button"
                       onClick={() =>
                         handleMarkNotificationRead(n.notificationId)
                       }

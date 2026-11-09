@@ -5,17 +5,87 @@ import crypto from "crypto";
 export const dynamic = "force-dynamic";
 
 const pool = new Pool({
-  host: process.env.DB_HOST || "aws-0-ap-northeast-2.pooler.supabase.com",
+  host: process.env.DB_HOST || "aws-0-ap-south-1.pooler.supabase.com",
   port: Number(process.env.DB_PORT || 6543),
   database: process.env.DB_NAME || "postgres",
-  user: process.env.DB_USER || "postgres.jkhvrohsrihmkyxzrhyw",
-  password: process.env.DB_PASS || "DisasterReliefSystem",
+  user: process.env.DB_USER || "postgres.sfcynookqsnhuamosvvq",
+  password: process.env.DB_PASS || "renzAldrean",
   ssl: { rejectUnauthorized: false },
   max: 5,
 });
 
 function hashPasswordSha256Base64(password: string): string {
   return crypto.createHash("sha256").update(password, "utf8").digest("base64");
+}
+
+function normalizeSelfRegisterRole(
+  raw: unknown
+): "Donor" | "Organization" | "Volunteer" | null {
+  if (typeof raw !== "string") return null;
+  const r = raw.trim().toLowerCase();
+  if (r === "donor") return "Donor";
+  if (r === "organization") return "Organization";
+  if (r === "volunteer") return "Volunteer";
+  return null;
+}
+
+function normalizeDonationStatus(raw: unknown): "Pending" | "Approved" | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (s === "pending") return "Pending";
+  if (s === "approved") return "Approved";
+  return null;
+}
+
+function normalizeRequestStatus(
+  raw: unknown
+): "Pending" | "Approved" | "Fulfilled" | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (s === "pending") return "Pending";
+  if (s === "approved") return "Approved";
+  if (s === "fulfilled") return "Fulfilled";
+  return null;
+}
+
+function normalizeDeliveryStatus(
+  raw: unknown
+): "Pending" | "In Transit" | "Delivered" | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (s === "pending") return "Pending";
+  if (s === "in transit") return "In Transit";
+  if (s === "delivered") return "Delivered";
+  return null;
+}
+
+function normalizeEventStatus(raw: unknown): "Active" | "Resolved" | null {
+  if (typeof raw !== "string") return null;
+  const s = raw.trim().toLowerCase();
+  if (s === "active") return "Active";
+  if (s === "resolved") return "Resolved";
+  return null;
+}
+
+function mergeLineItems(rawItems: unknown): { goodId: number; quantity: number }[] {
+  if (!Array.isArray(rawItems)) return [];
+  const merged = new Map<number, number>();
+  for (const item of rawItems) {
+    const goodId = Number((item as any)?.goodId);
+    const quantity = Number((item as any)?.quantity);
+    if (
+      Number.isInteger(goodId) &&
+      goodId > 0 &&
+      Number.isInteger(quantity) &&
+      quantity > 0
+    ) {
+      merged.set(goodId, (merged.get(goodId) || 0) + quantity);
+    }
+  }
+  return Array.from(merged.entries()).map(([goodId, quantity]) => ({
+    goodId,
+    quantity,
+  }));
 }
 
 async function tryForwardToJavaJdbcServer(
@@ -32,7 +102,7 @@ async function tryForwardToJavaJdbcServer(
   const url = `${javaBase.replace(/\/$/, "")}/api/${subpath}${search}`;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3500);
+  const timer = setTimeout(() => controller.abort(), 6500);
   try {
     const res = await fetch(url, {
       method: req.method,
@@ -42,7 +112,13 @@ async function tryForwardToJavaJdbcServer(
       cache: "no-store",
     });
     clearTimeout(timer);
-    if (res.ok || res.status === 400 || res.status === 401 || res.status === 409) {
+    const isJson = (res.headers.get("content-type") || "").includes(
+      "application/json"
+    );
+    if (
+      res.ok ||
+      ([400, 401, 404, 405, 409].includes(res.status) && isJson)
+    ) {
       const text = await res.text();
       return new NextResponse(text, {
         status: res.status,
@@ -110,7 +186,12 @@ async function handleRequest(req: NextRequest, subpath: string) {
 
     if (subpath === "auth/login" && req.method === "POST") {
       const { username, password } = body;
-      if (!username || !password) {
+      if (
+        typeof username !== "string" ||
+        !username.trim() ||
+        typeof password !== "string" ||
+        !password
+      ) {
         return NextResponse.json(
           { error: "Username and password are required." },
           { status: 400 }
@@ -183,19 +264,50 @@ async function handleRequest(req: NextRequest, subpath: string) {
         password,
         fullName,
         contactInfo,
-        role,
+        role: rawRole,
         donorType,
         orgName,
         location,
         vehicleType,
       } = body;
 
-      if (!username || !password || !fullName || !role) {
+      if (
+        typeof username !== "string" ||
+        !username.trim() ||
+        typeof password !== "string" ||
+        !password ||
+        typeof fullName !== "string" ||
+        !fullName.trim() ||
+        !rawRole
+      ) {
         return NextResponse.json(
           { error: "Missing required registration fields." },
           { status: 400 }
         );
       }
+
+      if (password.length < 4) {
+        return NextResponse.json(
+          { error: "Password must be at least 4 characters long." },
+          { status: 400 }
+        );
+      }
+
+      const role = normalizeSelfRegisterRole(rawRole);
+      if (!role) {
+        return NextResponse.json(
+          {
+            error:
+              "Self-registration is restricted to Donor, Organization, or Volunteer roles.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const safeDonorType =
+        String(donorType || "").trim().toLowerCase() === "corporate"
+          ? "Corporate"
+          : "Individual";
 
       const client = await pool.connect();
       try {
@@ -212,7 +324,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
           );
         }
 
-        if (role === "Organization" && orgName) {
+        if (role === "Organization" && typeof orgName === "string" && orgName.trim()) {
           const dupOrg = await client.query(
             "SELECT org_id FROM Organization WHERE LOWER(org_name) = LOWER($1)",
             [orgName.trim()]
@@ -235,9 +347,9 @@ async function handleRequest(req: NextRequest, subpath: string) {
           [
             username.trim(),
             hash,
-            role.trim(),
+            role,
             fullName.trim(),
-            contactInfo ? contactInfo.trim() : "",
+            typeof contactInfo === "string" ? contactInfo.trim() : "",
           ]
         );
         const newUser = insUser.rows[0];
@@ -246,17 +358,30 @@ async function handleRequest(req: NextRequest, subpath: string) {
         if (role === "Donor") {
           await client.query(
             "INSERT INTO Donor (user_id, donor_type) VALUES ($1, $2)",
-            [userId, donorType || "Individual"]
+            [userId, safeDonorType]
           );
         } else if (role === "Organization") {
           await client.query(
             "INSERT INTO Organization (user_id, org_name, location) VALUES ($1, $2, $3)",
-            [userId, orgName || fullName, location || "Metro Manila"]
+            [
+              userId,
+              typeof orgName === "string" && orgName.trim()
+                ? orgName.trim()
+                : fullName.trim(),
+              typeof location === "string" && location.trim()
+                ? location.trim()
+                : "Metro Manila",
+            ]
           );
         } else if (role === "Volunteer") {
           await client.query(
             "INSERT INTO Volunteer (user_id, vehicle_type, is_available) VALUES ($1, $2, true)",
-            [userId, vehicleType || "Van"]
+            [
+              userId,
+              typeof vehicleType === "string" && vehicleType.trim()
+                ? vehicleType.trim()
+                : "Van",
+            ]
           );
         }
 
@@ -276,7 +401,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
               username: newUser.username,
               fullName: newUser.full_name,
               role: newUser.role,
-              contactInfo: newUser.contact_info,
+              contactInfo: newUser.contact_info || "",
             },
             message: "Account registered successfully.",
           },
@@ -318,13 +443,13 @@ async function handleRequest(req: NextRequest, subpath: string) {
           "SELECT d.*, u.full_name as donor_name, e.event_name FROM Donation d JOIN Donor dn ON d.donor_id = dn.donor_id JOIN UserAccount u ON dn.user_id = u.user_id LEFT JOIN DisasterEvent e ON d.event_id = e.event_id ORDER BY d.donation_id DESC"
         ),
         pool.query(
-          "SELECT di.*, r.item_name, r.category, r.unit_of_measure FROM DonationItem di JOIN ReliefGood r ON di.good_id = r.good_id"
+          "SELECT di.*, r.item_name, r.category, r.unit_of_measure FROM DonationItem di JOIN ReliefGood r ON di.good_id = r.good_id ORDER BY di.item_id"
         ),
         pool.query(
           "SELECT r.*, o.org_name, e.event_name FROM ReliefRequest r JOIN Organization o ON r.org_id = o.org_id JOIN DisasterEvent e ON r.event_id = e.event_id ORDER BY r.request_id DESC"
         ),
         pool.query(
-          "SELECT ri.*, r.item_name, r.category, r.unit_of_measure FROM RequestItem ri JOIN ReliefGood r ON ri.good_id = r.good_id"
+          "SELECT ri.*, r.item_name, r.category, r.unit_of_measure FROM RequestItem ri JOIN ReliefGood r ON ri.good_id = r.good_id ORDER BY ri.request_item_id"
         ),
         pool.query(
           "SELECT d.*, u.full_name as volunteer_name, o.org_name, o.location FROM Delivery d LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id LEFT JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id ORDER BY d.delivery_id DESC"
@@ -554,7 +679,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
 
     if (subpath === "portal/donor" && req.method === "GET") {
       const userId = Number(req.nextUrl.searchParams.get("userId") || 0);
-      const [uRes, dRes, donRes, eventsRes, goodsRes, invRes, notifRes] =
+      const [uRes, dRes, donRes, donItemsRes, eventsRes, goodsRes, invRes, notifRes] =
         await Promise.all([
           pool.query("SELECT * FROM UserAccount WHERE user_id = $1", [userId]),
           pool.query("SELECT * FROM Donor WHERE user_id = $1", [userId]),
@@ -562,20 +687,21 @@ async function handleRequest(req: NextRequest, subpath: string) {
             "SELECT d.*, u.full_name as donor_name, e.event_name FROM Donation d JOIN Donor dn ON d.donor_id = dn.donor_id JOIN UserAccount u ON dn.user_id = u.user_id LEFT JOIN DisasterEvent e ON d.event_id = e.event_id WHERE dn.user_id = $1 ORDER BY d.donation_id DESC",
             [userId]
           ),
+          pool.query(
+            "SELECT di.*, r.item_name, r.category, r.unit_of_measure FROM DonationItem di JOIN ReliefGood r ON di.good_id = r.good_id JOIN Donation d ON di.donation_id = d.donation_id JOIN Donor dn ON d.donor_id = dn.donor_id WHERE dn.user_id = $1 ORDER BY di.item_id",
+            [userId]
+          ),
           pool.query("SELECT * FROM DisasterEvent ORDER BY event_id DESC"),
           pool.query("SELECT * FROM ReliefGood ORDER BY good_id"),
           pool.query(
-            "SELECT i.inventory_id, i.good_id, i.current_stock, r.item_name, r.category, r.unit_of_measure FROM Inventory i JOIN ReliefGood r ON i.good_id = r.good_id"
+            "SELECT i.inventory_id, i.good_id, i.current_stock, r.item_name, r.category, r.unit_of_measure FROM Inventory i JOIN ReliefGood r ON i.good_id = r.good_id ORDER BY i.inventory_id"
           ),
           pool.query(
-            "SELECT * FROM Notification WHERE user_id = $1 ORDER BY date_sent DESC",
+            "SELECT * FROM Notification WHERE user_id = $1 ORDER BY date_sent DESC LIMIT 50",
             [userId]
           ),
         ]);
 
-      const donItemsRes = await pool.query(
-        "SELECT di.*, r.item_name, r.category, r.unit_of_measure FROM DonationItem di JOIN ReliefGood r ON di.good_id = r.good_id"
-      );
       const itemsMap: Record<number, any[]> = {};
       donItemsRes.rows.forEach((it) => {
         if (!itemsMap[it.donation_id]) itemsMap[it.donation_id] = [];
@@ -655,32 +781,42 @@ async function handleRequest(req: NextRequest, subpath: string) {
 
     if (subpath === "portal/organization" && req.method === "GET") {
       const userId = Number(req.nextUrl.searchParams.get("userId") || 0);
-      const [uRes, oRes, reqRes, delRes, eventsRes, goodsRes, invRes, notifRes] =
-        await Promise.all([
-          pool.query("SELECT * FROM UserAccount WHERE user_id = $1", [userId]),
-          pool.query("SELECT * FROM Organization WHERE user_id = $1", [userId]),
-          pool.query(
-            "SELECT r.*, o.org_name, e.event_name FROM ReliefRequest r JOIN Organization o ON r.org_id = o.org_id JOIN DisasterEvent e ON r.event_id = e.event_id WHERE o.user_id = $1 ORDER BY r.request_id DESC",
-            [userId]
-          ),
-          pool.query(
-            "SELECT d.*, u.full_name as volunteer_name, o.org_name, o.location FROM Delivery d LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id LEFT JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id WHERE o.user_id = $1 ORDER BY d.delivery_id DESC",
-            [userId]
-          ),
-          pool.query("SELECT * FROM DisasterEvent ORDER BY event_id DESC"),
-          pool.query("SELECT * FROM ReliefGood ORDER BY good_id"),
-          pool.query(
-            "SELECT i.inventory_id, i.good_id, i.current_stock, r.item_name, r.category, r.unit_of_measure FROM Inventory i JOIN ReliefGood r ON i.good_id = r.good_id"
-          ),
-          pool.query(
-            "SELECT * FROM Notification WHERE user_id = $1 ORDER BY date_sent DESC",
-            [userId]
-          ),
-        ]);
+      const [
+        uRes,
+        oRes,
+        reqRes,
+        reqItemsRes,
+        delRes,
+        eventsRes,
+        goodsRes,
+        invRes,
+        notifRes,
+      ] = await Promise.all([
+        pool.query("SELECT * FROM UserAccount WHERE user_id = $1", [userId]),
+        pool.query("SELECT * FROM Organization WHERE user_id = $1", [userId]),
+        pool.query(
+          "SELECT r.*, o.org_name, e.event_name FROM ReliefRequest r JOIN Organization o ON r.org_id = o.org_id JOIN DisasterEvent e ON r.event_id = e.event_id WHERE o.user_id = $1 ORDER BY r.request_id DESC",
+          [userId]
+        ),
+        pool.query(
+          "SELECT ri.*, r.item_name, r.category, r.unit_of_measure FROM RequestItem ri JOIN ReliefGood r ON ri.good_id = r.good_id JOIN ReliefRequest req ON ri.request_id = req.request_id JOIN Organization o ON req.org_id = o.org_id WHERE o.user_id = $1 ORDER BY ri.request_item_id",
+          [userId]
+        ),
+        pool.query(
+          "SELECT d.*, u.full_name as volunteer_name, o.org_name, o.location FROM Delivery d LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id LEFT JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id WHERE o.user_id = $1 ORDER BY d.delivery_id DESC",
+          [userId]
+        ),
+        pool.query("SELECT * FROM DisasterEvent ORDER BY event_id DESC"),
+        pool.query("SELECT * FROM ReliefGood ORDER BY good_id"),
+        pool.query(
+          "SELECT i.inventory_id, i.good_id, i.current_stock, r.item_name, r.category, r.unit_of_measure FROM Inventory i JOIN ReliefGood r ON i.good_id = r.good_id ORDER BY i.inventory_id"
+        ),
+        pool.query(
+          "SELECT * FROM Notification WHERE user_id = $1 ORDER BY date_sent DESC LIMIT 50",
+          [userId]
+        ),
+      ]);
 
-      const reqItemsRes = await pool.query(
-        "SELECT ri.*, r.item_name, r.category, r.unit_of_measure FROM RequestItem ri JOIN ReliefGood r ON ri.good_id = r.good_id"
-      );
       const itemsMap: Record<number, any[]> = {};
       reqItemsRes.rows.forEach((it) => {
         if (!itemsMap[it.request_id]) itemsMap[it.request_id] = [];
@@ -785,7 +921,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
         ),
         pool.query("SELECT * FROM DisasterEvent ORDER BY event_id DESC"),
         pool.query(
-          "SELECT * FROM Notification WHERE user_id = $1 ORDER BY date_sent DESC",
+          "SELECT * FROM Notification WHERE user_id = $1 ORDER BY date_sent DESC LIMIT 50",
           [userId]
         ),
       ]);
@@ -844,7 +980,23 @@ async function handleRequest(req: NextRequest, subpath: string) {
 
     if (subpath === "donations") {
       if (req.method === "POST") {
-        const { userId, eventId, items } = body;
+        const userId = Number(body.userId);
+        const eventId = body.eventId ? Number(body.eventId) : null;
+        const items = mergeLineItems(body.items);
+
+        if (!Number.isInteger(userId) || userId <= 0) {
+          return NextResponse.json(
+            { error: "Valid userId is required." },
+            { status: 400 }
+          );
+        }
+        if (items.length === 0) {
+          return NextResponse.json(
+            { error: "At least one valid donation item (quantity > 0) is required." },
+            { status: 400 }
+          );
+        }
+
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
@@ -855,10 +1007,24 @@ async function handleRequest(req: NextRequest, subpath: string) {
           if (dRes.rows.length === 0) {
             await client.query("ROLLBACK");
             return NextResponse.json(
-              { error: "Donor profile not found." },
+              { error: "Donor profile not found for userId." },
               { status: 400 }
             );
           }
+          if (eventId && eventId > 0) {
+            const evRes = await client.query(
+              "SELECT 1 FROM DisasterEvent WHERE event_id = $1",
+              [eventId]
+            );
+            if (evRes.rows.length === 0) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                { error: "Selected disaster event does not exist." },
+                { status: 400 }
+              );
+            }
+          }
+
           const donorId = dRes.rows[0].donor_id;
           const insDon = await client.query(
             "INSERT INTO Donation (donor_id, event_id, donation_date, status) VALUES ($1, $2, CURRENT_DATE, 'Pending') RETURNING donation_id",
@@ -866,7 +1032,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
           );
           const donationId = insDon.rows[0].donation_id;
 
-          for (const it of items || []) {
+          for (const it of items) {
             await client.query(
               "INSERT INTO DonationItem (donation_id, good_id, quantity) VALUES ($1, $2, $3)",
               [donationId, it.goodId, it.quantity]
@@ -877,11 +1043,14 @@ async function handleRequest(req: NextRequest, subpath: string) {
             "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
             [
               userId,
-              `Donation Pledge #${donationId} (${(items || []).length} item types) recorded and awaiting Steward verification.`,
+              `Donation Pledge #${donationId} (${items.length} item types) recorded and awaiting Steward verification.`,
             ]
           );
           await client.query("COMMIT");
-          return NextResponse.json({ donationId }, { status: 201 });
+          return NextResponse.json(
+            { donationId, message: "Donation submitted atomically." },
+            { status: 201 }
+          );
         } catch (e) {
           await client.query("ROLLBACK");
           throw e;
@@ -889,16 +1058,31 @@ async function handleRequest(req: NextRequest, subpath: string) {
           client.release();
         }
       } else if (req.method === "PUT") {
-        const { donationId, status } = body;
+        const donationId = Number(body.donationId);
+        const status = normalizeDonationStatus(body.status);
+        if (!Number.isInteger(donationId) || donationId <= 0 || !status) {
+          return NextResponse.json(
+            { error: "Valid donationId and status (Pending or Approved) are required." },
+            { status: 400 }
+          );
+        }
+
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
           const prevRes = await client.query(
-            "SELECT status, donor_id FROM Donation WHERE donation_id = $1",
+            "SELECT status, donor_id FROM Donation WHERE donation_id = $1 FOR UPDATE",
             [donationId]
           );
-          const prevStatus = prevRes.rows[0]?.status;
-          const donorId = prevRes.rows[0]?.donor_id;
+          if (prevRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              { error: "Donation not found." },
+              { status: 404 }
+            );
+          }
+          const prevStatus = prevRes.rows[0].status;
+          const donorId = prevRes.rows[0].donor_id;
 
           await client.query(
             "UPDATE Donation SET status = $1 WHERE donation_id = $2",
@@ -907,35 +1091,35 @@ async function handleRequest(req: NextRequest, subpath: string) {
 
           if (status === "Approved" && prevStatus !== "Approved") {
             const itemsRes = await client.query(
-              "SELECT good_id, quantity FROM DonationItem WHERE donation_id = $1",
+              "SELECT good_id, SUM(quantity) AS total_qty FROM DonationItem WHERE donation_id = $1 GROUP BY good_id",
               [donationId]
             );
             for (const it of itemsRes.rows) {
               await client.query(
                 "INSERT INTO Inventory (good_id, current_stock) VALUES ($1, $2) ON CONFLICT (good_id) DO UPDATE SET current_stock = Inventory.current_stock + EXCLUDED.current_stock",
-                [it.good_id, it.quantity]
+                [it.good_id, Number(it.total_qty)]
               );
             }
           }
 
-          if (donorId) {
-            const uRes = await client.query(
-              "SELECT user_id FROM Donor WHERE donor_id = $1",
-              [donorId]
+          const uRes = await client.query(
+            "SELECT user_id FROM Donor WHERE donor_id = $1",
+            [donorId]
+          );
+          if (uRes.rows[0]) {
+            await client.query(
+              "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
+              [
+                uRes.rows[0].user_id,
+                `Your Donation #${donationId} status has been updated to: ${status}.`,
+              ]
             );
-            if (uRes.rows[0]) {
-              await client.query(
-                "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
-                [
-                  uRes.rows[0].user_id,
-                  `Your Donation #${donationId} status has been updated to: ${status}.`,
-                ]
-              );
-            }
           }
 
           await client.query("COMMIT");
-          return NextResponse.json({ updated: true });
+          return NextResponse.json({
+            message: "Donation status updated and warehouse inventory synchronized.",
+          });
         } catch (e) {
           await client.query("ROLLBACK");
           throw e;
@@ -944,14 +1128,45 @@ async function handleRequest(req: NextRequest, subpath: string) {
         }
       } else if (req.method === "DELETE") {
         const id = Number(req.nextUrl.searchParams.get("id") || 0);
-        await pool.query("DELETE FROM Donation WHERE donation_id = $1", [id]);
+        if (!Number.isInteger(id) || id <= 0) {
+          return NextResponse.json(
+            { error: "Valid donation id is required." },
+            { status: 400 }
+          );
+        }
+        const del = await pool.query(
+          "DELETE FROM Donation WHERE donation_id = $1",
+          [id]
+        );
+        if (del.rowCount === 0) {
+          return NextResponse.json(
+            { error: "Donation not found." },
+            { status: 404 }
+          );
+        }
         return NextResponse.json({ deleted: true });
       }
     }
 
     if (subpath === "requests") {
       if (req.method === "POST") {
-        const { userId, eventId, items } = body;
+        const userId = Number(body.userId);
+        const eventId = Number(body.eventId);
+        const items = mergeLineItems(body.items);
+
+        if (!Number.isInteger(userId) || userId <= 0 || !Number.isInteger(eventId) || eventId <= 0) {
+          return NextResponse.json(
+            { error: "Valid userId and eventId are required." },
+            { status: 400 }
+          );
+        }
+        if (items.length === 0) {
+          return NextResponse.json(
+            { error: "At least one requested relief item (quantity > 0) is required." },
+            { status: 400 }
+          );
+        }
+
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
@@ -962,10 +1177,22 @@ async function handleRequest(req: NextRequest, subpath: string) {
           if (oRes.rows.length === 0) {
             await client.query("ROLLBACK");
             return NextResponse.json(
-              { error: "Organization profile not found." },
+              { error: "Organization profile not found for userId." },
               { status: 400 }
             );
           }
+          const evRes = await client.query(
+            "SELECT 1 FROM DisasterEvent WHERE event_id = $1",
+            [eventId]
+          );
+          if (evRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              { error: "Selected disaster event does not exist." },
+              { status: 400 }
+            );
+          }
+
           const orgId = oRes.rows[0].org_id;
           const insReq = await client.query(
             "INSERT INTO ReliefRequest (org_id, event_id, request_date, status) VALUES ($1, $2, CURRENT_DATE, 'Pending') RETURNING request_id",
@@ -973,7 +1200,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
           );
           const requestId = insReq.rows[0].request_id;
 
-          for (const it of items || []) {
+          for (const it of items) {
             await client.query(
               "INSERT INTO RequestItem (request_id, good_id, quantity) VALUES ($1, $2, $3)",
               [requestId, it.goodId, it.quantity]
@@ -984,11 +1211,14 @@ async function handleRequest(req: NextRequest, subpath: string) {
             "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
             [
               userId,
-              `Relief Request #${requestId} submitted and queued for Steward review.`,
+              `Relief Request #${requestId} submitted for event #${eventId} and queued for Steward review.`,
             ]
           );
           await client.query("COMMIT");
-          return NextResponse.json({ requestId }, { status: 201 });
+          return NextResponse.json(
+            { requestId, message: "Relief request submitted atomically." },
+            { status: 201 }
+          );
         } catch (e) {
           await client.query("ROLLBACK");
           throw e;
@@ -996,26 +1226,64 @@ async function handleRequest(req: NextRequest, subpath: string) {
           client.release();
         }
       } else if (req.method === "PUT") {
-        const { requestId, status } = body;
+        const requestId = Number(body.requestId);
+        const status = normalizeRequestStatus(body.status);
+        if (!Number.isInteger(requestId) || requestId <= 0 || !status) {
+          return NextResponse.json(
+            {
+              error:
+                "Valid requestId and status (Pending, Approved, or Fulfilled) are required.",
+            },
+            { status: 400 }
+          );
+        }
+
         const client = await pool.connect();
         try {
           await client.query("BEGIN");
           const prevRes = await client.query(
-            "SELECT status, org_id FROM ReliefRequest WHERE request_id = $1",
+            "SELECT status, org_id FROM ReliefRequest WHERE request_id = $1 FOR UPDATE",
             [requestId]
           );
-          const prevStatus = prevRes.rows[0]?.status;
-          const orgId = prevRes.rows[0]?.org_id;
+          if (prevRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              { error: "Relief request not found." },
+              { status: 404 }
+            );
+          }
+          const prevStatus = prevRes.rows[0].status;
+          const orgId = prevRes.rows[0].org_id;
 
-          if (status === "Approved" && prevStatus === "Pending") {
+          if (
+            prevStatus === "Pending" &&
+            (status === "Approved" || status === "Fulfilled")
+          ) {
             const itemsRes = await client.query(
-              "SELECT good_id, quantity FROM RequestItem WHERE request_id = $1",
+              "SELECT ri.good_id, SUM(ri.quantity) AS total_qty, g.item_name, g.unit_of_measure FROM RequestItem ri JOIN ReliefGood g ON ri.good_id = g.good_id WHERE ri.request_id = $1 GROUP BY ri.good_id, g.item_name, g.unit_of_measure ORDER BY ri.good_id",
               [requestId]
             );
+
             for (const it of itemsRes.rows) {
+              const reqQty = Number(it.total_qty);
+              const invRes = await client.query(
+                "SELECT current_stock FROM Inventory WHERE good_id = $1 FOR UPDATE",
+                [it.good_id]
+              );
+              const available = invRes.rows[0]?.current_stock ?? 0;
+              if (invRes.rows.length === 0 || available < reqQty) {
+                await client.query("ROLLBACK");
+                return NextResponse.json(
+                  {
+                    error: `Insufficient warehouse stock for ${it.item_name}: requested ${reqQty} ${it.unit_of_measure}, available ${available} ${it.unit_of_measure}.`,
+                  },
+                  { status: 400 }
+                );
+              }
+
               await client.query(
-                "UPDATE Inventory SET current_stock = GREATEST(0, current_stock - $1) WHERE good_id = $2",
-                [it.quantity, it.good_id]
+                "UPDATE Inventory SET current_stock = current_stock - $1 WHERE good_id = $2",
+                [reqQty, it.good_id]
               );
             }
           }
@@ -1025,20 +1293,198 @@ async function handleRequest(req: NextRequest, subpath: string) {
             [status, requestId]
           );
 
-          if (orgId) {
-            const uRes = await client.query(
-              "SELECT user_id FROM Organization WHERE org_id = $1",
-              [orgId]
+          const uRes = await client.query(
+            "SELECT user_id FROM Organization WHERE org_id = $1",
+            [orgId]
+          );
+          if (uRes.rows[0]) {
+            await client.query(
+              "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
+              [
+                uRes.rows[0].user_id,
+                `Relief Request #${requestId} status updated to: ${status}.`,
+              ]
             );
-            if (uRes.rows[0]) {
-              await client.query(
-                "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
-                [
-                  uRes.rows[0].user_id,
-                  `Relief Request #${requestId} status updated to: ${status}.`,
-                ]
+          }
+
+          await client.query("COMMIT");
+          return NextResponse.json({
+            message: "Request status updated and inventory adjusted atomically.",
+          });
+        } catch (e) {
+          await client.query("ROLLBACK");
+          throw e;
+        } finally {
+          client.release();
+        }
+      } else if (req.method === "DELETE") {
+        const id = Number(req.nextUrl.searchParams.get("id") || 0);
+        if (!Number.isInteger(id) || id <= 0) {
+          return NextResponse.json(
+            { error: "Valid request id is required." },
+            { status: 400 }
+          );
+        }
+        const del = await pool.query(
+          "DELETE FROM ReliefRequest WHERE request_id = $1",
+          [id]
+        );
+        if (del.rowCount === 0) {
+          return NextResponse.json(
+            { error: "Relief request not found." },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json({ deleted: true });
+      }
+    }
+
+    if (subpath === "deliveries") {
+      if (req.method === "POST") {
+        const requestId = Number(body.requestId);
+        const volunteerId = body.volunteerId ? Number(body.volunteerId) : null;
+        const deliveryStatus =
+          body.deliveryStatus && String(body.deliveryStatus).trim()
+            ? normalizeDeliveryStatus(body.deliveryStatus)
+            : "In Transit";
+
+        if (!Number.isInteger(requestId) || requestId <= 0 || !deliveryStatus) {
+          return NextResponse.json(
+            { error: "Valid requestId and deliveryStatus are required." },
+            { status: 400 }
+          );
+        }
+
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const reqRes = await client.query(
+            "SELECT r.status, o.user_id FROM ReliefRequest r JOIN Organization o ON r.org_id = o.org_id WHERE r.request_id = $1 FOR UPDATE",
+            [requestId]
+          );
+          if (reqRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              { error: "Relief request not found." },
+              { status: 404 }
+            );
+          }
+          const reqStatus = reqRes.rows[0].status;
+          const orgUserId = reqRes.rows[0].user_id;
+          if (reqStatus !== "Approved") {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              {
+                error: `Only Approved relief requests can be dispatched (Request #${requestId} is ${reqStatus}).`,
+              },
+              { status: 400 }
+            );
+          }
+
+          let volUserId: number | null = null;
+          if (volunteerId && volunteerId > 0) {
+            const vRes = await client.query(
+              "SELECT user_id FROM Volunteer WHERE volunteer_id = $1",
+              [volunteerId]
+            );
+            if (vRes.rows.length === 0) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                { error: "Assigned volunteer not found." },
+                { status: 404 }
               );
             }
+            volUserId = vRes.rows[0].user_id;
+          }
+
+          const insDel = await client.query(
+            "INSERT INTO Delivery (request_id, volunteer_id, dispatch_date, delivery_status) VALUES ($1, $2, CURRENT_DATE, $3) RETURNING delivery_id",
+            [requestId, volunteerId && volunteerId > 0 ? volunteerId : null, deliveryStatus]
+          );
+          const deliveryId = insDel.rows[0].delivery_id;
+
+          if (volUserId) {
+            await client.query(
+              "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
+              [
+                volUserId,
+                `New Dispatch Assignment (#${deliveryId}): You have been assigned to Relief Request #${requestId}.`,
+              ]
+            );
+          }
+
+          if (deliveryStatus === "Delivered") {
+            await client.query(
+              "UPDATE ReliefRequest SET status = 'Fulfilled' WHERE request_id = $1",
+              [requestId]
+            );
+            await client.query(
+              "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
+              [
+                orgUserId,
+                `Delivery #${deliveryId} for Relief Request #${requestId} has been delivered.`,
+              ]
+            );
+          }
+
+          await client.query("COMMIT");
+          return NextResponse.json(
+            { created: true, deliveryId },
+            { status: 201 }
+          );
+        } catch (e) {
+          await client.query("ROLLBACK");
+          throw e;
+        } finally {
+          client.release();
+        }
+      } else if (req.method === "PUT") {
+        const deliveryId = Number(body.deliveryId);
+        const deliveryStatus = normalizeDeliveryStatus(body.deliveryStatus);
+        if (!Number.isInteger(deliveryId) || deliveryId <= 0 || !deliveryStatus) {
+          return NextResponse.json(
+            {
+              error:
+                "Valid deliveryId and deliveryStatus (Pending, In Transit, or Delivered) are required.",
+            },
+            { status: 400 }
+          );
+        }
+
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const checkRes = await client.query(
+            "SELECT d.request_id, o.user_id FROM Delivery d JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id WHERE d.delivery_id = $1 FOR UPDATE",
+            [deliveryId]
+          );
+          if (checkRes.rows.length === 0) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              { error: "Delivery not found." },
+              { status: 404 }
+            );
+          }
+          const requestId = checkRes.rows[0].request_id;
+          const orgUserId = checkRes.rows[0].user_id;
+
+          await client.query(
+            "UPDATE Delivery SET delivery_status = $1 WHERE delivery_id = $2",
+            [deliveryStatus, deliveryId]
+          );
+
+          if (deliveryStatus === "Delivered") {
+            await client.query(
+              "UPDATE ReliefRequest SET status = 'Fulfilled' WHERE request_id = $1",
+              [requestId]
+            );
+            await client.query(
+              "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
+              [
+                orgUserId,
+                `Delivery #${deliveryId} for Relief Request #${requestId} has arrived and is marked Fulfilled.`,
+              ]
+            );
           }
 
           await client.query("COMMIT");
@@ -1051,74 +1497,94 @@ async function handleRequest(req: NextRequest, subpath: string) {
         }
       } else if (req.method === "DELETE") {
         const id = Number(req.nextUrl.searchParams.get("id") || 0);
-        await pool.query("DELETE FROM ReliefRequest WHERE request_id = $1", [
-          id,
-        ]);
-        return NextResponse.json({ deleted: true });
-      }
-    }
-
-    if (subpath === "deliveries") {
-      if (req.method === "POST") {
-        const { requestId, volunteerId, deliveryStatus } = body;
-        await pool.query(
-          "INSERT INTO Delivery (request_id, volunteer_id, dispatch_date, delivery_status) VALUES ($1, $2, CURRENT_DATE, $3)",
-          [requestId, volunteerId || null, deliveryStatus || "In Transit"]
-        );
-        if (volunteerId) {
-          const vRes = await pool.query(
-            "SELECT user_id FROM Volunteer WHERE volunteer_id = $1",
-            [volunteerId]
-          );
-          if (vRes.rows[0]) {
-            await pool.query(
-              "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
-              [
-                vRes.rows[0].user_id,
-                `New Dispatch Assignment: You have been assigned to Relief Request #${requestId}.`,
-              ]
-            );
-          }
-        }
-        return NextResponse.json({ created: true }, { status: 201 });
-      } else if (req.method === "PUT") {
-        const { deliveryId, deliveryStatus } = body;
-        await pool.query(
-          "UPDATE Delivery SET delivery_status = $1 WHERE delivery_id = $2",
-          [deliveryStatus, deliveryId]
-        );
-        if (deliveryStatus === "Delivered") {
-          await pool.query(
-            "UPDATE ReliefRequest SET status = 'Fulfilled' WHERE request_id = (SELECT request_id FROM Delivery WHERE delivery_id = $1)",
-            [deliveryId]
+        if (!Number.isInteger(id) || id <= 0) {
+          return NextResponse.json(
+            { error: "Valid delivery id is required." },
+            { status: 400 }
           );
         }
-        return NextResponse.json({ updated: true });
-      } else if (req.method === "DELETE") {
-        const id = Number(req.nextUrl.searchParams.get("id") || 0);
-        await pool.query("DELETE FROM Delivery WHERE delivery_id = $1", [id]);
+        const del = await pool.query(
+          "DELETE FROM Delivery WHERE delivery_id = $1",
+          [id]
+        );
+        if (del.rowCount === 0) {
+          return NextResponse.json(
+            { error: "Delivery not found." },
+            { status: 404 }
+          );
+        }
         return NextResponse.json({ deleted: true });
       }
     }
 
     if (subpath === "events") {
       if (req.method === "POST") {
-        const { eventName, location, status, startDate } = body;
-        await pool.query(
-          "INSERT INTO DisasterEvent (event_name, location, status, start_date) VALUES ($1, $2, $3, COALESCE($4::date, CURRENT_DATE))",
-          [eventName, location, status || "Active", startDate || null]
+        const { eventName, location, status: rawStatus, startDate } = body;
+        const status =
+          rawStatus && String(rawStatus).trim()
+            ? normalizeEventStatus(rawStatus)
+            : "Active";
+        if (
+          typeof eventName !== "string" ||
+          !eventName.trim() ||
+          typeof location !== "string" ||
+          !location.trim() ||
+          !status
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Event name, location, and valid status (Active or Resolved) are required.",
+            },
+            { status: 400 }
+          );
+        }
+        const ins = await pool.query(
+          "INSERT INTO DisasterEvent (event_name, location, status, start_date) VALUES ($1, $2, $3, COALESCE($4::date, CURRENT_DATE)) RETURNING event_id",
+          [eventName.trim(), location.trim(), status, startDate || null]
         );
-        return NextResponse.json({ created: true }, { status: 201 });
+        return NextResponse.json(
+          { created: true, eventId: ins.rows[0].event_id },
+          { status: 201 }
+        );
       } else if (req.method === "PUT") {
-        const { eventId, status } = body;
-        await pool.query(
+        const eventId = Number(body.eventId);
+        const status = normalizeEventStatus(body.status);
+        if (!Number.isInteger(eventId) || eventId <= 0 || !status) {
+          return NextResponse.json(
+            { error: "Valid eventId and status (Active or Resolved) are required." },
+            { status: 400 }
+          );
+        }
+        const upd = await pool.query(
           "UPDATE DisasterEvent SET status = $1 WHERE event_id = $2",
           [status, eventId]
         );
+        if (upd.rowCount === 0) {
+          return NextResponse.json(
+            { error: "Disaster event not found." },
+            { status: 404 }
+          );
+        }
         return NextResponse.json({ updated: true });
       } else if (req.method === "DELETE") {
         const id = Number(req.nextUrl.searchParams.get("id") || 0);
-        await pool.query("DELETE FROM DisasterEvent WHERE event_id = $1", [id]);
+        if (!Number.isInteger(id) || id <= 0) {
+          return NextResponse.json(
+            { error: "Valid event id is required." },
+            { status: 400 }
+          );
+        }
+        const del = await pool.query(
+          "DELETE FROM DisasterEvent WHERE event_id = $1",
+          [id]
+        );
+        if (del.rowCount === 0) {
+          return NextResponse.json(
+            { error: "Disaster event not found." },
+            { status: 404 }
+          );
+        }
         return NextResponse.json({ deleted: true });
       }
     }
@@ -1126,50 +1592,148 @@ async function handleRequest(req: NextRequest, subpath: string) {
     if (subpath === "inventory") {
       if (req.method === "POST") {
         const { itemName, category, unitOfMeasure, currentStock } = body;
-        const gRes = await pool.query(
-          "INSERT INTO ReliefGood (item_name, category, unit_of_measure) VALUES ($1, $2, $3) RETURNING good_id",
-          [itemName, category, unitOfMeasure]
-        );
-        const goodId = gRes.rows[0].good_id;
-        await pool.query(
-          "INSERT INTO Inventory (good_id, current_stock) VALUES ($1, $2)",
-          [goodId, Number(currentStock || 0)]
-        );
-        return NextResponse.json({ created: true }, { status: 201 });
+        const stock = Number(currentStock ?? 0);
+        if (
+          typeof itemName !== "string" ||
+          !itemName.trim() ||
+          typeof category !== "string" ||
+          !category.trim() ||
+          typeof unitOfMeasure !== "string" ||
+          !unitOfMeasure.trim()
+        ) {
+          return NextResponse.json(
+            { error: "Item name, category, and unit of measure are required." },
+            { status: 400 }
+          );
+        }
+        if (!Number.isInteger(stock) || stock < 0) {
+          return NextResponse.json(
+            { error: "Opening stock cannot be negative." },
+            { status: 400 }
+          );
+        }
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const gRes = await client.query(
+            "INSERT INTO ReliefGood (item_name, category, unit_of_measure) VALUES ($1, $2, $3) RETURNING good_id",
+            [itemName.trim(), category.trim(), unitOfMeasure.trim()]
+          );
+          const goodId = gRes.rows[0].good_id;
+          await client.query(
+            "INSERT INTO Inventory (good_id, current_stock) VALUES ($1, $2)",
+            [goodId, stock]
+          );
+          await client.query("COMMIT");
+          return NextResponse.json(
+            { created: true, goodId },
+            { status: 201 }
+          );
+        } catch (e) {
+          await client.query("ROLLBACK");
+          throw e;
+        } finally {
+          client.release();
+        }
       } else if (req.method === "PUT") {
-        const { inventoryId, currentStock } = body;
-        await pool.query(
+        const inventoryId = Number(body.inventoryId);
+        const newStock = Number(body.currentStock);
+        if (
+          !Number.isInteger(inventoryId) ||
+          inventoryId <= 0 ||
+          !Number.isInteger(newStock) ||
+          newStock < 0
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "Valid inventoryId and non-negative integer currentStock are required.",
+            },
+            { status: 400 }
+          );
+        }
+        const upd = await pool.query(
           "UPDATE Inventory SET current_stock = $1 WHERE inventory_id = $2",
-          [Number(currentStock), inventoryId]
+          [newStock, inventoryId]
         );
+        if (upd.rowCount === 0) {
+          return NextResponse.json(
+            { error: "Inventory record not found." },
+            { status: 404 }
+          );
+        }
         return NextResponse.json({ updated: true });
       } else if (req.method === "DELETE") {
         const id = Number(req.nextUrl.searchParams.get("id") || 0);
-        await pool.query(
+        if (!Number.isInteger(id) || id <= 0) {
+          return NextResponse.json(
+            { error: "Valid inventory id is required." },
+            { status: 400 }
+          );
+        }
+        const del = await pool.query(
           "DELETE FROM ReliefGood WHERE good_id = (SELECT good_id FROM Inventory WHERE inventory_id = $1)",
           [id]
         );
+        if (del.rowCount === 0) {
+          return NextResponse.json(
+            { error: "Inventory record not found." },
+            { status: 404 }
+          );
+        }
         return NextResponse.json({ deleted: true });
       }
     }
 
     if (subpath === "volunteer/profile" && req.method === "PUT") {
-      const { userId, fullName, contactInfo, vehicleType, isAvailable } = body;
-      if (fullName && contactInfo !== undefined) {
-        await pool.query(
-          "UPDATE UserAccount SET full_name = $1, contact_info = $2 WHERE user_id = $3",
-          [fullName, contactInfo, userId]
+      const userId = Number(body.userId);
+      const { fullName, contactInfo, vehicleType, isAvailable } = body;
+      if (!Number.isInteger(userId) || userId <= 0) {
+        return NextResponse.json(
+          { error: "Valid userId is required." },
+          { status: 400 }
         );
       }
-      await pool.query(
-        "INSERT INTO Volunteer (user_id, vehicle_type, is_available) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET vehicle_type = EXCLUDED.vehicle_type, is_available = EXCLUDED.is_available",
-        [userId, vehicleType || "Van", Boolean(isAvailable)]
-      );
-      return NextResponse.json({ updated: true });
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        if (typeof fullName === "string" && fullName.trim() && contactInfo !== undefined) {
+          await client.query(
+            "UPDATE UserAccount SET full_name = $1, contact_info = $2 WHERE user_id = $3",
+            [fullName.trim(), String(contactInfo).trim(), userId]
+          );
+        }
+        await client.query(
+          "INSERT INTO Volunteer (user_id, vehicle_type, is_available) VALUES ($1, $2, $3) ON CONFLICT (user_id) DO UPDATE SET vehicle_type = EXCLUDED.vehicle_type, is_available = EXCLUDED.is_available",
+          [
+            userId,
+            typeof vehicleType === "string" && vehicleType.trim()
+              ? vehicleType.trim()
+              : "Van",
+            Boolean(isAvailable),
+          ]
+        );
+        await client.query("COMMIT");
+        return NextResponse.json({ updated: true });
+      } catch (e) {
+        await client.query("ROLLBACK");
+        throw e;
+      } finally {
+        client.release();
+      }
     }
 
-    if (subpath === "notifications/read" && req.method === "PUT") {
-      const { notificationId } = body;
+    if (
+      subpath === "notifications/read" &&
+      (req.method === "PUT" || req.method === "POST")
+    ) {
+      const notificationId = Number(body.notificationId);
+      if (!Number.isInteger(notificationId) || notificationId <= 0) {
+        return NextResponse.json(
+          { error: "Valid notificationId is required." },
+          { status: 400 }
+        );
+      }
       await pool.query(
         "UPDATE Notification SET is_read = true WHERE notification_id = $1",
         [notificationId]
