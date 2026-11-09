@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: drrms-java-jdbc-api
+    runtime: docker
+    plan: free
+    envVars:
+      - key: DB_HOST
+        value: aws-0-ap-northeast-2.pooler.supabase.com
+      - key: DB_PORT
+        value: "6543"
+      - key: DB_NAME
+        value: postgres
+      - key: DB_USER
+        value: postgres.jkhvrohsrihmkyxzrhyw
+      - key: DB_PASS
+        value: DisasterReliefSystem
