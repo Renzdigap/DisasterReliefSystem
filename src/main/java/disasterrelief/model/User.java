@@ -16,6 +16,7 @@ public class User implements Serializable {
     private String role;
     private String contactInfo;
     private String email;
+    private boolean isVerified = true;
     private Timestamp createdAt;
 
     public User() {
@@ -96,8 +97,20 @@ public class User implements Serializable {
         return email != null ? email : contactInfo;
     }
 
+    public String getRawEmail() {
+        return email;
+    }
+
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public boolean isVerified() {
+        return isVerified;
+    }
+
+    public void setVerified(boolean isVerified) {
+        this.isVerified = isVerified;
     }
 
     public Timestamp getCreatedAt() {

@@ -85,6 +85,7 @@ Sample accounts in Supabase (also listed in [`credentials.txt`](credentials.txt)
 * **Web Frontend (Vercel):** Set the Root Directory to `web`, framework Next.js, and configure environment variables from [`web/.env.example`](web/.env.example):
   * `JAVA_API_URL` (your Render URL, e.g. `https://drrms-java-jdbc-api.onrender.com`)
   * `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` (Supabase Pooler connection)
+  * `SMTP_HOST` (`smtp.gmail.com`), `SMTP_PORT` (`465`), `SMTP_USER` (your Gmail address), `SMTP_PASS` (Google 16-character App Password for 6-digit email OTP verification)
 
 ---
 
@@ -92,3 +93,4 @@ Sample accounts in Supabase (also listed in [`credentials.txt`](credentials.txt)
 * [`IT161_Phase1_Project_Documentation_and_Defense_Guide.pdf`](IT161_Phase1_Project_Documentation_and_Defense_Guide.pdf)
 * [`credentials.txt`](credentials.txt)
 * [`src/main/resources/database/disaster_relief_schema_postgres.sql`](src/main/resources/database/disaster_relief_schema_postgres.sql)
+* [`src/main/resources/database/migration_email_verification.sql`](src/main/resources/database/migration_email_verification.sql)

@@ -5,6 +5,8 @@ export interface UserSession {
     fullName: string;
     role: "Admin" | "Donor" | "Organization" | "Volunteer" | string;
     contactInfo: string;
+    email?: string;
+    isVerified?: boolean;
   };
   donorId?: number;
   donorType?: string;

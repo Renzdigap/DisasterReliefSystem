@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Pool } from "pg";
 import crypto from "crypto";
+import { isEmailConfigured, sendVerificationOtpEmail } from "@/lib/mailer";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,67 @@ const pool = new Pool({
 function hashPasswordSha256Base64(password: string): string {
   return crypto.createHash("sha256").update(password, "utf8").digest("base64");
 }
+
+function hashOtpCode(email: string, code: string): string {
+  return crypto
+    .createHash("sha256")
+    .update(`${email.trim().toLowerCase()}:${code}`, "utf8")
+    .digest("hex");
+}
+
+function constantTimeHexEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+function isValidEmail(raw: unknown): raw is string {
+  if (typeof raw !== "string") return false;
+  const email = raw.trim();
+  if (!email || email.length > 255 || /[\r\n\s]/.test(email)) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+let verificationSchemaReady: Promise<void> | null = null;
+function ensureVerificationSchema(): Promise<void> {
+  if (!verificationSchemaReady) {
+    verificationSchemaReady = (async () => {
+      await pool.query(
+        "ALTER TABLE UserAccount ADD COLUMN IF NOT EXISTS email VARCHAR(255)"
+      );
+      await pool.query(
+        "ALTER TABLE UserAccount ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT true"
+      );
+      await pool.query(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_useraccount_email_unique ON UserAccount (LOWER(email)) WHERE email IS NOT NULL"
+      );
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS PendingVerification (
+          verification_id SERIAL PRIMARY KEY,
+          email VARCHAR(255) NOT NULL UNIQUE,
+          username VARCHAR(50) NOT NULL,
+          code_hash VARCHAR(128) NOT NULL,
+          payload_json TEXT NOT NULL,
+          attempts INT NOT NULL DEFAULT 0,
+          expires_at TIMESTAMPTZ NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    })().catch((err) => {
+      verificationSchemaReady = null;
+      throw err;
+    });
+  }
+  return verificationSchemaReady;
+}
+
+const NEXTJS_HANDLED_ENDPOINTS = new Set([
+  "auth/register",
+  "auth/verify-email",
+  "auth/resend-otp",
+]);
 
 function normalizeSelfRegisterRole(
   raw: unknown
@@ -117,7 +179,7 @@ async function tryForwardToJavaJdbcServer(
     );
     if (
       res.ok ||
-      ([400, 401, 404, 405, 409].includes(res.status) && isJson)
+      ([400, 401, 403, 404, 405, 409].includes(res.status) && isJson)
     ) {
       const text = await res.text();
       return new NextResponse(text, {
@@ -167,9 +229,12 @@ async function handleRequest(req: NextRequest, subpath: string) {
     ? await req.text()
     : "";
 
-  // 1. Try forwarding to Java JDBC REST API Server (Render / Localhost)
-  const forwarded = await tryForwardToJavaJdbcServer(req, subpath, bodyText);
-  if (forwarded) return forwarded;
+  // 1. Try forwarding to Java JDBC REST API Server (Render / Localhost),
+  //    except email OTP endpoints which use Next.js Nodemailer SMTP directly.
+  if (!NEXTJS_HANDLED_ENDPOINTS.has(subpath)) {
+    const forwarded = await tryForwardToJavaJdbcServer(req, subpath, bodyText);
+    if (forwarded) return forwarded;
+  }
 
   // 2. Seamless Direct Supabase PostgreSQL 15 Execution (if Render is cold-starting)
   try {
@@ -185,6 +250,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
     }
 
     if (subpath === "auth/login" && req.method === "POST") {
+      await ensureVerificationSchema();
       const { username, password } = body;
       if (
         typeof username !== "string" ||
@@ -193,13 +259,14 @@ async function handleRequest(req: NextRequest, subpath: string) {
         !password
       ) {
         return NextResponse.json(
-          { error: "Username and password are required." },
+          { error: "Username or email and password are required." },
           { status: 400 }
         );
       }
+      const identifier = username.trim();
       const uRes = await pool.query(
-        "SELECT * FROM UserAccount WHERE username = $1",
-        [username.trim()]
+        "SELECT * FROM UserAccount WHERE LOWER(username) = LOWER($1) OR (email IS NOT NULL AND LOWER(email) = LOWER($1))",
+        [identifier]
       );
       if (uRes.rows.length === 0) {
         return NextResponse.json(
@@ -217,12 +284,24 @@ async function handleRequest(req: NextRequest, subpath: string) {
         );
       }
 
+      if (row.is_verified === false) {
+        return NextResponse.json(
+          {
+            error:
+              "Please verify your email address before signing in.",
+          },
+          { status: 403 }
+        );
+      }
+
       const user = {
         userId: row.user_id,
         username: row.username,
         fullName: row.full_name,
         role: row.role,
         contactInfo: row.contact_info || "",
+        email: row.email || "",
+        isVerified: row.is_verified !== false,
       };
 
       const resp: any = { user };
@@ -259,8 +338,10 @@ async function handleRequest(req: NextRequest, subpath: string) {
     }
 
     if (subpath === "auth/register" && req.method === "POST") {
+      await ensureVerificationSchema();
       const {
         username,
+        email: rawEmail,
         password,
         fullName,
         contactInfo,
@@ -286,9 +367,28 @@ async function handleRequest(req: NextRequest, subpath: string) {
         );
       }
 
-      if (password.length < 4) {
+      const trimmedUsername = username.trim();
+      if (trimmedUsername.length < 3 || trimmedUsername.length > 50 || /[\s@]/.test(trimmedUsername)) {
         return NextResponse.json(
-          { error: "Password must be at least 4 characters long." },
+          {
+            error:
+              "Username must be 3-50 characters and cannot contain spaces or '@'.",
+          },
+          { status: 400 }
+        );
+      }
+
+      if (!isValidEmail(rawEmail)) {
+        return NextResponse.json(
+          { error: "Please enter a valid email address for verification." },
+          { status: 400 }
+        );
+      }
+      const normalizedEmail = rawEmail.trim().toLowerCase();
+
+      if (password.length < 6) {
+        return NextResponse.json(
+          { error: "Password must be at least 6 characters long." },
           { status: 400 }
         );
       }
@@ -304,33 +404,359 @@ async function handleRequest(req: NextRequest, subpath: string) {
         );
       }
 
+      if (!isEmailConfigured()) {
+        return NextResponse.json(
+          {
+            error:
+              "Email verification is not configured on the server yet (missing SMTP_USER / SMTP_PASS in Vercel Environment Variables).",
+          },
+          { status: 503 }
+        );
+      }
+
       const safeDonorType =
         String(donorType || "").trim().toLowerCase() === "corporate"
           ? "Corporate"
           : "Individual";
 
+      const dupUser = await pool.query(
+        "SELECT user_id, username, email FROM UserAccount WHERE LOWER(username) = LOWER($1) OR (email IS NOT NULL AND LOWER(email) = LOWER($2))",
+        [trimmedUsername, normalizedEmail]
+      );
+      if (dupUser.rows.length > 0) {
+        const hit = dupUser.rows[0];
+        if ((hit.email || "").toLowerCase() === normalizedEmail) {
+          return NextResponse.json(
+            { error: "An account with this email address already exists." },
+            { status: 409 }
+          );
+        }
+        return NextResponse.json(
+          { error: "Username already exists in Master Registry." },
+          { status: 409 }
+        );
+      }
+
+      if (role === "Organization" && typeof orgName === "string" && orgName.trim()) {
+        const dupOrg = await pool.query(
+          "SELECT org_id FROM Organization WHERE LOWER(org_name) = LOWER($1)",
+          [orgName.trim()]
+        );
+        if (dupOrg.rows.length > 0) {
+          return NextResponse.json(
+            {
+              error:
+                "Duplicate Organization detected in Master Data Registry.",
+            },
+            { status: 409 }
+          );
+        }
+      }
+
+      const existingPending = await pool.query(
+        "SELECT email, EXTRACT(EPOCH FROM (NOW() - updated_at)) AS elapsed_sec FROM PendingVerification WHERE email = $1",
+        [normalizedEmail]
+      );
+      if (
+        existingPending.rows.length > 0 &&
+        Number(existingPending.rows[0].elapsed_sec) < 30
+      ) {
+        const waitSec = Math.max(
+          1,
+          Math.ceil(30 - Number(existingPending.rows[0].elapsed_sec))
+        );
+        return NextResponse.json(
+          {
+            error: `A verification code was just sent. Please wait ${waitSec}s before requesting another code.`,
+          },
+          { status: 429 }
+        );
+      }
+
+      const otpCode = crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+      const codeHash = hashOtpCode(normalizedEmail, otpCode);
+      const pendingPayload = {
+        username: trimmedUsername,
+        passwordHash: hashPasswordSha256Base64(password),
+        fullName: fullName.trim(),
+        contactInfo: typeof contactInfo === "string" ? contactInfo.trim() : "",
+        role,
+        donorType: safeDonorType,
+        orgName:
+          typeof orgName === "string" && orgName.trim()
+            ? orgName.trim()
+            : fullName.trim(),
+        location:
+          typeof location === "string" && location.trim()
+            ? location.trim()
+            : "Metro Manila",
+        vehicleType:
+          typeof vehicleType === "string" && vehicleType.trim()
+            ? vehicleType.trim()
+            : "Van",
+      };
+
+      await pool.query(
+        `INSERT INTO PendingVerification (email, username, code_hash, payload_json, attempts, expires_at, updated_at)
+         VALUES ($1, $2, $3, $4, 0, NOW() + INTERVAL '10 minutes', NOW())
+         ON CONFLICT (email) DO UPDATE SET
+           username = EXCLUDED.username,
+           code_hash = EXCLUDED.code_hash,
+           payload_json = EXCLUDED.payload_json,
+           attempts = 0,
+           expires_at = NOW() + INTERVAL '10 minutes',
+           updated_at = NOW()`,
+        [
+          normalizedEmail,
+          trimmedUsername,
+          codeHash,
+          JSON.stringify(pendingPayload),
+        ]
+      );
+
+      try {
+        await sendVerificationOtpEmail({
+          toEmail: normalizedEmail,
+          fullName: pendingPayload.fullName,
+          username: pendingPayload.username,
+          role: pendingPayload.role,
+          code: otpCode,
+        });
+      } catch (mailErr: any) {
+        await pool.query("DELETE FROM PendingVerification WHERE email = $1", [
+          normalizedEmail,
+        ]);
+        console.error("Failed to send OTP email:", mailErr?.message || mailErr);
+        return NextResponse.json(
+          {
+            error:
+              "Failed to send verification email via SMTP. Please verify SMTP_USER and Gmail App Password (SMTP_PASS) settings.",
+          },
+          { status: 502 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          pendingVerification: true,
+          email: normalizedEmail,
+          expiresInMinutes: 10,
+          message: `We sent a 6-digit verification code to ${normalizedEmail}.`,
+        },
+        { status: 202 }
+      );
+    }
+
+    if (subpath === "auth/resend-otp" && req.method === "POST") {
+      await ensureVerificationSchema();
+      const { email: rawEmail } = body;
+      if (!isValidEmail(rawEmail)) {
+        return NextResponse.json(
+          { error: "Valid email address is required." },
+          { status: 400 }
+        );
+      }
+      const normalizedEmail = rawEmail.trim().toLowerCase();
+
+      if (!isEmailConfigured()) {
+        return NextResponse.json(
+          {
+            error:
+              "Email verification is not configured on the server yet (missing SMTP_USER / SMTP_PASS).",
+          },
+          { status: 503 }
+        );
+      }
+
+      const pendingRes = await pool.query(
+        "SELECT *, EXTRACT(EPOCH FROM (NOW() - updated_at)) AS elapsed_sec FROM PendingVerification WHERE email = $1",
+        [normalizedEmail]
+      );
+      if (pendingRes.rows.length === 0) {
+        return NextResponse.json(
+          {
+            error:
+              "No pending registration found for this email. Please fill out the Create Account form first.",
+          },
+          { status: 404 }
+        );
+      }
+
+      const row = pendingRes.rows[0];
+      const elapsed = Number(row.elapsed_sec || 0);
+      if (elapsed < 45) {
+        const retryAfterSeconds = Math.max(1, Math.ceil(45 - elapsed));
+        return NextResponse.json(
+          {
+            error: `Please wait ${retryAfterSeconds}s before requesting a new code.`,
+            retryAfterSeconds,
+          },
+          { status: 429 }
+        );
+      }
+
+      const payload = JSON.parse(row.payload_json);
+      const otpCode = crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+      const codeHash = hashOtpCode(normalizedEmail, otpCode);
+
+      await pool.query(
+        "UPDATE PendingVerification SET code_hash = $1, attempts = 0, expires_at = NOW() + INTERVAL '10 minutes', updated_at = NOW() WHERE email = $2",
+        [codeHash, normalizedEmail]
+      );
+
+      try {
+        await sendVerificationOtpEmail({
+          toEmail: normalizedEmail,
+          fullName: payload.fullName,
+          username: payload.username,
+          role: payload.role,
+          code: otpCode,
+        });
+      } catch (mailErr: any) {
+        console.error("Failed to resend OTP email:", mailErr?.message || mailErr);
+        return NextResponse.json(
+          {
+            error:
+              "Could not resend verification email. Check SMTP_USER / SMTP_PASS settings.",
+          },
+          { status: 502 }
+        );
+      }
+
+      return NextResponse.json({
+        sent: true,
+        email: normalizedEmail,
+        message: `A new 6-digit verification code has been sent to ${normalizedEmail}.`,
+      });
+    }
+
+    if (subpath === "auth/verify-email" && req.method === "POST") {
+      await ensureVerificationSchema();
+      const { email: rawEmail, code: rawCode } = body;
+      if (!isValidEmail(rawEmail)) {
+        return NextResponse.json(
+          { error: "Valid email address is required." },
+          { status: 400 }
+        );
+      }
+      const code = typeof rawCode === "string" ? rawCode.trim() : "";
+      if (!/^\d{6}$/.test(code)) {
+        return NextResponse.json(
+          { error: "Please enter the exact 6-digit numeric verification code." },
+          { status: 400 }
+        );
+      }
+      const normalizedEmail = rawEmail.trim().toLowerCase();
+
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        const dupUser = await client.query(
-          "SELECT user_id FROM UserAccount WHERE LOWER(username) = LOWER($1)",
-          [username.trim()]
+        const pendRes = await client.query(
+          "SELECT *, (expires_at < NOW()) AS is_expired FROM PendingVerification WHERE email = $1 FOR UPDATE",
+          [normalizedEmail]
         );
-        if (dupUser.rows.length > 0) {
+        if (pendRes.rows.length === 0) {
           await client.query("ROLLBACK");
           return NextResponse.json(
-            { error: "Username already exists in Master Registry." },
+            {
+              error:
+                "No pending verification found for this email. Please submit the registration form again.",
+            },
+            { status: 404 }
+          );
+        }
+
+        const pending = pendRes.rows[0];
+        if (pending.is_expired) {
+          await client.query(
+            "DELETE FROM PendingVerification WHERE verification_id = $1",
+            [pending.verification_id]
+          );
+          await client.query("COMMIT");
+          return NextResponse.json(
+            {
+              error:
+                "Your verification code has expired. Please request a new registration.",
+            },
+            { status: 400 }
+          );
+        }
+
+        if (Number(pending.attempts) >= 5) {
+          await client.query(
+            "DELETE FROM PendingVerification WHERE verification_id = $1",
+            [pending.verification_id]
+          );
+          await client.query("COMMIT");
+          return NextResponse.json(
+            {
+              error:
+                "Too many invalid attempts. Please restart registration for a fresh code.",
+            },
+            { status: 429 }
+          );
+        }
+
+        const expectedHash = pending.code_hash;
+        const providedHash = hashOtpCode(normalizedEmail, code);
+        if (!constantTimeHexEquals(expectedHash, providedHash)) {
+          const nextAttempts = Number(pending.attempts) + 1;
+          if (nextAttempts >= 5) {
+            await client.query(
+              "DELETE FROM PendingVerification WHERE verification_id = $1",
+              [pending.verification_id]
+            );
+            await client.query("COMMIT");
+            return NextResponse.json(
+              {
+                error:
+                  "Too many invalid attempts (5/5). Please restart registration to get a new code.",
+              },
+              { status: 429 }
+            );
+          }
+          await client.query(
+            "UPDATE PendingVerification SET attempts = $1 WHERE verification_id = $2",
+            [nextAttempts, pending.verification_id]
+          );
+          await client.query("COMMIT");
+          const remaining = 5 - nextAttempts;
+          return NextResponse.json(
+            {
+              error: `Invalid verification code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`,
+            },
+            { status: 400 }
+          );
+        }
+
+        const p = JSON.parse(pending.payload_json);
+        const dupUser = await client.query(
+          "SELECT user_id FROM UserAccount WHERE LOWER(username) = LOWER($1) OR (email IS NOT NULL AND LOWER(email) = LOWER($2))",
+          [p.username, normalizedEmail]
+        );
+        if (dupUser.rows.length > 0) {
+          await client.query(
+            "DELETE FROM PendingVerification WHERE verification_id = $1",
+            [pending.verification_id]
+          );
+          await client.query("COMMIT");
+          return NextResponse.json(
+            { error: "Username or email is already registered." },
             { status: 409 }
           );
         }
 
-        if (role === "Organization" && typeof orgName === "string" && orgName.trim()) {
+        if (p.role === "Organization" && p.orgName) {
           const dupOrg = await client.query(
             "SELECT org_id FROM Organization WHERE LOWER(org_name) = LOWER($1)",
-            [orgName.trim()]
+            [p.orgName]
           );
           if (dupOrg.rows.length > 0) {
-            await client.query("ROLLBACK");
+            await client.query(
+              "DELETE FROM PendingVerification WHERE verification_id = $1",
+              [pending.verification_id]
+            );
+            await client.query("COMMIT");
             return NextResponse.json(
               {
                 error:
@@ -341,72 +767,73 @@ async function handleRequest(req: NextRequest, subpath: string) {
           }
         }
 
-        const hash = hashPasswordSha256Base64(password);
         const insUser = await client.query(
-          "INSERT INTO UserAccount (username, password_hash, role, full_name, contact_info) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+          "INSERT INTO UserAccount (username, password_hash, role, full_name, contact_info, email, is_verified) VALUES ($1, $2, $3, $4, $5, $6, true) RETURNING *",
           [
-            username.trim(),
-            hash,
-            role,
-            fullName.trim(),
-            typeof contactInfo === "string" ? contactInfo.trim() : "",
+            p.username,
+            p.passwordHash,
+            p.role,
+            p.fullName,
+            p.contactInfo || "",
+            normalizedEmail,
           ]
         );
         const newUser = insUser.rows[0];
         const userId = newUser.user_id;
 
-        if (role === "Donor") {
-          await client.query(
-            "INSERT INTO Donor (user_id, donor_type) VALUES ($1, $2)",
-            [userId, safeDonorType]
+        const resp: any = {
+          user: {
+            userId: newUser.user_id,
+            username: newUser.username,
+            fullName: newUser.full_name,
+            role: newUser.role,
+            contactInfo: newUser.contact_info || "",
+            email: newUser.email || normalizedEmail,
+            isVerified: true,
+          },
+          message: "Email verified and account created successfully.",
+        };
+
+        if (p.role === "Donor") {
+          const dIns = await client.query(
+            "INSERT INTO Donor (user_id, donor_type) VALUES ($1, $2) RETURNING *",
+            [userId, p.donorType === "Corporate" ? "Corporate" : "Individual"]
           );
-        } else if (role === "Organization") {
-          await client.query(
-            "INSERT INTO Organization (user_id, org_name, location) VALUES ($1, $2, $3)",
-            [
-              userId,
-              typeof orgName === "string" && orgName.trim()
-                ? orgName.trim()
-                : fullName.trim(),
-              typeof location === "string" && location.trim()
-                ? location.trim()
-                : "Metro Manila",
-            ]
+          resp.donorId = dIns.rows[0].donor_id;
+          resp.donorType = dIns.rows[0].donor_type;
+        } else if (p.role === "Organization") {
+          const oIns = await client.query(
+            "INSERT INTO Organization (user_id, org_name, location) VALUES ($1, $2, $3) RETURNING *",
+            [userId, p.orgName || p.fullName, p.location || "Metro Manila"]
           );
-        } else if (role === "Volunteer") {
-          await client.query(
-            "INSERT INTO Volunteer (user_id, vehicle_type, is_available) VALUES ($1, $2, true)",
-            [
-              userId,
-              typeof vehicleType === "string" && vehicleType.trim()
-                ? vehicleType.trim()
-                : "Van",
-            ]
+          resp.orgId = oIns.rows[0].org_id;
+          resp.orgName = oIns.rows[0].org_name;
+          resp.location = oIns.rows[0].location;
+        } else if (p.role === "Volunteer") {
+          const vIns = await client.query(
+            "INSERT INTO Volunteer (user_id, vehicle_type, is_available) VALUES ($1, $2, true) RETURNING *",
+            [userId, p.vehicleType || "Van"]
           );
+          resp.volunteerId = vIns.rows[0].volunteer_id;
+          resp.vehicleType = vIns.rows[0].vehicle_type;
+          resp.isAvailable = vIns.rows[0].is_available;
         }
 
         await client.query(
           "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
           [
             userId,
-            `Welcome to DRRMS! Your ${role} account has been verified under RA 10173 Data Privacy guidelines.`,
+            `Welcome to DRRMS! Your ${p.role} account (${normalizedEmail}) has been verified under RA 10173 Data Privacy guidelines.`,
           ]
         );
 
-        await client.query("COMMIT");
-        return NextResponse.json(
-          {
-            user: {
-              userId: newUser.user_id,
-              username: newUser.username,
-              fullName: newUser.full_name,
-              role: newUser.role,
-              contactInfo: newUser.contact_info || "",
-            },
-            message: "Account registered successfully.",
-          },
-          { status: 201 }
+        await client.query(
+          "DELETE FROM PendingVerification WHERE verification_id = $1",
+          [pending.verification_id]
         );
+
+        await client.query("COMMIT");
+        return NextResponse.json(resp, { status: 201 });
       } catch (e) {
         await client.query("ROLLBACK");
         throw e;
@@ -637,6 +1064,8 @@ async function handleRequest(req: NextRequest, subpath: string) {
           fullName: u.full_name,
           role: u.role,
           contactInfo: u.contact_info || "",
+          email: u.email || "",
+          isVerified: u.is_verified !== false,
         })),
         notifications: notifRes.rows.map((n) => ({
           notificationId: n.notification_id,

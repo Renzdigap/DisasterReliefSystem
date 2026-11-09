@@ -389,6 +389,7 @@ export default function AdminPortalPage() {
           String(u.userId).includes(q) ||
           (u.fullName || "").toLowerCase().includes(q) ||
           (u.username || "").toLowerCase().includes(q) ||
+          (u.email || "").toLowerCase().includes(q) ||
           (u.contactInfo || "").toLowerCase().includes(q))
     );
   }, [users, statusFilter, searchQuery]);
@@ -2036,7 +2037,10 @@ export default function AdminPortalPage() {
                       Role
                     </th>
                     <th scope="col" className="p-3">
-                      Contact Info
+                      Email &amp; Contact
+                    </th>
+                    <th scope="col" className="p-3">
+                      Status
                     </th>
                   </tr>
                 </thead>
@@ -2044,7 +2048,7 @@ export default function AdminPortalPage() {
                   {filteredUsers.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="p-6 text-center text-slate-400"
                       >
                         No matching user accounts found.
@@ -2066,7 +2070,31 @@ export default function AdminPortalPage() {
                           </span>
                         </td>
                         <td className="p-3 text-slate-500">
-                          {u.contactInfo || "—"}
+                          {u.email ? (
+                            <div className="space-y-0.5">
+                              <div className="text-slate-700 font-medium">
+                                {u.email}
+                              </div>
+                              {u.contactInfo && (
+                                <div className="text-[11px] text-slate-400">
+                                  {u.contactInfo}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            u.contactInfo || "—"
+                          )}
+                        </td>
+                        <td className="p-3">
+                          <span
+                            className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
+                              u.isVerified === false
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            }`}
+                          >
+                            {u.isVerified === false ? "Unverified" : "Verified"}
+                          </span>
                         </td>
                       </tr>
                     ))

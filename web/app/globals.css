@@ -12,6 +12,32 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
+.auth-input:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.auth-input:user-invalid {
+  border-color: #dc2626;
+  background-color: #fef2f2;
+}
+
+.auth-input:user-valid {
+  border-color: #16a34a;
+}
+
+.field-error-msg {
+  display: none;
+  color: #b91c1c;
+  font-size: 0.6875rem;
+  margin-top: 0.25rem;
+}
+
+.auth-input:user-invalid + .field-error-msg,
+.relative:has(.auth-input:user-invalid) + .field-error-msg {
+  display: block;
+}
+
 dialog:modal {
   overscroll-behavior: contain;
 }

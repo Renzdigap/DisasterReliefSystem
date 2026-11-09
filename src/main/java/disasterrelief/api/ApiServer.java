@@ -61,10 +61,13 @@ public class ApiServer {
                 }
 
                 try (Connection conn = DatabaseConnection.getConnection()) {
+                    String identifier = username.trim();
                     User user = null;
                     try (PreparedStatement ps = conn.prepareStatement(
-                            "SELECT user_id, username, password_hash, full_name, role, contact_info FROM UserAccount WHERE username = ?")) {
-                        ps.setString(1, username.trim());
+                            "SELECT user_id, username, password_hash, full_name, role, contact_info, email, is_verified " +
+                            "FROM UserAccount WHERE LOWER(username) = LOWER(?) OR (email IS NOT NULL AND LOWER(email) = LOWER(?))")) {
+                        ps.setString(1, identifier);
+                        ps.setString(2, identifier);
                         try (ResultSet rs = ps.executeQuery()) {
                             if (rs.next()) {
                                 user = new User(
@@ -75,6 +78,8 @@ public class ApiServer {
                                         rs.getString("role"),
                                         rs.getString("contact_info")
                                 );
+                                user.setEmail(rs.getString("email"));
+                                user.setVerified(rs.getBoolean("is_verified"));
                             }
                         }
                     }
@@ -88,6 +93,11 @@ public class ApiServer {
                             || password.equals(user.getPasswordHash());
                     if (!valid) {
                         sendJson(ex, 401, "{\"error\":\"Invalid username or password.\"}");
+                        return;
+                    }
+
+                    if (!user.isVerified()) {
+                        sendJson(ex, 403, "{\"error\":\"Please verify your email address before signing in.\"}");
                         return;
                     }
 
@@ -1229,12 +1239,15 @@ public class ApiServer {
     private static User queryUserById(Connection conn, int userId) throws SQLException {
         if (userId <= 0) return null;
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT user_id, username, full_name, role, contact_info FROM UserAccount WHERE user_id = ?")) {
+                "SELECT user_id, username, full_name, role, contact_info, email, is_verified FROM UserAccount WHERE user_id = ?")) {
             ps.setInt(1, userId);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return new User(rs.getInt("user_id"), rs.getString("username"), "",
+                    User u = new User(rs.getInt("user_id"), rs.getString("username"), "",
                             rs.getString("full_name"), rs.getString("role"), rs.getString("contact_info"));
+                    u.setEmail(rs.getString("email"));
+                    u.setVerified(rs.getBoolean("is_verified"));
+                    return u;
                 }
             }
         }
@@ -1540,11 +1553,14 @@ public class ApiServer {
     private static List<User> queryAllUsers(Connection conn) throws SQLException {
         List<User> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(
-                "SELECT user_id, username, full_name, role, contact_info FROM UserAccount ORDER BY user_id");
+                "SELECT user_id, username, full_name, role, contact_info, email, is_verified FROM UserAccount ORDER BY user_id");
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                list.add(new User(rs.getInt("user_id"), rs.getString("username"), "",
-                        rs.getString("full_name"), rs.getString("role"), rs.getString("contact_info")));
+                User u = new User(rs.getInt("user_id"), rs.getString("username"), "",
+                        rs.getString("full_name"), rs.getString("role"), rs.getString("contact_info"));
+                u.setEmail(rs.getString("email"));
+                u.setVerified(rs.getBoolean("is_verified"));
+                list.add(u);
             }
         }
         return list;
@@ -1877,11 +1893,14 @@ public class ApiServer {
 
     private static String userToJson(User u) {
         if (u == null) return "null";
+        String rawEmail = u.getRawEmail();
         return "{\"userId\":" + u.getUserId() +
                ",\"username\":" + q(u.getUsername()) +
                ",\"fullName\":" + q(u.getFullName()) +
                ",\"role\":" + q(u.getRole()) +
-               ",\"contactInfo\":" + q(u.getContactInfo() != null ? u.getContactInfo() : "") + "}";
+               ",\"contactInfo\":" + q(u.getContactInfo() != null ? u.getContactInfo() : "") +
+               ",\"email\":" + q(rawEmail != null ? rawEmail : "") +
+               ",\"isVerified\":" + u.isVerified() + "}";
     }
 
     private static String usersToJson(List<User> list) {

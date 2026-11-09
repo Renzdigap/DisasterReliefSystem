@@ -4,6 +4,7 @@
 -- ==========================================
 
 -- Drop existing tables to allow clean re-run
+DROP TABLE IF EXISTS PendingVerification CASCADE;
 DROP TABLE IF EXISTS Notification CASCADE;
 DROP TABLE IF EXISTS Delivery CASCADE;
 DROP TABLE IF EXISTS RequestItem CASCADE;
@@ -25,8 +26,14 @@ CREATE TABLE UserAccount (
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL CHECK (role IN ('Admin', 'Donor', 'Volunteer', 'Manager', 'Organization')),
     full_name VARCHAR(100) NOT NULL,
-    contact_info VARCHAR(100)
+    contact_info VARCHAR(100),
+    email VARCHAR(255),
+    is_verified BOOLEAN NOT NULL DEFAULT true
 );
+
+CREATE UNIQUE INDEX idx_useraccount_email_unique
+    ON UserAccount (LOWER(email))
+    WHERE email IS NOT NULL;
 
 -- 2. DONORS (Donor)
 CREATE TABLE Donor (
@@ -140,6 +147,19 @@ CREATE TABLE Notification (
     is_read BOOLEAN DEFAULT false,
     date_sent TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES UserAccount(user_id) ON DELETE CASCADE
+);
+
+-- 14. PENDING EMAIL VERIFICATIONS (6-digit OTP staging)
+CREATE TABLE PendingVerification (
+    verification_id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    username VARCHAR(50) NOT NULL,
+    code_hash VARCHAR(128) NOT NULL,
+    payload_json TEXT NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================================
