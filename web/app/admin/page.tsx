@@ -18,7 +18,7 @@ import {
   Users,
   Bell,
 } from "lucide-react";
-import PortalHeader from "@/components/PortalHeader";
+import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton } from "@/components/SkeletonUI";
 import {
   apiFetch,
@@ -241,154 +241,157 @@ export default function AdminPortalPage() {
     a.click();
   };
 
+  const navItems: SidebarNavItem[] = [
+    {
+      id: "overview",
+      label: "Executive Overview",
+      icon: <AlertTriangle className="h-4 w-4" />,
+    },
+    {
+      id: "events",
+      label: "Disaster Events",
+      icon: <AlertTriangle className="h-4 w-4" />,
+      badge: metrics.activeDisasters ?? 0,
+      badgeTone: "rose",
+    },
+    {
+      id: "requests",
+      label: "Relief Requests",
+      icon: <Building2 className="h-4 w-4" />,
+      badge: metrics.pendingRequests ?? 0,
+      badgeTone: "amber",
+    },
+    {
+      id: "donations",
+      label: "Donations Ledger",
+      icon: <HeartHandshake className="h-4 w-4" />,
+      badge: metrics.totalDonations ?? 0,
+      badgeTone: "emerald",
+    },
+    {
+      id: "inventory",
+      label: "Warehouse Inventory",
+      icon: <Package className="h-4 w-4" />,
+      badge: metrics.reliefGoodsCount ?? 0,
+    },
+    {
+      id: "deliveries",
+      label: "Fleet Deliveries",
+      icon: <Truck className="h-4 w-4" />,
+      badge: deliveries.length,
+    },
+    {
+      id: "stakeholders",
+      label: "Master Stakeholders",
+      icon: <Users className="h-4 w-4" />,
+      badge: donors.length + organizations.length + volunteers.length,
+    },
+    {
+      id: "reports",
+      label: "Analytical Reports (3)",
+      icon: <FileBarChart className="h-4 w-4" />,
+      badge: "3",
+      badgeTone: "emerald",
+    },
+  ];
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <PortalHeader
-        session={session}
-        portalTitle="DRRMS Administrator Operations Console"
-        portalSubtitle="Master Data Steward & Resource Allocation Control Center"
-      />
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Top Institutional Banner */}
-        <div className="rounded-xl bg-gradient-to-r from-[#002060] to-[#1F4E79] border-t-4 border-amber-400 p-5 text-white shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wider text-amber-300">
-              Institutional Data Owner &amp; Steward Console
-            </div>
-            <h1 className="text-xl font-bold mt-0.5">
-              National Disaster Relief &amp; Resource Distribution Management
-            </h1>
-            <p className="text-xs text-blue-100 mt-0.5">
-              Atomic 3NF Split-Transactions • Master Catalog Deduplication • Live Decision Analytics
-            </p>
-          </div>
-          <button
-            onClick={refreshData}
-            disabled={syncing}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-white/20 px-3.5 py-2 text-xs font-semibold text-white transition self-start sm:self-auto"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-            {syncing ? "Syncing JDBC..." : "Refresh Live DB"}
-          </button>
+    <PortalSidebarLayout
+      session={session}
+      portalTitle="DRRMS Administrator Operations Console"
+      portalSubtitle="Master Data Steward & Resource Allocation Control Center"
+      roleBadge="Admin Steward"
+      navItems={navItems}
+      activeTab={activeTab}
+      onSelectTab={(id: AdminTab) => {
+        setActiveTab(id);
+        setSearchQuery("");
+        setStatusFilter("ALL");
+      }}
+      onSync={refreshData}
+      syncing={syncing}
+    >
+      {toast && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs sm:text-sm font-semibold text-emerald-900 shadow-sm flex items-center gap-2.5 no-print">
+          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+          <span>{toast}</span>
         </div>
+      )}
 
-        {toast && (
-          <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-xs font-semibold text-emerald-800 shadow-sm flex items-center gap-2 no-print">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            {toast}
+      {/* Executive KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 no-print">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Active Disasters
           </div>
-        )}
-
-        {/* Executive KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 no-print">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-[11px] font-semibold text-slate-500">
-              Active Disasters
-            </div>
-            <div className="text-2xl font-bold text-rose-600 mt-1">
-              {metrics.activeDisasters ?? 0}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              Master Event Registry
-            </div>
+          <div className="text-2xl font-extrabold text-rose-600 mt-1.5">
+            {metrics.activeDisasters ?? 0}
           </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-[11px] font-semibold text-slate-500">
-              Pending Requests
-            </div>
-            <div className="text-2xl font-bold text-amber-600 mt-1">
-              {metrics.pendingRequests ?? 0}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              Awaiting Steward Approval
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-[11px] font-semibold text-slate-500">
-              Logged Donations
-            </div>
-            <div className="text-2xl font-bold text-emerald-600 mt-1">
-              {metrics.totalDonations ?? 0}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              3NF Inflow Pledges
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-[11px] font-semibold text-slate-500">
-              Master Relief Goods
-            </div>
-            <div className="text-2xl font-bold text-[#002060] mt-1">
-              {metrics.reliefGoodsCount ?? 0}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              Standardized SKUs
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-[11px] font-semibold text-slate-500">
-              Field Volunteers
-            </div>
-            <div className="text-2xl font-bold text-indigo-600 mt-1">
-              {metrics.registeredVolunteers ?? 0}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              Active Fleet Drivers
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="text-[11px] font-semibold text-slate-500">
-              Fulfilled Deliveries
-            </div>
-            <div className="text-2xl font-bold text-teal-600 mt-1">
-              {metrics.completedDeliveries ?? 0}
-            </div>
-            <div className="text-[10px] text-slate-400 mt-0.5">
-              Verified Dispatches
-            </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            Master Event Registry
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 pb-3 no-print">
-          {[
-            { id: "overview", label: "1. Executive Overview", icon: AlertTriangle },
-            { id: "events", label: "2. Disaster Events", icon: AlertTriangle },
-            { id: "requests", label: "3. Relief Requests", icon: Building2 },
-            { id: "donations", label: "4. Donations Ledger", icon: HeartHandshake },
-            { id: "inventory", label: "5. Warehouse Inventory", icon: Package },
-            { id: "deliveries", label: "6. Fleet Deliveries", icon: Truck },
-            { id: "stakeholders", label: "7. Master Stakeholders", icon: Users },
-            { id: "reports", label: "8. Analytical Reports (3)", icon: FileBarChart },
-          ].map((t) => {
-            const Icon = t.icon;
-            const active = activeTab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => {
-                  setActiveTab(t.id as AdminTab);
-                  setSearchQuery("");
-                  setStatusFilter("ALL");
-                }}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold transition ${
-                  active
-                    ? "bg-[#002060] text-white shadow-sm"
-                    : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-100"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5" />
-                {t.label}
-              </button>
-            );
-          })}
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Pending Requests
+          </div>
+          <div className="text-2xl font-extrabold text-amber-600 mt-1.5">
+            {metrics.pendingRequests ?? 0}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            Awaiting Steward Approval
+          </div>
         </div>
+
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Logged Donations
+          </div>
+          <div className="text-2xl font-extrabold text-emerald-600 mt-1.5">
+            {metrics.totalDonations ?? 0}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            3NF Inflow Pledges
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Master Relief Goods
+          </div>
+          <div className="text-2xl font-extrabold text-slate-900 mt-1.5">
+            {metrics.reliefGoodsCount ?? 0}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            Standardized SKUs
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Field Volunteers
+          </div>
+          <div className="text-2xl font-extrabold text-sky-600 mt-1.5">
+            {metrics.registeredVolunteers ?? 0}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            Active Fleet Drivers
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Fulfilled Deliveries
+          </div>
+          <div className="text-2xl font-extrabold text-emerald-700 mt-1.5">
+            {metrics.completedDeliveries ?? 0}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5">
+            Verified Dispatches
+          </div>
+        </div>
+      </div>
 
         {/* TAB 1: OVERVIEW */}
         {activeTab === "overview" && (
@@ -1343,7 +1346,6 @@ export default function AdminPortalPage() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+    </PortalSidebarLayout>
   );
 }
