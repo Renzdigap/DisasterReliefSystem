@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LogOut,
@@ -28,9 +28,18 @@ export interface NotificationItem {
   id?: number | string;
   message?: string;
   title?: string;
+  dateSent?: string;
   sentDate?: string;
   createdAt?: string;
   isRead?: boolean;
+}
+
+function formatNotificationTimestamp(item: NotificationItem): string {
+  const raw = item.dateSent || item.sentDate || item.createdAt;
+  if (!raw) return "Just now";
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return String(raw);
+  return parsed.toLocaleString();
 }
 
 interface PortalSidebarLayoutProps {
@@ -71,6 +80,17 @@ export function PortalSidebarLayout({
   const router = useRouter();
   const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
   const [showAidTracker, setShowAidTracker] = useState(false);
+
+  useEffect(() => {
+    if (!showNotificationDrawer) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowNotificationDrawer(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showNotificationDrawer]);
 
   const handleLogout = () => {
     clearSession();
@@ -122,8 +142,9 @@ export function PortalSidebarLayout({
                 return (
                   <button
                     key={item.id}
+                    type="button"
                     onClick={() => onSelectTab(item.id)}
-                    className={`group flex items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all shrink-0 lg:w-full ${
+                    className={`group flex items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all shrink-0 lg:w-full active:scale-[0.98] ${
                       isActive
                         ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25"
                         : "text-slate-600 hover:bg-slate-100/90 hover:text-slate-900"
@@ -256,6 +277,8 @@ export function PortalSidebarLayout({
               <div className="relative">
                 <button
                   type="button"
+                  aria-expanded={showNotificationDrawer}
+                  aria-label="Operational notifications"
                   onClick={() => {
                     if (notificationsList && notificationsList.length > 0) {
                       setShowNotificationDrawer(!showNotificationDrawer);
@@ -263,12 +286,12 @@ export function PortalSidebarLayout({
                       onOpenNotifications();
                     }
                   }}
-                  className="relative rounded-xl border border-slate-200 bg-white hover:bg-slate-50 p-2 text-slate-600 transition shadow-xs"
+                  className="relative rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] p-2 text-slate-600 transition shadow-xs"
                   title="Operational Notifications"
                 >
-                  <Bell className="h-4 w-4" />
+                  <Bell className="h-4 w-4" aria-hidden="true" />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm">
                       {unreadCount}
                     </span>
                   )}
@@ -330,7 +353,7 @@ export function PortalSidebarLayout({
                                   )}
                                 </div>
                                 <span className="text-[10px] text-slate-400 font-normal">
-                                  {n.sentDate || n.createdAt || "Just now"}
+                                  {formatNotificationTimestamp(n)}
                                 </span>
                               </div>
                             );

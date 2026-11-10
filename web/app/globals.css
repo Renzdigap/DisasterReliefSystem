@@ -17,9 +17,20 @@ body {
   outline-offset: 1px;
 }
 
-:where(button, a[href], select):focus-visible {
+:where(button, a[href], input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 2px;
+}
+
+.isolated-panel {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px auto 520px;
+}
+
+@supports not (content-visibility: auto) {
+  .isolated-panel {
+    contain: layout style paint;
+  }
 }
 
 .track-aid-btn:focus-visible {
@@ -128,6 +139,21 @@ dialog::backdrop {
 
 @media print {
   .no-print {
+    display: none !important;
+  }
+  dialog.certificate-dialog {
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  dialog::backdrop {
     display: none !important;
   }
   body {

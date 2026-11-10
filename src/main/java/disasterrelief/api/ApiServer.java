@@ -456,10 +456,32 @@ public class ApiServer {
                                 sendJson(ex, 400, "{\"error\":\"Donor profile not found for userId.\"}");
                                 return;
                             }
-                            if (eventId != null && eventId > 0 && !recordExists(conn, "SELECT 1 FROM DisasterEvent WHERE event_id = ?", eventId)) {
-                                conn.rollback();
-                                sendJson(ex, 400, "{\"error\":\"Selected disaster event does not exist.\"}");
-                                return;
+                            if (eventId != null && eventId > 0) {
+                                String evStatus = null;
+                                try (PreparedStatement evPs = conn.prepareStatement("SELECT status FROM DisasterEvent WHERE event_id = ?")) {
+                                    evPs.setInt(1, eventId);
+                                    try (ResultSet rs = evPs.executeQuery()) {
+                                        if (rs.next()) evStatus = rs.getString("status");
+                                    }
+                                }
+                                if (evStatus == null) {
+                                    conn.rollback();
+                                    sendJson(ex, 400, "{\"error\":\"Selected disaster event does not exist.\"}");
+                                    return;
+                                }
+                                if (!"Active".equalsIgnoreCase(evStatus)) {
+                                    conn.rollback();
+                                    sendJson(ex, 400, "{\"error\":\"Selected disaster event is resolved. Please select an Active disaster or General Relief Fund.\"}");
+                                    return;
+                                }
+                            }
+
+                            for (int[] pair : items) {
+                                if (!recordExists(conn, "SELECT 1 FROM ReliefGood WHERE good_id = ?", pair[0])) {
+                                    conn.rollback();
+                                    sendJson(ex, 400, "{\"error\":\"One or more selected relief items are no longer in the catalog. Please refresh.\"}");
+                                    return;
+                                }
                             }
 
                             int donationId;
@@ -488,7 +510,7 @@ public class ApiServer {
                             try (PreparedStatement notifStmt = conn.prepareStatement(
                                     "INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
                                 notifStmt.setInt(1, userId);
-                                notifStmt.setString(2, "Donation Pledge #" + donationId + " (" + items.size() + " item types) recorded and awaiting Steward verification.");
+                                notifStmt.setString(2, "Donation Pledge " + donationId + " (" + items.size() + " item types) recorded and awaiting review.");
                                 notifStmt.executeUpdate();
                             }
 
@@ -565,7 +587,7 @@ public class ApiServer {
                                         int donorUserId = rs.getInt(1);
                                         try (PreparedStatement notif = conn.prepareStatement("INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
                                             notif.setInt(1, donorUserId);
-                                            notif.setString(2, "Your Donation #" + donationId + " status has been updated to: " + status + ".");
+                                            notif.setString(2, "Your Donation " + donationId + " status has been updated to: " + status + ".");
                                             notif.executeUpdate();
                                         }
                                     }
@@ -582,19 +604,63 @@ public class ApiServer {
                 } else if ("DELETE".equalsIgnoreCase(method)) {
                     Map<String, String> params = parseQuery(ex.getRequestURI().getRawQuery());
                     int id = parsePositiveInt(params.get("id"), 0);
+                    int ownerUserId = parsePositiveInt(params.get("userId"), 0);
+                    boolean onlyPending = "true".equalsIgnoreCase(params.get("onlyPending"));
                     if (id <= 0) {
                         sendJson(ex, 400, "{\"error\":\"Valid donation id is required.\"}");
                         return;
                     }
-                    try (Connection conn = DatabaseConnection.getConnection();
-                         PreparedStatement ps = conn.prepareStatement("DELETE FROM Donation WHERE donation_id = ?")) {
-                        ps.setInt(1, id);
-                        int affected = ps.executeUpdate();
-                        if (affected == 0) {
-                            sendJson(ex, 404, "{\"error\":\"Donation not found.\"}");
-                            return;
+                    if (onlyPending || ownerUserId > 0) {
+                        try (Connection conn = DatabaseConnection.getConnection()) {
+                            conn.setAutoCommit(false);
+                            try {
+                                String status;
+                                int rowUserId;
+                                try (PreparedStatement chk = conn.prepareStatement(
+                                        "SELECT d.status, dn.user_id FROM Donation d JOIN Donor dn ON d.donor_id = dn.donor_id WHERE d.donation_id = ? FOR UPDATE")) {
+                                    chk.setInt(1, id);
+                                    try (ResultSet rs = chk.executeQuery()) {
+                                        if (!rs.next()) {
+                                            conn.rollback();
+                                            sendJson(ex, 404, "{\"error\":\"Donation not found.\"}");
+                                            return;
+                                        }
+                                        status = rs.getString("status");
+                                        rowUserId = rs.getInt("user_id");
+                                    }
+                                }
+                                if (ownerUserId > 0 && rowUserId != ownerUserId) {
+                                    conn.rollback();
+                                    sendJson(ex, 403, "{\"error\":\"You can only cancel your own donations.\"}");
+                                    return;
+                                }
+                                if (onlyPending && !"Pending".equalsIgnoreCase(status)) {
+                                    conn.rollback();
+                                    sendJson(ex, 409, "{\"error\":\"Only pending donations can be cancelled. Approved pledges are already credited to warehouse inventory.\"}");
+                                    return;
+                                }
+                                try (PreparedStatement del = conn.prepareStatement("DELETE FROM Donation WHERE donation_id = ?")) {
+                                    del.setInt(1, id);
+                                    del.executeUpdate();
+                                }
+                                conn.commit();
+                                sendJson(ex, 200, "{\"deleted\":true}");
+                            } catch (Exception e) {
+                                conn.rollback();
+                                throw e;
+                            }
                         }
-                        sendJson(ex, 200, "{\"deleted\":true}");
+                    } else {
+                        try (Connection conn = DatabaseConnection.getConnection();
+                             PreparedStatement ps = conn.prepareStatement("DELETE FROM Donation WHERE donation_id = ?")) {
+                            ps.setInt(1, id);
+                            int affected = ps.executeUpdate();
+                            if (affected == 0) {
+                                sendJson(ex, 404, "{\"error\":\"Donation not found.\"}");
+                                return;
+                            }
+                            sendJson(ex, 200, "{\"deleted\":true}");
+                        }
                     }
                 } else {
                     sendJson(ex, 405, "{\"error\":\"Method not allowed\"}");
@@ -1211,6 +1277,22 @@ public class ApiServer {
                     return;
                 }
                 String body = readBody(ex);
+                boolean markAll = extractBoolean(body, "markAll", false);
+                int userId = extractInt(body, "userId", 0);
+                if (markAll) {
+                    if (userId <= 0) {
+                        sendJson(ex, 400, "{\"error\":\"Valid userId is required to mark all notifications read.\"}");
+                        return;
+                    }
+                    try (Connection conn = DatabaseConnection.getConnection();
+                         PreparedStatement ps = conn.prepareStatement("UPDATE Notification SET is_read = true WHERE user_id = ? AND is_read = false")) {
+                        ps.setInt(1, userId);
+                        ps.executeUpdate();
+                        sendJson(ex, 200, "{\"ok\":true,\"markAll\":true}");
+                    }
+                    return;
+                }
+
                 int notificationId = extractInt(body, "notificationId", 0);
                 if (notificationId <= 0) {
                     sendJson(ex, 400, "{\"error\":\"Valid notificationId is required.\"}");

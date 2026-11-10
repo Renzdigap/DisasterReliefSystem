@@ -114,172 +114,298 @@ export function DonationCertificateModal({
   donorName,
   onClose,
 }: DonationCertificateModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    const handleNativeClose = () => {
+      dialog.returnValue = "";
+      onCloseRef.current();
+    };
+    dialog.addEventListener("close", handleNativeClose);
+
+    // Light-dismiss fallback when <dialog closedby="any"> is unsupported
+    let pressedOutside = false;
+    const isOutsideDialog = (e: PointerEvent) => {
+      const rect = dialog.getBoundingClientRect();
+      return (
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom
+      );
+    };
+    const handlePointerDown = (e: PointerEvent) => {
+      pressedOutside = isOutsideDialog(e);
+    };
+    const handlePointerUp = (e: PointerEvent) => {
+      if (pressedOutside && isOutsideDialog(e)) {
+        dialog.close();
+      }
+      pressedOutside = false;
+    };
+
+    const needsClosedByFallback = !("closedBy" in HTMLDialogElement.prototype);
+    if (needsClosedByFallback) {
+      dialog.addEventListener("pointerdown", handlePointerDown);
+      dialog.addEventListener("pointerup", handlePointerUp);
+    }
+
+    return () => {
+      dialog.removeEventListener("close", handleNativeClose);
+      if (needsClosedByFallback) {
+        dialog.removeEventListener("pointerdown", handlePointerDown);
+        dialog.removeEventListener("pointerup", handlePointerUp);
+      }
+      if (dialog.open) {
+        dialog.close();
+      }
+    };
+  }, [donation]);
+
   if (!donation) return null;
+
+  const requestClose = () => {
+    const dialog = dialogRef.current;
+    if (dialog && dialog.open) {
+      dialog.close();
+    } else {
+      onClose();
+    }
+  };
 
   const certNumber = `DRRMS-DON-CERT-${String(
     donation.donationId || "0"
   ).padStart(6, "0")}`;
+
+  const items: any[] = Array.isArray(donation.items) ? donation.items : [];
+  const totalUnits = items.reduce(
+    (sum, it) => sum + Number(it.quantity || 0),
+    0
+  );
+  const isApproved =
+    (donation.status || "").toLowerCase() === "approved";
 
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
-        {/* Top Control Bar (Hidden on print) */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-3.5 no-print">
-          <div className="flex items-center gap-2">
-            <Award className="h-4 w-4 text-blue-600" />
-            <span className="text-xs font-bold text-slate-800">
-              Official Donation Acknowledgment &bull; {certNumber}
-            </span>
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      {...({ closedby: "any" } as any)}
+      className="certificate-dialog m-auto w-[min(94vw,42rem)] max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-0 text-slate-900 shadow-2xl border border-slate-200"
+    >
+      {/* Top Control Bar (Hidden on print) */}
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-3.5 no-print">
+        <div className="flex items-center gap-2 min-w-0">
+          <Award className="h-4 w-4 text-blue-600 shrink-0" aria-hidden="true" />
+          <span className="text-xs font-bold text-slate-800 truncate">
+            Donation Receipt &bull; {certNumber}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition"
+          >
+            <Printer className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Print</span>
+          </button>
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Close receipt"
+            className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 active:scale-95 transition"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      {/* Printable Official Receipt Body */}
+      <div className="p-6 sm:p-8 space-y-5 bg-white">
+        {/* Letterhead */}
+        <div className="text-center space-y-2 border-b-2 border-[#002060] pb-4">
+          <div className="flex items-center justify-center">
+            <div className="h-12 w-12 rounded-2xl bg-white p-1 border border-slate-200 shadow-xs flex items-center justify-center">
+              <img
+                src="/ndrrmc-logo.png"
+                alt="NDRRMC Seal"
+                className="h-full w-full object-contain"
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
+          <div>
+            <div className="text-[11px] font-semibold text-slate-500">
+              Republic of the Philippines &bull; Office of Civil Defense
+            </div>
+            <h2
+              id={titleId}
+              className="text-base sm:text-lg font-extrabold text-[#002060] tracking-tight"
             >
-              <Printer className="h-3.5 w-3.5" />
-              <span>Print Certificate</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition"
-            >
-              <X className="h-4 w-4" />
-            </button>
+              National Disaster Risk Reduction &amp; Management Council
+            </h2>
+            <p className="text-xs font-semibold text-blue-700">
+              {isApproved
+                ? "Official Donation Acknowledgment Certificate"
+                : "Donation Pledge Receipt (Pending Review)"}
+            </p>
           </div>
         </div>
 
-        {/* Printable Official Certificate Body */}
-        <div className="p-8 sm:p-10 space-y-6 bg-gradient-to-b from-white via-[#FCFDFE] to-slate-50/50">
-          {/* Certificate Official Letterhead */}
-          <div className="text-center space-y-2 border-b-2 border-[#002060] pb-5">
-            <div className="flex items-center justify-center gap-3">
-              <div className="h-14 w-14 rounded-2xl bg-white p-1 border border-slate-200 shadow-sm flex items-center justify-center">
-                <img
-                  src="/ndrrmc-logo.png"
-                  alt="NDRRMC Seal"
-                  className="h-full w-full object-contain"
-                />
-              </div>
-            </div>
-            <div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                Republic of the Philippines &bull; Office of Civil Defense
-              </div>
-              <h1 className="text-lg sm:text-xl font-black text-[#002060] tracking-tight uppercase">
-                National Disaster Risk Reduction &amp; Management Council
-              </h1>
-              <p className="text-xs font-bold text-blue-700">
-                Disaster Relief &amp; Resource Management System (DRRMS)
-              </p>
-            </div>
+        {/* Summary & Benefactor */}
+        <div className="rounded-2xl border border-slate-200/80 bg-slate-50/60 p-4 text-center space-y-2">
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs">
+            <span className="font-mono font-semibold text-slate-700">
+              {certNumber}
+            </span>
+            <span className="text-slate-300">&bull;</span>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold ${
+                isApproved
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-amber-50 text-amber-800 border-amber-200"
+              }`}
+            >
+              {isApproved ? (
+                <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+              ) : (
+                <Clock className="h-3 w-3" aria-hidden="true" />
+              )}
+              <span>{donation.status || "Pending"}</span>
+            </span>
           </div>
 
-          {/* Certificate Title */}
-          <div className="text-center space-y-1">
-            <div className="inline-block px-3 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-extrabold text-blue-700 uppercase tracking-widest">
-              Official Acknowledgment Certificate
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-              Certificate of Humanitarian Aid Donation
-            </h2>
-            <p className="text-xs text-slate-500 font-mono">
-              Serial Number: <span className="font-bold text-slate-800">{certNumber}</span>
-            </p>
+          <div className="text-lg font-bold text-slate-900 pt-1">
+            {donorName || donation.donorName || "Registered Donor"}
           </div>
+          <p className="text-xs text-slate-600">
+            Campaign:{" "}
+            <span className="font-semibold text-slate-900">
+              {donation.eventName || "General Relief Fund"}
+            </span>
+          </p>
+        </div>
 
-          {/* Formal Gratitude Statement */}
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs text-center space-y-2">
-            <p className="text-xs text-slate-600 leading-relaxed">
-              This certifies that the National Disaster Risk Reduction &amp; Management Council acknowledges the vital humanitarian contribution of:
-            </p>
-            <div className="text-lg sm:text-xl font-black text-blue-900 tracking-tight py-1">
-              {donorName || "Verified Citizen Benefactor"}
-            </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              in support of national emergency relief mobilization for:
-            </p>
-            <div className="text-sm font-extrabold text-slate-900 bg-slate-50 rounded-xl py-1 px-3 inline-block border border-slate-200">
-              {donation.eventName || "NDRRMC Central Calamity Emergency Fund"}
-            </div>
+        {/* Itemized Goods Schedule */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <h3 className="font-bold text-slate-700">Contributed Relief Items</h3>
+            {items.length > 0 && (
+              <span className="font-semibold text-slate-600 tabular-nums">
+                Total: {totalUnits.toLocaleString()} units
+              </span>
+            )}
           </div>
-
-          {/* Itemized Goods Schedule */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600">
-              Audited Schedule of Contributed Relief Goods
-            </h3>
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                <tr>
+                  <th scope="col" className="py-2.5 px-3">
+                    Relief Item
+                  </th>
+                  <th scope="col" className="py-2.5 px-3">
+                    Category
+                  </th>
+                  <th scope="col" className="py-2.5 px-3 text-right">
+                    Quantity
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {items.length === 0 ? (
                   <tr>
-                    <th className="py-2.5 px-3">Relief Item Description</th>
-                    <th className="py-2.5 px-3">Category</th>
-                    <th className="py-2.5 px-3 text-right">Quantity Contributed</th>
+                    <td
+                      colSpan={3}
+                      className="py-4 px-3 text-center text-slate-400"
+                    >
+                      No itemized relief goods recorded for this entry.
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(donation.items || []).map((it: any, i: number) => (
-                    <tr key={i}>
+                ) : (
+                  items.map((it: any, i: number) => (
+                    <tr key={it.itemId || i}>
                       <td className="py-2.5 px-3 font-semibold text-slate-900">
                         {it.itemName}
                       </td>
                       <td className="py-2.5 px-3 text-slate-600">
                         {it.category || "Relief Commodity"}
                       </td>
-                      <td className="py-2.5 px-3 text-right font-bold text-emerald-700">
-                        {it.quantity} {it.unitOfMeasure || "Units"}
+                      <td className="py-2.5 px-3 text-right font-semibold text-emerald-700 tabular-nums">
+                        {Number(it.quantity || 0).toLocaleString()}{" "}
+                        {it.unitOfMeasure || "Units"}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Verification Footer */}
+        <div className="pt-4 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-4 items-end text-xs">
+          <div className="space-y-1">
+            <span className="text-[11px] text-slate-500 font-semibold block">
+              Pledged Date
+            </span>
+            <span className="font-bold text-slate-800 block tabular-nums">
+              {donation.donationDate || "Recorded"}
+            </span>
+            <span
+              className={`text-[11px] font-semibold inline-flex items-center gap-1 ${
+                isApproved ? "text-emerald-700" : "text-amber-700"
+              }`}
+            >
+              {isApproved ? (
+                <>
+                  <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                  Inventory Credited
+                </>
+              ) : (
+                <>
+                  <Clock className="h-3 w-3" aria-hidden="true" />
+                  Pending Verification
+                </>
+              )}
+            </span>
           </div>
 
-          {/* Certification Protocol & Security Footer */}
-          <div className="pt-4 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-4 items-end text-xs">
-            <div className="space-y-1">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block">
-                Pledged On
-              </span>
-              <span className="font-bold text-slate-800 block">
-                {donation.donationDate || new Date().toISOString().slice(0, 10)}
-              </span>
-              <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3" /> Custody Verified
-              </span>
+          <div className="hidden sm:flex flex-col items-center justify-center text-center space-y-1">
+            <div className="h-10 w-10 border border-slate-200 rounded-lg p-1 bg-slate-50 flex items-center justify-center text-slate-500">
+              <QrCode className="h-full w-full" aria-hidden="true" />
             </div>
+            <span className="text-[10px] text-slate-500 font-mono">
+              REF-{donation.donationId}
+            </span>
+          </div>
 
-            <div className="hidden sm:flex flex-col items-center justify-center text-center space-y-1">
-              <div className="h-10 w-10 border border-slate-300 rounded-lg p-1 bg-slate-50 flex items-center justify-center text-slate-500">
-                <QrCode className="h-full w-full" />
-              </div>
-              <span className="text-[9px] text-slate-400 font-mono">
-                SEC-ID-{donation.donationId}
-              </span>
+          <div className="text-right space-y-1">
+            <div className="text-xs font-semibold text-slate-900">
+              NDRRMC Logistics Desk
             </div>
-
-            <div className="text-right space-y-1">
-              <div className="font-serif italic text-blue-900 text-sm">
-                Col. Bernardo R. Ramos
-              </div>
-              <div className="border-t border-slate-300 pt-1 text-[10px] font-bold text-slate-700 uppercase">
-                Director of Logistics
-              </div>
-              <div className="text-[9px] text-slate-400">
-                NDRRMC Central Command
-              </div>
+            <div className="border-t border-slate-200 pt-1 text-[11px] font-medium text-slate-500">
+              Central Warehouse Operations
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 

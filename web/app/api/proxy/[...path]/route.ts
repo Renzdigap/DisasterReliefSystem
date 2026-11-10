@@ -1442,7 +1442,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
           }
           if (eventId && eventId > 0) {
             const evRes = await client.query(
-              "SELECT 1 FROM DisasterEvent WHERE event_id = $1",
+              "SELECT status FROM DisasterEvent WHERE event_id = $1",
               [eventId]
             );
             if (evRes.rows.length === 0) {
@@ -1452,6 +1452,32 @@ async function handleRequest(req: NextRequest, subpath: string) {
                 { status: 400 }
               );
             }
+            if ((evRes.rows[0].status || "").toLowerCase() !== "active") {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                {
+                  error:
+                    "Selected disaster event is resolved. Please select an Active disaster or General Relief Fund.",
+                },
+                { status: 400 }
+              );
+            }
+          }
+
+          const goodIds = items.map((it) => it.goodId);
+          const gCheck = await client.query(
+            "SELECT good_id FROM ReliefGood WHERE good_id = ANY($1::int[])",
+            [goodIds]
+          );
+          if (gCheck.rows.length !== goodIds.length) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              {
+                error:
+                  "One or more selected relief items are no longer in the catalog. Please refresh.",
+              },
+              { status: 400 }
+            );
           }
 
           const donorId = dRes.rows[0].donor_id;
@@ -1472,7 +1498,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
             "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
             [
               userId,
-              `Donation Pledge #${donationId} (${items.length} item types) recorded and awaiting Steward verification.`,
+              `Donation Pledge ${donationId} (${items.length} item types) recorded and awaiting review.`,
             ]
           );
           await client.query("COMMIT");
@@ -1540,7 +1566,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
               "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
               [
                 uRes.rows[0].user_id,
-                `Your Donation #${donationId} status has been updated to: ${status}.`,
+                `Your Donation ${donationId} status has been updated to: ${status}.`,
               ]
             );
           }
@@ -1557,12 +1583,67 @@ async function handleRequest(req: NextRequest, subpath: string) {
         }
       } else if (req.method === "DELETE") {
         const id = Number(req.nextUrl.searchParams.get("id") || 0);
+        const ownerUserId = Number(req.nextUrl.searchParams.get("userId") || 0);
+        const onlyPending =
+          req.nextUrl.searchParams.get("onlyPending") === "true";
+
         if (!Number.isInteger(id) || id <= 0) {
           return NextResponse.json(
             { error: "Valid donation id is required." },
             { status: 400 }
           );
         }
+
+        if (onlyPending || ownerUserId > 0) {
+          const client = await pool.connect();
+          try {
+            await client.query("BEGIN");
+            const checkRes = await client.query(
+              "SELECT d.status, dn.user_id FROM Donation d JOIN Donor dn ON d.donor_id = dn.donor_id WHERE d.donation_id = $1 FOR UPDATE",
+              [id]
+            );
+            if (checkRes.rows.length === 0) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                { error: "Donation not found." },
+                { status: 404 }
+              );
+            }
+            const row = checkRes.rows[0];
+            if (ownerUserId > 0 && Number(row.user_id) !== ownerUserId) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                { error: "You can only cancel your own donations." },
+                { status: 403 }
+              );
+            }
+            if (
+              onlyPending &&
+              String(row.status || "").toLowerCase() !== "pending"
+            ) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                {
+                  error:
+                    "Only pending donations can be cancelled. Approved pledges are already credited to warehouse inventory.",
+                },
+                { status: 409 }
+              );
+            }
+            await client.query(
+              "DELETE FROM Donation WHERE donation_id = $1",
+              [id]
+            );
+            await client.query("COMMIT");
+            return NextResponse.json({ deleted: true });
+          } catch (e) {
+            await client.query("ROLLBACK");
+            throw e;
+          } finally {
+            client.release();
+          }
+        }
+
         const del = await pool.query(
           "DELETE FROM Donation WHERE donation_id = $1",
           [id]
@@ -2156,6 +2237,22 @@ async function handleRequest(req: NextRequest, subpath: string) {
       subpath === "notifications/read" &&
       (req.method === "PUT" || req.method === "POST")
     ) {
+      const markAll = Boolean(body.markAll);
+      const userId = Number(body.userId || 0);
+      if (markAll) {
+        if (!Number.isInteger(userId) || userId <= 0) {
+          return NextResponse.json(
+            { error: "Valid userId is required to mark all notifications read." },
+            { status: 400 }
+          );
+        }
+        await pool.query(
+          "UPDATE Notification SET is_read = true WHERE user_id = $1 AND is_read = false",
+          [userId]
+        );
+        return NextResponse.json({ ok: true, markAll: true });
+      }
+
       const notificationId = Number(body.notificationId);
       if (!Number.isInteger(notificationId) || notificationId <= 0) {
         return NextResponse.json(
