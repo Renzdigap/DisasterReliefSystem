@@ -1,9 +1,21 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Bell, RefreshCw, X, Check, ChevronRight, Inbox } from "lucide-react";
+import {
+  LogOut,
+  Bell,
+  RefreshCw,
+  X,
+  Check,
+  ChevronRight,
+  Inbox,
+  Moon,
+  Sun,
+  Search,
+} from "lucide-react";
 import { clearSession, UserSession } from "@/lib/api";
+import { PublicAidTrackerModal } from "@/components/DisasterEnhancements";
 
 export interface SidebarNavItem {
   id: string;
@@ -60,6 +72,23 @@ export function PortalSidebarLayout({
 }: PortalSidebarLayoutProps) {
   const router = useRouter();
   const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
+  const [showAidTracker, setShowAidTracker] = useState(false);
+  const [nightOps, setNightOps] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("drrms_night_ops");
+      if (saved === "1") setNightOps(true);
+    } catch {}
+  }, []);
+
+  const toggleNightOps = () => {
+    const next = !nightOps;
+    setNightOps(next);
+    try {
+      localStorage.setItem("drrms_night_ops", next ? "1" : "0");
+    } catch {}
+  };
 
   const handleLogout = () => {
     clearSession();
@@ -69,7 +98,11 @@ export function PortalSidebarLayout({
   const activeNav = navItems.find((item) => item.id === activeTab);
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row text-slate-900">
+    <div
+      className={`min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row text-slate-900 transition-colors ${
+        nightOps ? "night-ops" : ""
+      }`}
+    >
       {/* Clean Light Sidebar */}
       <aside className="w-full lg:w-60 shrink-0 bg-white flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-200/90 lg:min-h-screen lg:sticky lg:top-0 lg:h-screen no-print">
         <div className="flex flex-col flex-1 min-h-0">
@@ -212,14 +245,49 @@ export function PortalSidebarLayout({
             <p className="text-xs text-slate-500 truncate">{portalSubtitle}</p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             {/* System Live Connection Status */}
-            <div className="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-[11px] font-semibold text-slate-700 shadow-xs">
+            <div className="hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-[11px] font-semibold text-slate-700 shadow-xs">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>NDRRMC Central Operations Live</span>
             </div>
 
             {headerActions}
+
+            {/* Public Relief Delivery Tracker Shortcut */}
+            <button
+              type="button"
+              onClick={() => setShowAidTracker(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-700 transition shadow-xs"
+              title="Public Relief Shipment & Donation Tracker"
+            >
+              <Search className="h-3.5 w-3.5 text-blue-600" />
+              <span className="hidden sm:inline">Track Aid</span>
+            </button>
+
+            {/* Central Command Night Ops / Kiosk Mode Toggle */}
+            <button
+              type="button"
+              onClick={toggleNightOps}
+              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition shadow-xs ${
+                nightOps
+                  ? "border-amber-400/50 bg-amber-500/15 text-amber-300"
+                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
+              }`}
+              title="Toggle Command Center Night Operations Mode"
+            >
+              {nightOps ? (
+                <>
+                  <Sun className="h-3.5 w-3.5 text-amber-400" />
+                  <span className="hidden md:inline">Day Ops</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="h-3.5 w-3.5 text-slate-600" />
+                  <span className="hidden md:inline">Night Ops</span>
+                </>
+              )}
+            </button>
 
             {onSync && (
               <button
@@ -352,6 +420,10 @@ export function PortalSidebarLayout({
           {children}
         </main>
       </div>
+
+      {showAidTracker && (
+        <PublicAidTrackerModal onClose={() => setShowAidTracker(false)} />
+      )}
     </div>
   );
 }

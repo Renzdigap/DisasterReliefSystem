@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   Printer,
   X,
@@ -16,6 +16,14 @@ import {
   FileText,
   Building2,
   Users,
+  Search,
+  Radio,
+  Send,
+  Navigation,
+  Compass,
+  Clock,
+  Smartphone,
+  Sparkles,
 } from "lucide-react";
 
 // ==========================================
@@ -497,3 +505,861 @@ export function DeliveryWaybillModal({
     </div>
   );
 }
+
+// ==========================================
+// 4. PUBLIC RELIEF DELIVERY TRACKER MODAL
+// ==========================================
+interface PublicAidTrackerModalProps {
+  onClose: () => void;
+  initialCode?: string;
+}
+
+const SAMPLE_TRACKING_RECORDS = [
+  {
+    code: "DRRMS-WB-2024-00001",
+    shortId: "#1",
+    type: "Waybill Dispatch",
+    campaign: "Typhoon Carina Flood Response",
+    benefactor: "Robert Tan (Citizen Donor)",
+    recipient: "Philippine Red Cross Manila",
+    destination: "Port Area Evacuation Complex, Manila",
+    driver: "Charlie Driver • Relief Truck (NDL-4921)",
+    items: "500 Bottles Drinking Water 1L, 120 Sacks Rice 25kg",
+    status: "Delivered",
+    currentStage: 4,
+    auditHash: "SHA256-9F8A-44C1-B72E-NDRRMC",
+    timestamps: [
+      "Jul 27, 08:15 AM • Pledge Audited",
+      "Jul 27, 01:40 PM • Camp Aguinaldo Warehouse Allocated",
+      "Jul 28, 06:10 AM • Dispatched via Fleet Truck NDL-4921",
+      "Jul 28, 11:45 AM • Signed & Handed Over at Port Area Manila",
+    ],
+  },
+  {
+    code: "DRRMS-WB-2024-00008",
+    shortId: "#8",
+    type: "Waybill Dispatch",
+    campaign: "Tropical Storm Kristine Prep",
+    benefactor: "Metro Pacific Relief Foundation",
+    recipient: "LGU Albay Emergency Command",
+    destination: "Legazpi City Central Evacuation Dome, Albay",
+    driver: "Marco Reyes • Heavy Cargo Van (VNR-8820)",
+    items: "600 Bottles Drinking Water 1L, 200 Thermal Blankets",
+    status: "In Transit",
+    currentStage: 3,
+    auditHash: "SHA256-3E12-90D4-A19C-NDRRMC",
+    timestamps: [
+      "Oct 23, 09:30 AM • Pledge Audited",
+      "Oct 23, 03:15 PM • Regional Hub Stock Allocated",
+      "Oct 24, 05:00 AM • En Route via Maharlika Highway Convoy",
+      "Pending • Estimated Arrival 04:30 PM at Legazpi Dome",
+    ],
+  },
+  {
+    code: "DRRMS-DON-CERT-000003",
+    shortId: "#3",
+    type: "Donation Pledge",
+    campaign: "Central Luzon Monsoon Inundation",
+    benefactor: "Robert Tan (Citizen Donor)",
+    recipient: "Pampanga Provincial Disaster Office",
+    destination: "San Fernando Mega Evacuation Center, Pampanga",
+    driver: "Fleet Assignment Queue • Camp Aguinaldo Hub",
+    items: "250 Hygiene Kits, 100 Boxes Paracetamol 500mg",
+    status: "Warehouse Allocated",
+    currentStage: 2,
+    auditHash: "SHA256-7B41-66F9-E08A-NDRRMC",
+    timestamps: [
+      "Oct 25, 10:05 AM • Donor Pledge Verified",
+      "Oct 25, 02:20 PM • Quality Inspected & Stocked in Bay 4",
+      "Scheduled • Awaiting Convoy Loading",
+      "Pending • Final LGU Handover",
+    ],
+  },
+];
+
+export function PublicAidTrackerModal({
+  onClose,
+  initialCode = "DRRMS-WB-2024-00001",
+}: PublicAidTrackerModalProps) {
+  const [query, setQuery] = useState(initialCode);
+  const [selectedRecord, setSelectedRecord] = useState(
+    SAMPLE_TRACKING_RECORDS[0]
+  );
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = query.trim().toLowerCase();
+    const match =
+      SAMPLE_TRACKING_RECORDS.find(
+        (r) =>
+          r.code.toLowerCase().includes(q) ||
+          r.shortId.toLowerCase() === q ||
+          r.campaign.toLowerCase().includes(q) ||
+          r.recipient.toLowerCase().includes(q)
+      ) || SAMPLE_TRACKING_RECORDS[0];
+    setSelectedRecord(match);
+  };
+
+  const stages = [
+    {
+      step: 1,
+      title: "Pledge Audited & Logged",
+      subtitle: "Central DRRMS Ledger",
+      time: selectedRecord.timestamps[0],
+    },
+    {
+      step: 2,
+      title: "Warehouse Stock Allocated",
+      subtitle: "Camp Aguinaldo Logistics Base",
+      time: selectedRecord.timestamps[1],
+    },
+    {
+      step: 3,
+      title: "Dispatched via Certified Fleet",
+      subtitle: selectedRecord.driver,
+      time: selectedRecord.timestamps[2],
+    },
+    {
+      step: 4,
+      title: "Verified Evacuation Handover",
+      subtitle: selectedRecord.destination,
+      time: selectedRecord.timestamps[3],
+    },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-4 backdrop-blur-xs overflow-y-auto no-print">
+      <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6 text-slate-900">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-[#071936] via-[#0B2956] to-[#123E7C] px-6 py-5 text-white flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0">
+              <img
+                src="/ndrrmc-logo.png"
+                alt="NDRRMC"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                  Public Transparency Audit
+                </span>
+              </div>
+              <h2 className="text-base sm:text-lg font-extrabold tracking-tight mt-0.5">
+                NDRRMC Real-Time Relief Shipment Tracker
+              </h2>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl p-1.5 text-white/70 hover:bg-white/10 hover:text-white transition"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5">
+          {/* Search Input & Quick Sample Pills */}
+          <div className="space-y-2.5">
+            <form onSubmit={handleSearch} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Enter Waybill ID (e.g. DRRMS-WB-2024-00001) or Donation ID..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:border-blue-600 focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition shrink-0"
+              >
+                Track Shipment
+              </button>
+            </form>
+
+            <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+              <span className="text-slate-400 font-semibold">
+                Verified Shipments:
+              </span>
+              {SAMPLE_TRACKING_RECORDS.map((rec) => (
+                <button
+                  key={rec.code}
+                  type="button"
+                  onClick={() => {
+                    setQuery(rec.code);
+                    setSelectedRecord(rec);
+                  }}
+                  className={`px-2.5 py-1 rounded-lg font-mono font-bold transition ${
+                    selectedRecord.code === rec.code
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {rec.code} ({rec.status})
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Shipment Summary Banner */}
+          <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xs font-extrabold text-blue-700">
+                  {selectedRecord.code}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    selectedRecord.currentStage === 4
+                      ? "bg-emerald-100 text-emerald-800"
+                      : selectedRecord.currentStage === 3
+                      ? "bg-amber-100 text-amber-800"
+                      : "bg-blue-100 text-blue-800"
+                  }`}
+                >
+                  {selectedRecord.status}
+                </span>
+              </div>
+              <h3 className="text-sm font-extrabold text-slate-900">
+                {selectedRecord.campaign} &rarr; {selectedRecord.recipient}
+              </h3>
+              <p className="text-xs text-slate-600">
+                <span className="font-semibold">Cargo Manifest:</span>{" "}
+                {selectedRecord.items}
+              </p>
+            </div>
+            <div className="text-left sm:text-right shrink-0 space-y-0.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                Audit Verification Hash
+              </span>
+              <span className="font-mono text-[11px] font-bold text-emerald-700 bg-white px-2 py-1 rounded-lg border border-emerald-200 inline-block">
+                ✓ {selectedRecord.auditHash}
+              </span>
+            </div>
+          </div>
+
+          {/* 4-Stage Chain-of-Custody Stepper */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              End-to-End Chain of Custody Audit Trail
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+              {stages.map((s) => {
+                const isDone = s.step <= selectedRecord.currentStage;
+                const isCurrent = s.step === selectedRecord.currentStage;
+                return (
+                  <div
+                    key={s.step}
+                    className={`rounded-2xl border p-3.5 flex flex-col justify-between gap-2 transition ${
+                      isCurrent
+                        ? "border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20"
+                        : isDone
+                        ? "border-emerald-200 bg-emerald-50/30"
+                        : "border-slate-200 bg-slate-50/60 opacity-60"
+                    }`}
+                  >
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span
+                          className={`h-6 w-6 rounded-full text-xs font-extrabold flex items-center justify-center ${
+                            isDone
+                              ? "bg-emerald-600 text-white"
+                              : "bg-slate-200 text-slate-600"
+                          }`}
+                        >
+                          {isDone ? "✓" : s.step}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Step 0{s.step}
+                        </span>
+                      </div>
+                      <div className="text-xs font-extrabold text-slate-900 leading-snug">
+                        {s.title}
+                      </div>
+                      <div className="text-[11px] font-medium text-slate-600">
+                        {s.subtitle}
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t border-slate-200/70 text-[10px] font-semibold text-slate-500">
+                      {s.time}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 5. INTERACTIVE PHILIPPINE COMMAND MAP (GIS)
+// ==========================================
+interface PhilippineCommandMapProps {
+  events?: any[];
+  onSelectEventAction?: (event: any) => void;
+  actionLabel?: string;
+}
+
+const REGIONAL_HOTSPOTS = [
+  {
+    id: "luzon-north",
+    region: "Region II • Cagayan Valley",
+    city: "Tuguegarao & Isabela",
+    x: 152,
+    y: 68,
+    matchKeyword: "carina",
+    defaultEventName: "Typhoon Carina Flood",
+    trucksActive: 6,
+  },
+  {
+    id: "luzon-central",
+    region: "Region III • Central Luzon",
+    city: "Pampanga & Bulacan",
+    x: 138,
+    y: 122,
+    matchKeyword: "monsoon",
+    defaultEventName: "Central Luzon Monsoon Inundation",
+    trucksActive: 8,
+  },
+  {
+    id: "ncr-manila",
+    region: "NCR • Metro Manila",
+    city: "Port Area & Marikina Basin",
+    x: 142,
+    y: 145,
+    matchKeyword: "manila",
+    defaultEventName: "Metro Manila Urban Flood Response",
+    trucksActive: 11,
+  },
+  {
+    id: "bicol-albay",
+    region: "Region V • Bicol Peninsula",
+    city: "Legazpi & Albay Mayon Zone",
+    x: 192,
+    y: 175,
+    matchKeyword: "kristine",
+    defaultEventName: "Tropical Storm Kristine Prep",
+    trucksActive: 7,
+  },
+  {
+    id: "visayas-central",
+    region: "Region VII • Central Visayas",
+    city: "Cebu & Bohol Coastal",
+    x: 205,
+    y: 255,
+    matchKeyword: "visayas",
+    defaultEventName: "Visayas Coastal Surge Operations",
+    trucksActive: 4,
+  },
+  {
+    id: "mindanao-davao",
+    region: "Region XI • Davao & Mindanao",
+    city: "Davao Oriental Basin",
+    x: 235,
+    y: 335,
+    matchKeyword: "mindanao",
+    defaultEventName: "Southern Mindanao Trough Alert",
+    trucksActive: 5,
+  },
+];
+
+export function PhilippineCommandMap({
+  events = [],
+  onSelectEventAction,
+  actionLabel = "Inspect Zone",
+}: PhilippineCommandMapProps) {
+  const [selectedHotspotId, setSelectedHotspotId] = useState<string>(
+    REGIONAL_HOTSPOTS[0].id
+  );
+
+  const activeHotspot =
+    REGIONAL_HOTSPOTS.find((h) => h.id === selectedHotspotId) ||
+    REGIONAL_HOTSPOTS[0];
+
+  // Match real DB event if available
+  const matchedEvent =
+    events.find(
+      (ev) =>
+        (ev.eventName || "")
+          .toLowerCase()
+          .includes(activeHotspot.matchKeyword) ||
+        (ev.location || "")
+          .toLowerCase()
+          .includes(activeHotspot.city.split(" ")[0].toLowerCase())
+    ) ||
+    events[0] || {
+      eventId: 1,
+      eventName: activeHotspot.defaultEventName,
+      location: activeHotspot.city,
+      status: "Active",
+    };
+
+  const alertInfo = getDisasterAlertInfo(
+    matchedEvent?.eventName || activeHotspot.defaultEventName
+  );
+
+  return (
+    <div className="rounded-2xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-rose-50 text-rose-600 border border-rose-200/60">
+            <Compass className="h-4 w-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">
+                Philippine National Calamity GIS Telemetry Map
+              </h2>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-extrabold uppercase">
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
+                Live Radar
+              </span>
+            </div>
+            <p className="text-xs text-slate-500">
+              Click any regional emergency beacon to inspect PAGASA warning tiers and active relief deployment
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] font-semibold text-slate-600">
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" /> Signal 3 / Red Alert
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500" /> Orange Alert
+          </span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12">
+        {/* Left: Interactive Radar Map Canvas */}
+        <div className="lg:col-span-7 bg-gradient-to-br from-[#07152B] via-[#0B2144] to-[#0F2C59] p-5 flex flex-col items-center justify-center relative min-h-[340px]">
+          {/* Subtle Radar Grid Overlay */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-15"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(56,189,248,0.4) 1px, transparent 1px), linear-gradient(to right, rgba(56,189,248,0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(56,189,248,0.12) 1px, transparent 1px)",
+              backgroundSize: "28px 28px",
+            }}
+          />
+
+          <div className="relative z-10 w-full max-w-[340px]">
+            <svg
+              viewBox="0 0 340 400"
+              className="w-full h-auto drop-shadow-[0_10px_25px_rgba(0,0,0,0.5)]"
+            >
+              {/* Concentric Radar Sweep Circles */}
+              <circle
+                cx="175"
+                cy="200"
+                r="155"
+                fill="none"
+                stroke="rgba(56, 189, 248, 0.14)"
+                strokeDasharray="4 4"
+              />
+              <circle
+                cx="175"
+                cy="200"
+                r="105"
+                fill="none"
+                stroke="rgba(56, 189, 248, 0.18)"
+                strokeDasharray="3 3"
+              />
+
+              {/* Stylized Philippine Archipelago Vector Path */}
+              {/* Luzon */}
+              <path
+                d="M128,38 L162,42 L168,85 L156,115 L176,142 L208,168 L195,188 L158,165 L132,155 L122,125 L130,90 Z"
+                fill="#1E3A5F"
+                stroke="#38BDF8"
+                strokeWidth="1.5"
+                opacity="0.9"
+              />
+              {/* Mindoro & Palawan */}
+              <path
+                d="M115,172 L134,178 L130,205 L112,198 Z M55,275 L98,215 L106,222 L64,282 Z"
+                fill="#1E3A5F"
+                stroke="#38BDF8"
+                strokeWidth="1.2"
+                opacity="0.8"
+              />
+              {/* Visayas */}
+              <path
+                d="M158,205 L222,202 L236,245 L205,275 L162,262 L148,232 Z"
+                fill="#1E3A5F"
+                stroke="#38BDF8"
+                strokeWidth="1.5"
+                opacity="0.9"
+              />
+              {/* Mindanao */}
+              <path
+                d="M172,292 L245,288 L262,338 L232,372 L185,365 L155,335 Z"
+                fill="#1E3A5F"
+                stroke="#38BDF8"
+                strokeWidth="1.5"
+                opacity="0.9"
+              />
+
+              {/* Supply Convoy Vector Lines from Camp Aguinaldo (NCR) */}
+              {REGIONAL_HOTSPOTS.map((spot) => (
+                <line
+                  key={`line-${spot.id}`}
+                  x1={142}
+                  y1={145}
+                  x2={spot.x}
+                  y2={spot.y}
+                  stroke={
+                    selectedHotspotId === spot.id
+                      ? "#38BDF8"
+                      : "rgba(148, 163, 184, 0.25)"
+                  }
+                  strokeWidth={selectedHotspotId === spot.id ? "2" : "1"}
+                  strokeDasharray="3 3"
+                />
+              ))}
+
+              {/* Interactive Regional Hotspot Pins */}
+              {REGIONAL_HOTSPOTS.map((spot, idx) => {
+                const isSelected = selectedHotspotId === spot.id;
+                const isCritical = idx === 0 || idx === 3;
+                const pinColor = isCritical ? "#F43F5E" : "#F59E0B";
+
+                return (
+                  <g
+                    key={spot.id}
+                    onClick={() => setSelectedHotspotId(spot.id)}
+                    className="cursor-pointer"
+                  >
+                    {/* Outer Pulse Ring */}
+                    <circle
+                      cx={spot.x}
+                      cy={spot.y}
+                      r={isSelected ? "18" : "11"}
+                      fill={pinColor}
+                      opacity={isSelected ? "0.35" : "0.2"}
+                    />
+                    {/* Core Beacon */}
+                    <circle
+                      cx={spot.x}
+                      cy={spot.y}
+                      r={isSelected ? "7.5" : "5.5"}
+                      fill={pinColor}
+                      stroke="#FFFFFF"
+                      strokeWidth="2"
+                    />
+                    {/* Label Tag */}
+                    <text
+                      x={spot.x + 11}
+                      y={spot.y + 4}
+                      fontSize={isSelected ? "10" : "8.5"}
+                      fontWeight={isSelected ? "800" : "600"}
+                      fill={isSelected ? "#FFFFFF" : "#CBD5E1"}
+                    >
+                      {spot.city.split(" ")[0]}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
+          </div>
+
+          {/* Bottom Region Selector Pills */}
+          <div className="relative z-10 flex flex-wrap justify-center gap-1.5 mt-2">
+            {REGIONAL_HOTSPOTS.map((spot) => (
+              <button
+                key={spot.id}
+                type="button"
+                onClick={() => setSelectedHotspotId(spot.id)}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
+                  selectedHotspotId === spot.id
+                    ? "bg-blue-500 text-white shadow-sm"
+                    : "bg-white/10 text-slate-300 hover:bg-white/20"
+                }`}
+              >
+                {spot.city.split("&")[0].trim()}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Active Zone Telemetry & Operational Detail */}
+        <div className="lg:col-span-5 p-5 flex flex-col justify-between bg-slate-50/50 space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-700">
+                {activeHotspot.region}
+              </span>
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${alertInfo.badgeColor}`}
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${alertInfo.dotColor} animate-pulse`}
+                />
+                {alertInfo.severity}
+              </span>
+            </div>
+
+            <div>
+              <h3 className="text-base font-black text-slate-900">
+                {matchedEvent?.eventName || activeHotspot.defaultEventName}
+              </h3>
+              <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                <span>{activeHotspot.city}</span>
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              <div className="rounded-xl bg-white border border-slate-200/80 p-3">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                  Displaced Population
+                </span>
+                <span className="text-sm font-black text-slate-900 mt-0.5 block">
+                  {alertInfo.familiesAffected}
+                </span>
+              </div>
+              <div className="rounded-xl bg-white border border-slate-200/80 p-3">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block">
+                  Evacuation Centers
+                </span>
+                <span className="text-sm font-black text-emerald-700 mt-0.5 block">
+                  {alertInfo.evacCenters} Active Sites
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white border border-slate-200/80 p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-700">
+                  Relief Supply Target Progress
+                </span>
+                <span className="font-extrabold text-blue-700">
+                  {alertInfo.progressPct}% Fulfilled
+                </span>
+              </div>
+              <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                <div
+                  style={{ width: `${alertInfo.progressPct}%` }}
+                  className="h-full rounded-full bg-gradient-to-r from-blue-600 to-emerald-500"
+                />
+              </div>
+              <p className="text-[11px] text-slate-500">
+                <strong className="text-slate-700">Priority Needs:</strong>{" "}
+                {alertInfo.priorityDemand}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-blue-50/70 border border-blue-200/70 p-3 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2">
+                <Truck className="h-4 w-4 text-blue-600 shrink-0" />
+                <span className="font-semibold text-slate-800">
+                  Volunteer Fleet Deployed:
+                </span>
+              </div>
+              <span className="font-extrabold text-blue-700">
+                {activeHotspot.trucksActive} Trucks En Route
+              </span>
+            </div>
+          </div>
+
+          {onSelectEventAction && (
+            <button
+              type="button"
+              onClick={() => onSelectEventAction(matchedEvent)}
+              className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-500/20 transition"
+            >
+              {actionLabel} &rarr;
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==========================================
+// 6. EMERGENCY FLEET SMS BROADCAST CONSOLE
+// ==========================================
+interface EmergencyBroadcastModalProps {
+  events?: any[];
+  onClose: () => void;
+  onBroadcastSent?: (summary: string) => void;
+}
+
+export function EmergencyBroadcastModal({
+  events = [],
+  onClose,
+  onBroadcastSent,
+}: EmergencyBroadcastModalProps) {
+  const [selectedZone, setSelectedZone] = useState(
+    events[0]?.eventName || "Tropical Storm Kristine Prep (Albay)"
+  );
+  const [alertTier, setAlertTier] = useState("CRITICAL FLEET MOBILIZATION");
+  const [customNote, setCustomNote] = useState(
+    "Report to Camp Aguinaldo Loading Bay 2 for immediate relief convoy dispatch. Bring rain-tarpaulin truck covers."
+  );
+  const [sending, setSending] = useState(false);
+  const [sentDone, setSentDone] = useState(false);
+
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSending(true);
+    setTimeout(() => {
+      setSending(false);
+      setSentDone(true);
+      if (onBroadcastSent) {
+        onBroadcastSent(
+          `Emergency Telecom Broadcast transmitted to 10 registered Volunteer Fleet Drivers for ${selectedZone}.`
+        );
+      }
+    }, 600);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-4 backdrop-blur-xs overflow-y-auto no-print">
+      <div className="relative w-full max-w-xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6 text-slate-900">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 px-6 py-4 text-white flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <Radio className="h-5 w-5 animate-pulse" />
+            <div>
+              <h2 className="text-base font-extrabold">
+                NDRRMC Emergency Fleet SMS Broadcast Console
+              </h2>
+              <p className="text-[11px] text-rose-100">
+                Multi-Channel Telecom &amp; Radio Dispatch Alert Transmitter
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl p-1 text-white/80 hover:bg-white/15 hover:text-white transition"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSend} className="p-6 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Target Calamity Operation
+              </label>
+              <select
+                value={selectedZone}
+                onChange={(e) => setSelectedZone(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900"
+              >
+                {events.map((ev: any) => (
+                  <option key={ev.eventId} value={ev.eventName}>
+                    {ev.eventName} ({ev.location})
+                  </option>
+                ))}
+                <option value="All Active Calamity Sectors">
+                  All Active Calamity Sectors (National)
+                </option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Emergency Broadcast Priority
+              </label>
+              <select
+                value={alertTier}
+                onChange={(e) => setAlertTier(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900"
+              >
+                <option value="CRITICAL FLEET MOBILIZATION">
+                  🚨 CRITICAL FLEET MOBILIZATION
+                </option>
+                <option value="PRIORITY CONVOY ESCORT">
+                  🚚 PRIORITY CONVOY ESCORT
+                </option>
+                <option value="SEVERE WEATHER ROUTE WARNING">
+                  🌧️ SEVERE WEATHER ROUTE WARNING
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">
+              Dispatch Directive Message
+            </label>
+            <textarea
+              rows={2}
+              value={customNote}
+              onChange={(e) => setCustomNote(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 font-medium"
+              required
+            />
+          </div>
+
+          {/* Realistic Mobile SMS Preview */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
+              <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                <Smartphone className="h-3.5 w-3.5" /> SMS GATEWAY PREVIEW (GOV-PH-NDRRMC)
+              </span>
+              <span>RECIPIENTS: 10 CERTIFIED DRIVERS</span>
+            </div>
+            <p className="text-xs font-mono leading-relaxed text-slate-100 bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+              [NDRRMC-DRRMS {alertTier}] Operation: {selectedZone}. Directive:{" "}
+              {customNote} Acknowledge via Volunteer Portal immediately.
+            </p>
+          </div>
+
+          {sentDone ? (
+            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 flex items-center justify-between text-xs text-emerald-900 font-bold">
+              <span className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Broadcast transmitted to all active Volunteer Fleet Drivers!
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg bg-emerald-600 text-white px-3 py-1 text-xs"
+              >
+                Done
+              </button>
+            </div>
+          ) : (
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={sending}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 px-5 py-2 text-xs font-bold text-white shadow-md transition disabled:opacity-50"
+              >
+                <Send className="h-3.5 w-3.5" />
+                <span>
+                  {sending
+                    ? "Transmitting via Telecom Gateway..."
+                    : "Transmit Emergency Broadcast"}
+                </span>
+              </button>
+            </div>
+          )}
+        </form>
+      </div>
+    </div>
+  );
+}
+

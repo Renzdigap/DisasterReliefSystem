@@ -23,12 +23,15 @@ import {
   Phone,
   MapPin,
   Flame,
+  Search,
 } from "lucide-react";
 import { apiFetch, saveSession, UserSession } from "@/lib/api";
+import { PublicAidTrackerModal } from "@/components/DisasterEnhancements";
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
+  const [showTracker, setShowTracker] = useState(false);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -358,6 +361,30 @@ export default function LoginPage() {
                 <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Fleet Units</p>
               </div>
             </div>
+
+            {/* Public Transparency Aid Tracker Launch Bar */}
+            <button
+              type="button"
+              onClick={() => setShowTracker(true)}
+              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-blue-600/30 via-indigo-600/30 to-emerald-600/30 hover:from-blue-600/45 hover:to-emerald-600/45 border border-blue-400/40 p-3 flex items-center justify-between text-left backdrop-blur-md transition group shadow-lg"
+            >
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-xl bg-blue-500/30 border border-blue-300/40 flex items-center justify-center text-blue-200">
+                  <Search className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-extrabold text-white block">
+                    Public Relief Shipment &amp; Donation Tracker
+                  </span>
+                  <span className="text-[11px] text-blue-200/90 block">
+                    Verify Waybill ID or Donation Certificate Chain-of-Custody
+                  </span>
+                </div>
+              </div>
+              <span className="text-xs font-bold text-emerald-300 group-hover:translate-x-1 transition-transform">
+                Track Aid &rarr;
+              </span>
+            </button>
           </div>
         </div>
 
@@ -1144,6 +1171,10 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+
+      {showTracker && (
+        <PublicAidTrackerModal onClose={() => setShowTracker(false)} />
+      )}
     </div>
   );
 }

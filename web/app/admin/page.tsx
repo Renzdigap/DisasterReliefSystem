@@ -20,6 +20,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Radio,
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
@@ -28,7 +29,11 @@ import {
   InventoryHealthCharts,
   DonorImpactCharts,
 } from "@/components/ReportCharts";
-import { getDisasterAlertInfo } from "@/components/DisasterEnhancements";
+import {
+  getDisasterAlertInfo,
+  PhilippineCommandMap,
+  EmergencyBroadcastModal,
+} from "@/components/DisasterEnhancements";
 import {
   apiFetch,
   getCachedData,
@@ -149,6 +154,7 @@ export default function AdminPortalPage() {
   const [activeReport, setActiveReport] = useState<
     "operationalSummary" | "inventoryHealth" | "donorImpact"
   >("operationalSummary");
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
 
   // Delete confirmation modal
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -849,6 +855,17 @@ export default function AdminPortalPage() {
       onMarkNotificationRead={handleMarkNotificationRead}
       onSync={() => refreshData(true)}
       syncing={syncing}
+      headerActions={
+        <button
+          type="button"
+          onClick={() => setShowBroadcastModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
+          title="Broadcast Emergency Fleet SMS Dispatch Alert"
+        >
+          <Radio className="h-3.5 w-3.5 animate-pulse" />
+          <span className="hidden sm:inline">Broadcast Fleet Alert</span>
+        </button>
+      }
     >
       {toast && (
         <div
@@ -985,7 +1002,14 @@ export default function AdminPortalPage() {
 
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="space-y-6">
+          <PhilippineCommandMap
+            events={events}
+            actionLabel="Manage Calamity Operations"
+            onSelectEventAction={() => setActiveTab("events")}
+          />
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-slate-900">
@@ -1082,6 +1106,7 @@ export default function AdminPortalPage() {
                 );
               })}
             </div>
+          </div>
           </div>
         </div>
       )}
@@ -1603,6 +1628,55 @@ export default function AdminPortalPage() {
       {/* TAB 5: WAREHOUSE INVENTORY & MASTER CATALOG */}
       {activeTab === "inventory" && (
         <div className="space-y-5">
+          {/* Emergency Warehouse Auto-Replenishment & Shortage Trigger */}
+          {(() => {
+            const criticalOrLowItems = inventory.filter(
+              (item) => item.currentStock <= 1000
+            );
+            if (criticalOrLowItems.length === 0) return null;
+            return (
+              <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-rose-50/60 to-amber-50/40 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold uppercase">
+                      <AlertTriangle className="h-3 w-3" /> Replenishment Trigger
+                    </span>
+                    <span className="text-xs font-extrabold text-slate-900">
+                      {criticalOrLowItems.length} Commodities Below Optimal Safety Buffer
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Depletion forecast:{" "}
+                    <strong className="text-rose-700">
+                      ~3.2 Operational Days remaining
+                    </strong>{" "}
+                    for{" "}
+                    {criticalOrLowItems
+                      .slice(0, 3)
+                      .map((i) => `${i.itemName} (${i.currentStock} ${i.unitOfMeasure})`)
+                      .join(", ")}
+                    .
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    showToast(
+                      `Urgent Calamity Replenishment Appeal published to Donor Portal for: ${criticalOrLowItems
+                        .slice(0, 3)
+                        .map((i) => i.itemName)
+                        .join(", ")}!`,
+                      "success"
+                    )
+                  }
+                  className="rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition shrink-0"
+                >
+                  Publish Urgent Donor Appeal &rarr;
+                </button>
+              </div>
+            );
+          })()}
+
           <form
             onSubmit={handleAddInventoryItem}
             className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm grid grid-cols-1 sm:grid-cols-6 gap-3 items-end"
@@ -2736,6 +2810,15 @@ export default function AdminPortalPage() {
           </form>
         </div>
       </dialog>
+
+      {/* Emergency Fleet SMS Broadcast Console */}
+      {showBroadcastModal && (
+        <EmergencyBroadcastModal
+          events={events}
+          onClose={() => setShowBroadcastModal(false)}
+          onBroadcastSent={(msg) => showToast(msg, "success")}
+        />
+      )}
     </PortalSidebarLayout>
   );
 }

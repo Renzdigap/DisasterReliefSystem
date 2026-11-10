@@ -90,3 +90,63 @@ dialog::backdrop {
   transform: rotateY(180deg) translateZ(0);
   -webkit-transform: rotateY(180deg) translateZ(0);
 }
+
+/* Central Command Night Ops / Kiosk Mode (Screen Only) */
+@media screen {
+  .night-ops {
+    background-color: #070e1c !important;
+    color: #f1f5f9 !important;
+  }
+  .night-ops aside,
+  .night-ops header {
+    background-color: #0b1528 !important;
+    border-color: #1e293b !important;
+  }
+  .night-ops .bg-white,
+  .night-ops [class*="from-white"] {
+    background-color: #0f1d36 !important;
+    background-image: linear-gradient(
+      to bottom right,
+      #0f1d36,
+      #132442
+    ) !important;
+    border-color: #1e3a5f !important;
+    color: #f1f5f9 !important;
+  }
+  .night-ops .bg-slate-50,
+  .night-ops .bg-slate-50\/70,
+  .night-ops .bg-slate-50\/60,
+  .night-ops .bg-slate-50\/50,
+  .night-ops .bg-slate-100,
+  .night-ops .bg-slate-100\/80 {
+    background-color: #162644 !important;
+    border-color: #23385e !important;
+    color: #e2e8f0 !important;
+  }
+  .night-ops .text-slate-900,
+  .night-ops .text-slate-800 {
+    color: #f8fafc !important;
+  }
+  .night-ops .text-slate-700,
+  .night-ops .text-slate-600 {
+    color: #cbd5e1 !important;
+  }
+  .night-ops .text-slate-500,
+  .night-ops .text-slate-400 {
+    color: #94a3b8 !important;
+  }
+  .night-ops input,
+  .night-ops select,
+  .night-ops textarea {
+    background-color: #0b1528 !important;
+    border-color: #253d66 !important;
+    color: #f8fafc !important;
+  }
+  .night-ops table thead,
+  .night-ops table tr {
+    border-color: #1e293b !important;
+  }
+  .night-ops .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #1e293b !important;
+  }
+}
