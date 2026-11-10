@@ -30,7 +30,6 @@ import {
   DonorImpactCharts,
 } from "@/components/ReportCharts";
 import {
-  getDisasterAlertInfo,
   EmergencyBroadcastModal,
 } from "@/components/DisasterEnhancements";
 import {
@@ -835,7 +834,7 @@ export default function AdminPortalPage() {
     <PortalSidebarLayout
       session={session}
       portalTitle="Admin Dashboard"
-      portalSubtitle="Relief Operations & Resource Management"
+      portalSubtitle=""
       roleBadge={session?.user?.role || "Admin"}
       navItems={navItems}
       activeTab={activeTab}
@@ -843,12 +842,14 @@ export default function AdminPortalPage() {
         setActiveTab(id);
         setSearchQuery("");
         setStatusFilter("ALL");
+        window.scrollTo({ top: 0 });
       }}
       unreadCount={unreadCount}
       onOpenNotifications={() => {
         setActiveTab("notifications");
         setSearchQuery("");
         setStatusFilter("ALL");
+        window.scrollTo({ top: 0 });
       }}
       notificationsList={notifications}
       onMarkNotificationRead={handleMarkNotificationRead}
@@ -858,10 +859,10 @@ export default function AdminPortalPage() {
         <button
           type="button"
           onClick={() => setShowBroadcastModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
-          title="Broadcast Emergency Fleet SMS Dispatch Alert"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 active:scale-[0.98] px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
+          title="Broadcast Emergency Fleet Dispatch Alert"
         >
-          <Radio className="h-3.5 w-3.5 animate-pulse" />
+          <Radio className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" />
           <span className="hidden sm:inline">Broadcast Fleet Alert</span>
         </button>
       }
@@ -894,210 +895,210 @@ export default function AdminPortalPage() {
         </div>
       )}
 
-      {/* Executive KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 no-print">
-        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-rose-50/20 hover:border-rose-300 p-4 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Active Disasters
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-              <AlertTriangle className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-rose-600 mt-2 tracking-tight">
-            {metrics.activeDisasters ?? 0}
-          </div>
-          <div className="text-[10px] font-semibold text-rose-500 mt-0.5">
-            Priority Calamities
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-amber-50/20 hover:border-amber-300 p-4 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Pending Requests
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Building2 className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-amber-600 mt-2 tracking-tight">
-            {metrics.pendingRequests ?? 0}
-          </div>
-          <div className="text-[10px] font-semibold text-amber-600 mt-0.5">
-            Needs Review
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-blue-50/20 hover:border-blue-300 p-4 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Donations
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <HeartHandshake className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-blue-600 mt-2 tracking-tight">
-            {metrics.totalDonations ?? 0}
-          </div>
-          <div className="text-[10px] font-semibold text-blue-500 mt-0.5">
-            Pledged Batches
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-indigo-50/20 hover:border-indigo-300 p-4 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Relief Items
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
-              <Package className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-indigo-600 mt-2 tracking-tight">
-            {metrics.reliefGoodsCount ?? 0}
-          </div>
-          <div className="text-[10px] font-semibold text-indigo-500 mt-0.5">
-            Stock Catalog
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-sky-50/20 hover:border-sky-300 p-4 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Volunteers
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
-              <Users className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-sky-600 mt-2 tracking-tight">
-            {metrics.registeredVolunteers ?? 0}
-          </div>
-          <div className="text-[10px] font-semibold text-sky-600 mt-0.5">
-            Fleet Drivers
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-emerald-50/20 hover:border-emerald-300 p-4 shadow-sm hover:shadow-md transition-all">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Deliveries Done
-            </span>
-            <div className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Truck className="h-3.5 w-3.5" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-emerald-600 mt-2 tracking-tight">
-            {metrics.completedDeliveries ?? 0}
-          </div>
-          <div className="text-[10px] font-semibold text-emerald-600 mt-0.5">
-            Confirmed Dispatches
-          </div>
-        </div>
-      </div>
-
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-slate-900">
-                Pending Requests
-              </h2>
-              <button
-                type="button"
-                onClick={() => setActiveTab("requests")}
-                className="text-xs font-semibold text-blue-600 hover:underline"
-              >
-                View all
-              </button>
+        <div className="space-y-6">
+          {/* Executive KPI Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 no-print">
+            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-rose-300 p-4 shadow-xs transition">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-600">
+                  Active Disasters
+                </span>
+                <div className="h-7 w-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-rose-600 mt-2 tracking-tight tabular-nums">
+                {Number(metrics.activeDisasters ?? 0).toLocaleString()}
+              </div>
             </div>
-            {pendingRequestsList.length === 0 ? (
-              <div className="py-8 text-center text-xs text-slate-400">
-                All relief requests have been reviewed.
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 p-4 shadow-xs transition">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-600">
+                  Pending Requests
+                </span>
+                <div className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                  <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
               </div>
-            ) : (
-              <div className="divide-y divide-slate-100">
-                {pendingRequestsList.slice(0, 5).map((r) => (
-                  <div
-                    key={r.requestId}
-                    className="py-3 flex items-center justify-between gap-3 text-xs"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-800">
-                        #{r.requestId} • {r.orgName}
-                      </div>
-                      <div className="text-slate-500">
-                        {r.eventName} ({r.requestDate})
-                      </div>
-                      <div className="text-[11px] text-slate-500 mt-0.5">
-                        {(r.items || [])
-                          .map((i: any) => `${i.itemName} (${i.quantity})`)
-                          .join(", ")}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={isBusy}
-                      onClick={() =>
-                        handleUpdateRequestStatus(r.requestId, "Approved")
-                      }
-                      className="rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-3 py-1.5 text-xs font-semibold text-white shrink-0"
-                    >
-                      {busyKey === `request-${r.requestId}`
-                        ? "Saving..."
-                        : "Approve"}
-                    </button>
-                  </div>
-                ))}
+              <div className="text-2xl font-black text-amber-600 mt-2 tracking-tight tabular-nums">
+                {Number(metrics.pendingRequests ?? 0).toLocaleString()}
               </div>
-            )}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 p-4 shadow-xs transition">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-600">
+                  Donations
+                </span>
+                <div className="h-7 w-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                  <HeartHandshake className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-blue-600 mt-2 tracking-tight tabular-nums">
+                {Number(metrics.totalDonations ?? 0).toLocaleString()}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 p-4 shadow-xs transition">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-600">
+                  Relief Items
+                </span>
+                <div className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                  <Package className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-indigo-600 mt-2 tracking-tight tabular-nums">
+                {Number(metrics.reliefGoodsCount ?? 0).toLocaleString()}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-sky-300 p-4 shadow-xs transition">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-600">
+                  Volunteers
+                </span>
+                <div className="h-7 w-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
+                  <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-sky-600 mt-2 tracking-tight tabular-nums">
+                {Number(metrics.registeredVolunteers ?? 0).toLocaleString()}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 p-4 shadow-xs transition">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-semibold text-slate-600">
+                  Deliveries Done
+                </span>
+                <div className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                  <Truck className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-emerald-600 mt-2 tracking-tight tabular-nums">
+                {Number(metrics.completedDeliveries ?? 0).toLocaleString()}
+              </div>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-slate-900">
-                Warehouse Stock
-              </h2>
-              <button
-                type="button"
-                onClick={() => setActiveTab("inventory")}
-                className="text-xs font-semibold text-blue-600 hover:underline"
-              >
-                Manage inventory
-              </button>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {inventory.slice(0, 6).map((inv) => {
-                const low = inv.currentStock <= 200;
-                return (
-                  <div
-                    key={inv.inventoryId}
-                    className="py-2.5 flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <span className="font-semibold text-slate-800">
-                        {inv.itemName}
-                      </span>
-                      <span className="text-slate-400 ml-2">{inv.category}</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-slate-900">
+                  Pending Requests
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("requests");
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className="text-xs font-semibold text-blue-600 hover:underline"
+                >
+                  View all
+                </button>
+              </div>
+              {pendingRequestsList.length === 0 ? (
+                <div className="py-8 text-center text-xs text-slate-400">
+                  All relief requests have been reviewed.
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {pendingRequestsList.slice(0, 5).map((r) => (
+                    <div
+                      key={r.requestId}
+                      className="py-3 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-semibold text-slate-900 truncate">
+                          {r.orgName}{" "}
+                          <span className="font-normal text-slate-400">
+                            #{r.requestId}
+                          </span>
+                        </div>
+                        <div className="text-slate-600 mt-0.5 truncate">
+                          {r.eventName}
+                          {(r.items || []).length > 0 && (
+                            <>
+                              {" "}
+                              &bull;{" "}
+                              {(r.items || [])
+                                .map((i: any) => `${i.itemName} × ${i.quantity}`)
+                                .join(", ")}
+                            </>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() =>
+                          handleUpdateRequestStatus(r.requestId, "Approved")
+                        }
+                        className="rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 px-3.5 py-1.5 text-xs font-semibold text-white transition shrink-0"
+                      >
+                        {busyKey === `request-${r.requestId}`
+                          ? "Saving..."
+                          : "Approve"}
+                      </button>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-900">
-                        {inv.currentStock} {inv.unitOfMeasure}
-                      </span>
-                      {low && (
-                        <span className="rounded-full bg-rose-50 text-rose-600 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold">
-                          Low
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-bold text-slate-900">
+                  Warehouse Stock
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("inventory");
+                    window.scrollTo({ top: 0 });
+                  }}
+                  className="text-xs font-semibold text-blue-600 hover:underline"
+                >
+                  Manage inventory
+                </button>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {inventory.slice(0, 6).map((inv) => {
+                  const low = inv.currentStock <= 200;
+                  return (
+                    <div
+                      key={inv.inventoryId}
+                      className="py-2.5 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="min-w-0 truncate">
+                        <span className="font-semibold text-slate-900">
+                          {inv.itemName}
                         </span>
-                      )}
+                        <span className="text-slate-400 ml-2">
+                          {inv.category}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-semibold text-slate-900 tabular-nums">
+                          {Number(inv.currentStock ?? 0).toLocaleString()}{" "}
+                          {inv.unitOfMeasure}
+                        </span>
+                        {low && (
+                          <span className="rounded-full bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 text-xs font-semibold">
+                            Low
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </section>
           </div>
         </div>
       )}
@@ -1107,14 +1108,14 @@ export default function AdminPortalPage() {
         <div className="space-y-5">
           <form
             onSubmit={handleCreateEvent}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col sm:flex-row items-end gap-3"
+            className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col sm:flex-row items-end gap-3"
           >
             <div className="flex-1 w-full">
               <label
                 htmlFor="new-event-name"
                 className="block text-xs font-semibold text-slate-700 mb-1"
               >
-                New Disaster Event Name (Master Registry)
+                Disaster Event Name
               </label>
               <input
                 id="new-event-name"
@@ -1124,7 +1125,7 @@ export default function AdminPortalPage() {
                 value={newEventName}
                 onChange={(e) => setNewEventName(e.target.value)}
                 placeholder="e.g. Super Typhoon Pepito"
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
             <div className="flex-1 w-full">
@@ -1132,7 +1133,7 @@ export default function AdminPortalPage() {
                 htmlFor="new-event-location"
                 className="block text-xs font-semibold text-slate-700 mb-1"
               >
-                Affected Province / Region
+                Affected Location
               </label>
               <input
                 id="new-event-location"
@@ -1142,46 +1143,50 @@ export default function AdminPortalPage() {
                 value={newEventLocation}
                 onChange={(e) => setNewEventLocation(e.target.value)}
                 placeholder="e.g. Ilocos Norte / Cagayan Valley"
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
             <button
               type="submit"
               disabled={isBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-[#002060] hover:bg-[#1F4E79] disabled:opacity-50 px-4 py-2 text-xs font-bold text-white shrink-0"
+              className="inline-flex items-center gap-1.5 min-h-[40px] rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 px-4 py-2 text-xs font-bold text-white transition shrink-0"
             >
-              <Plus className="h-3.5 w-3.5" />
-              {busyKey === "create-event" ? "Saving..." : "Register Event"}
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{busyKey === "create-event" ? "Saving..." : "Add Event"}</span>
             </button>
           </form>
 
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 {["ALL", "Active", "Resolved"].map((st) => (
                   <button
                     key={st}
                     type="button"
+                    aria-pressed={statusFilter === st}
                     onClick={() => setStatusFilter(st)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                       statusFilter === st
-                        ? "bg-[#002060] text-white"
-                        : "bg-slate-100 text-slate-600"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    {st}
+                    {st === "ALL" ? "All" : st}
                   </button>
                 ))}
               </div>
               <div className="relative">
-                <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <Search
+                  className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  aria-hidden="true"
+                />
                 <input
                   type="search"
                   aria-label="Search disaster events or locations"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search events or locations..."
-                  className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
                 />
               </div>
             </div>
@@ -1190,84 +1195,70 @@ export default function AdminPortalPage() {
               tabIndex={0}
               role="region"
               aria-label="Disaster events table"
-              className="overflow-x-auto"
+              className="table-scroll-container"
             >
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+              <table className="w-full text-left text-xs sm:text-sm disaster-table">
+                <caption className="sr-only">Disaster events directory</caption>
+                <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                   <tr>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       ID
                     </th>
-                    <th scope="col" className="p-3">
-                      Disaster Event Name
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      Event Name
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Location
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Start Date
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Status
                     </th>
-                    <th scope="col" className="p-3 text-right">
-                      Governance Action
+                    <th scope="col" className="px-4 py-3 font-semibold text-right">
+                      Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredEvents.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-6 text-center text-slate-400">
+                      <td
+                        colSpan={6}
+                        className="p-6 text-center text-xs text-slate-400"
+                      >
                         No matching disaster events found.
                       </td>
                     </tr>
                   ) : (
                     slicePage(filteredEvents).map((ev) => (
-                      <tr key={ev.eventId} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold">#{ev.eventId}</td>
-                        <td className="p-3">
-                          <div className="space-y-1">
-                            <div className="font-semibold text-slate-900 flex items-center gap-2 flex-wrap">
-                              <span>{ev.eventName}</span>
-                              {(() => {
-                                const alert = getDisasterAlertInfo(ev.eventName);
-                                return (
-                                  <span
-                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${alert.badgeColor}`}
-                                  >
-                                    <span
-                                      className={`h-1.5 w-1.5 rounded-full ${alert.dotColor} animate-pulse`}
-                                    />
-                                    {alert.severity}
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                            {(() => {
-                              const alert = getDisasterAlertInfo(ev.eventName);
-                              return (
-                                <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                                  <span>{alert.warningType}</span>
-                                  <span>&bull;</span>
-                                  <span className="text-slate-700 font-bold">{alert.familiesAffected}</span>
-                                </p>
-                              );
-                            })()}
-                          </div>
+                      <tr key={ev.eventId} className="hover:bg-slate-50/80">
+                        <th
+                          scope="row"
+                          className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap"
+                        >
+                          #{ev.eventId}
+                        </th>
+                        <td className="px-4 py-3 font-semibold text-slate-900">
+                          {ev.eventName}
                         </td>
-                        <td className="p-3 text-slate-600">{ev.location}</td>
-                        <td className="p-3 text-slate-500">{ev.startDate}</td>
-                        <td className="p-3">
+                        <td className="px-4 py-3 text-slate-600">
+                          {ev.location}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500 tabular-nums whitespace-nowrap">
+                          {ev.startDate}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <StatusBadge status={ev.status} />
                         </td>
-                        <td className="p-3 text-right">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
                             <button
                               type="button"
                               disabled={isBusy}
                               onClick={() => handleToggleEventStatus(ev)}
-                              className="rounded-lg border border-slate-300 hover:bg-slate-100 disabled:opacity-50 px-2.5 py-1 text-xs font-semibold text-slate-700"
+                              className="rounded-lg border border-slate-300 hover:bg-slate-100 active:scale-[0.98] disabled:opacity-50 px-2.5 py-1 text-xs font-semibold text-slate-700 transition"
                             >
                               Mark{" "}
                               {ev.status === "Active" ? "Resolved" : "Active"}
@@ -1283,9 +1274,9 @@ export default function AdminPortalPage() {
                                   label: `Disaster Event #${ev.eventId} (${ev.eventName})`,
                                 })
                               }
-                              className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1.5"
+                              className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 active:scale-[0.98] disabled:opacity-50 p-1.5 transition"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                           </div>
                         </td>

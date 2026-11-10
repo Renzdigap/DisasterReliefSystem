@@ -36,7 +36,7 @@ export interface NotificationItem {
 interface PortalSidebarLayoutProps {
   session: UserSession | null;
   portalTitle: string;
-  portalSubtitle: string;
+  portalSubtitle?: string;
   roleBadge?: string;
   navItems: SidebarNavItem[];
   activeTab: string;
@@ -95,25 +95,22 @@ export function PortalSidebarLayout({
                 />
               </div>
               <div className="truncate">
-                <div className="flex items-center gap-1.5">
-                  <span className="font-extrabold text-sm text-slate-900 block leading-tight">
-                    DRRMS
-                  </span>
-                  <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-bold text-[9px] uppercase tracking-wider border border-blue-200">
-                    Gov
-                  </span>
-                </div>
-                <span className="text-[11px] font-semibold text-blue-600 block truncate">
+                <span className="font-extrabold text-sm text-slate-900 block leading-tight">
+                  DRRMS
+                </span>
+                <span className="text-xs font-semibold text-blue-600 block truncate">
                   {roleBadge || session?.user?.role || "Portal"}
                 </span>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={handleLogout}
+              aria-label="Sign out"
               className="lg:hidden inline-flex items-center gap-1 rounded-lg bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700"
             >
-              <LogOut className="h-3.5 w-3.5" />
+              <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </div>
 
@@ -190,18 +187,20 @@ export function PortalSidebarLayout({
                   <div className="text-xs font-bold text-slate-900 truncate">
                     {session.user.fullName}
                   </div>
-                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide truncate">
-                    {session.user.role} &bull; Verified
+                  <div className="text-xs font-medium text-slate-500 capitalize truncate">
+                    {session.user.role}
                   </div>
                 </div>
               </div>
 
               <button
+                type="button"
                 onClick={handleLogout}
+                aria-label="Sign out"
                 title="Sign Out"
                 className="rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 p-2 transition shrink-0"
               >
-                <LogOut className="h-4 w-4" />
+                <LogOut className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
           )}
@@ -212,48 +211,41 @@ export function PortalSidebarLayout({
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-20 bg-white/95 backdrop-blur-md border-b border-slate-200/80 px-6 py-3 flex items-center justify-between gap-4 no-print shadow-xs">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight truncate">
-                {activeNav ? activeNav.label : portalTitle}
-              </h1>
-              <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-[10px] font-bold text-blue-700">
-                DRRMS Central
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 truncate">{portalSubtitle}</p>
+            <h1 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight truncate">
+              {activeNav ? activeNav.label : portalTitle}
+            </h1>
+            {portalSubtitle ? (
+              <p className="text-xs text-slate-500 truncate">{portalSubtitle}</p>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* System Live Connection Status */}
-            <div className="hidden xl:inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/90 text-[11px] font-semibold text-slate-700 shadow-xs">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>NDRRMC Central Operations Live</span>
-            </div>
-
             {headerActions}
 
             {/* Public Relief Delivery Tracker Shortcut */}
             <button
               type="button"
               onClick={() => setShowAidTracker(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 px-3 py-1.5 text-xs font-bold text-blue-700 transition shadow-xs"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 active:scale-[0.98] px-3 py-1.5 text-xs font-bold text-blue-700 transition shadow-xs"
               title="Public Relief Shipment & Donation Tracker"
             >
-              <Search className="h-3.5 w-3.5 text-blue-600" />
+              <Search className="h-3.5 w-3.5 text-blue-600" aria-hidden="true" />
               <span className="hidden sm:inline">Track Aid</span>
             </button>
 
 
             {onSync && (
               <button
+                type="button"
                 onClick={onSync}
                 disabled={syncing}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition shadow-xs disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] px-3 py-1.5 text-xs font-semibold text-slate-700 transition shadow-xs disabled:opacity-50"
               >
                 <RefreshCw
                   className={`h-3.5 w-3.5 text-slate-500 ${
                     syncing ? "animate-spin" : ""
                   }`}
+                  aria-hidden="true"
                 />
                 <span>Sync</span>
               </button>
@@ -371,7 +363,7 @@ export function PortalSidebarLayout({
           </div>
         </header>
 
-        <main className="flex-1 p-5 sm:p-6 lg:p-8 max-w-6xl w-full mx-auto space-y-6">
+        <main className="flex-1 p-5 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-6">
           {children}
         </main>
       </div>
