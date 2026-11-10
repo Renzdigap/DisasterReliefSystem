@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LogOut,
@@ -10,8 +10,6 @@ import {
   Check,
   ChevronRight,
   Inbox,
-  Moon,
-  Sun,
   Search,
 } from "lucide-react";
 import { clearSession, UserSession } from "@/lib/api";
@@ -73,22 +71,6 @@ export function PortalSidebarLayout({
   const router = useRouter();
   const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
   const [showAidTracker, setShowAidTracker] = useState(false);
-  const [nightOps, setNightOps] = useState(false);
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("drrms_night_ops");
-      if (saved === "1") setNightOps(true);
-    } catch {}
-  }, []);
-
-  const toggleNightOps = () => {
-    const next = !nightOps;
-    setNightOps(next);
-    try {
-      localStorage.setItem("drrms_night_ops", next ? "1" : "0");
-    } catch {}
-  };
 
   const handleLogout = () => {
     clearSession();
@@ -98,11 +80,7 @@ export function PortalSidebarLayout({
   const activeNav = navItems.find((item) => item.id === activeTab);
 
   return (
-    <div
-      className={`min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row text-slate-900 transition-colors ${
-        nightOps ? "night-ops" : ""
-      }`}
-    >
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row text-slate-900">
       {/* Clean Light Sidebar */}
       <aside className="w-full lg:w-60 shrink-0 bg-white flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-200/90 lg:min-h-screen lg:sticky lg:top-0 lg:h-screen no-print">
         <div className="flex flex-col flex-1 min-h-0">
@@ -265,29 +243,6 @@ export function PortalSidebarLayout({
               <span className="hidden sm:inline">Track Aid</span>
             </button>
 
-            {/* Central Command Night Ops / Kiosk Mode Toggle */}
-            <button
-              type="button"
-              onClick={toggleNightOps}
-              className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition shadow-xs ${
-                nightOps
-                  ? "border-amber-400/50 bg-amber-500/15 text-amber-300"
-                  : "border-slate-200 bg-white hover:bg-slate-50 text-slate-700"
-              }`}
-              title="Toggle Command Center Night Operations Mode"
-            >
-              {nightOps ? (
-                <>
-                  <Sun className="h-3.5 w-3.5 text-amber-400" />
-                  <span className="hidden md:inline">Day Ops</span>
-                </>
-              ) : (
-                <>
-                  <Moon className="h-3.5 w-3.5 text-slate-600" />
-                  <span className="hidden md:inline">Night Ops</span>
-                </>
-              )}
-            </button>
 
             {onSync && (
               <button
