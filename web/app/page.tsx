@@ -21,7 +21,6 @@ import {
   Lock,
   Mail,
   Phone,
-  Sparkles,
   MapPin,
   Flame,
 } from "lucide-react";
@@ -400,10 +399,6 @@ export default function LoginPage() {
         <div className="w-full max-w-[460px] relative z-10 space-y-5 my-auto">
           {/* Header */}
           <div className="text-center lg:text-left space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-[11px] font-bold text-blue-700 shadow-sm mb-1">
-              <Sparkles className="h-3.5 w-3.5 text-blue-600" />
-              <span>Secure Stakeholder Portal</span>
-            </div>
             <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
               {mode === "login" ? "Sign In to Stakeholder Portal" : "Create Stakeholder Account"}
             </h2>
