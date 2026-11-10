@@ -2,6 +2,8 @@ package disasterrelief.model;
 
 import java.io.Serializable;
 import java.sql.Date;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Model representing a dispatch and delivery assignment for an approved relief request.
@@ -18,8 +20,12 @@ public class Delivery implements Serializable {
 
     // Joined helper fields
     private String volunteerName;
+    private String volunteerContact;
+    private String vehicleType;
     private String orgName;
     private String location;
+    private String eventName;
+    private List<RequestItem> items = new ArrayList<>();
 
     public Delivery() {
     }
@@ -80,6 +86,22 @@ public class Delivery implements Serializable {
         this.volunteerName = volunteerName;
     }
 
+    public String getVolunteerContact() {
+        return volunteerContact;
+    }
+
+    public void setVolunteerContact(String volunteerContact) {
+        this.volunteerContact = volunteerContact;
+    }
+
+    public String getVehicleType() {
+        return vehicleType;
+    }
+
+    public void setVehicleType(String vehicleType) {
+        this.vehicleType = vehicleType;
+    }
+
     public String getOrgName() {
         return orgName;
     }
@@ -96,6 +118,22 @@ public class Delivery implements Serializable {
         this.location = location;
     }
 
+    public String getEventName() {
+        return eventName;
+    }
+
+    public void setEventName(String eventName) {
+        this.eventName = eventName;
+    }
+
+    public List<RequestItem> getItems() {
+        return items;
+    }
+
+    public void setItems(List<RequestItem> items) {
+        this.items = items != null ? items : new ArrayList<>();
+    }
+
     public boolean isDelivered() {
         return "Delivered".equalsIgnoreCase(deliveryStatus);
     }
@@ -106,7 +144,7 @@ public class Delivery implements Serializable {
 
     @Override
     public String toString() {
-        return "Delivery #" + deliveryId + " for Request #" + requestId 
+        return "Delivery " + deliveryId + " for Request " + requestId
                 + " [" + deliveryStatus + " - " + (volunteerName != null ? volunteerName : "Unassigned") + "]";
     }
 }

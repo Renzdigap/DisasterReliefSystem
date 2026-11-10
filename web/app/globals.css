@@ -74,6 +74,19 @@ dialog::backdrop {
   backdrop-filter: blur(3px);
 }
 
+/* Native <input type="checkbox" switch> progressive enhancement */
+input[type="checkbox"][switch] {
+  accent-color: #2563eb;
+  width: 2.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+}
+
+input[type="checkbox"][switch]:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
 /* Container-responsive table layout */
 .table-scroll-container {
   overflow-x: auto;

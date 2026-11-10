@@ -879,7 +879,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
           "SELECT ri.*, r.item_name, r.category, r.unit_of_measure FROM RequestItem ri JOIN ReliefGood r ON ri.good_id = r.good_id ORDER BY ri.request_item_id"
         ),
         pool.query(
-          "SELECT d.*, u.full_name as volunteer_name, o.org_name, o.location FROM Delivery d LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id LEFT JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id ORDER BY d.delivery_id DESC"
+          "SELECT d.*, u.full_name as volunteer_name, u.contact_info as volunteer_contact, v.vehicle_type, o.org_name, o.location, e.event_name FROM Delivery d LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id LEFT JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id LEFT JOIN DisasterEvent e ON r.event_id = e.event_id ORDER BY d.delivery_id DESC"
         ),
         pool.query(
           "SELECT v.*, u.full_name as volunteer_name FROM Volunteer v JOIN UserAccount u ON v.user_id = u.user_id ORDER BY v.volunteer_id"
@@ -1006,8 +1006,12 @@ async function handleRequest(req: NextRequest, subpath: string) {
           : "",
         deliveryStatus: d.delivery_status,
         volunteerName: d.volunteer_name || "Unassigned",
+        volunteerContact: d.volunteer_contact || "",
+        vehicleType: d.vehicle_type || "",
         orgName: d.org_name,
         location: d.location,
+        eventName: d.event_name || "",
+        items: reqItemsByReqId[d.request_id] || [],
       }));
 
       return NextResponse.json({
@@ -1232,7 +1236,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
           [userId]
         ),
         pool.query(
-          "SELECT d.*, u.full_name as volunteer_name, o.org_name, o.location FROM Delivery d LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id LEFT JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id WHERE o.user_id = $1 ORDER BY d.delivery_id DESC",
+          "SELECT d.*, u.full_name as volunteer_name, u.contact_info as volunteer_contact, v.vehicle_type, o.org_name, o.location, e.event_name FROM Delivery d LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id LEFT JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id LEFT JOIN DisasterEvent e ON r.event_id = e.event_id WHERE o.user_id = $1 ORDER BY d.delivery_id DESC",
           [userId]
         ),
         pool.query("SELECT * FROM DisasterEvent ORDER BY event_id DESC"),
@@ -1300,8 +1304,12 @@ async function handleRequest(req: NextRequest, subpath: string) {
             : "",
           deliveryStatus: d.delivery_status,
           volunteerName: d.volunteer_name || "Unassigned",
+          volunteerContact: d.volunteer_contact || "",
+          vehicleType: d.vehicle_type || "",
           orgName: d.org_name,
           location: d.location,
+          eventName: d.event_name || "",
+          items: itemsMap[d.request_id] || [],
         })),
         events: eventsRes.rows.map((e) => ({
           eventId: e.event_id,
@@ -1338,14 +1346,18 @@ async function handleRequest(req: NextRequest, subpath: string) {
 
     if (subpath === "portal/volunteer" && req.method === "GET") {
       const userId = Number(req.nextUrl.searchParams.get("userId") || 0);
-      const [uRes, vRes, delRes, eventsRes, notifRes] = await Promise.all([
+      const [uRes, vRes, delRes, reqItemsRes, eventsRes, notifRes] = await Promise.all([
         pool.query("SELECT * FROM UserAccount WHERE user_id = $1", [userId]),
         pool.query(
           "SELECT v.*, u.full_name as volunteer_name FROM Volunteer v JOIN UserAccount u ON v.user_id = u.user_id WHERE v.user_id = $1",
           [userId]
         ),
         pool.query(
-          "SELECT d.*, u.full_name as volunteer_name, o.org_name, o.location FROM Delivery d JOIN Volunteer v ON d.volunteer_id = v.volunteer_id JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id WHERE v.user_id = $1 ORDER BY d.delivery_id DESC",
+          "SELECT d.*, u.full_name as volunteer_name, u.contact_info as volunteer_contact, v.vehicle_type, o.org_name, o.location, e.event_name FROM Delivery d JOIN Volunteer v ON d.volunteer_id = v.volunteer_id JOIN UserAccount u ON v.user_id = u.user_id JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id LEFT JOIN DisasterEvent e ON r.event_id = e.event_id WHERE v.user_id = $1 ORDER BY d.delivery_id DESC",
+          [userId]
+        ),
+        pool.query(
+          "SELECT ri.*, rg.item_name, rg.category, rg.unit_of_measure FROM RequestItem ri JOIN ReliefGood rg ON ri.good_id = rg.good_id JOIN Delivery d ON ri.request_id = d.request_id JOIN Volunteer v ON d.volunteer_id = v.volunteer_id WHERE v.user_id = $1 ORDER BY ri.request_item_id",
           [userId]
         ),
         pool.query("SELECT * FROM DisasterEvent ORDER BY event_id DESC"),
@@ -1354,6 +1366,19 @@ async function handleRequest(req: NextRequest, subpath: string) {
           [userId]
         ),
       ]);
+
+      const volItemsMap: Record<number, any[]> = {};
+      reqItemsRes.rows.forEach((it) => {
+        if (!volItemsMap[it.request_id]) volItemsMap[it.request_id] = [];
+        volItemsMap[it.request_id].push({
+          requestItemId: it.request_item_id,
+          goodId: it.good_id,
+          quantity: it.quantity,
+          itemName: it.item_name,
+          category: it.category,
+          unitOfMeasure: it.unit_of_measure,
+        });
+      });
 
       const u = uRes.rows[0];
       const v = vRes.rows[0];
@@ -1385,8 +1410,12 @@ async function handleRequest(req: NextRequest, subpath: string) {
             : "",
           deliveryStatus: d.delivery_status,
           volunteerName: d.volunteer_name || "Unassigned",
+          volunteerContact: d.volunteer_contact || "",
+          vehicleType: d.vehicle_type || "",
           orgName: d.org_name,
           location: d.location,
+          eventName: d.event_name || "",
+          items: volItemsMap[d.request_id] || [],
         })),
         events: eventsRes.rows.map((e) => ({
           eventId: e.event_id,
@@ -1692,7 +1721,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
             );
           }
           const evRes = await client.query(
-            "SELECT 1 FROM DisasterEvent WHERE event_id = $1",
+            "SELECT event_name, status FROM DisasterEvent WHERE event_id = $1",
             [eventId]
           );
           if (evRes.rows.length === 0) {
@@ -1701,6 +1730,34 @@ async function handleRequest(req: NextRequest, subpath: string) {
               { error: "Selected disaster event does not exist." },
               { status: 400 }
             );
+          }
+          if (String(evRes.rows[0].status || "").toLowerCase() !== "active") {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              {
+                error:
+                  "Selected disaster event is resolved. Please select an Active disaster.",
+              },
+              { status: 400 }
+            );
+          }
+          const eventName = evRes.rows[0].event_name || `Event ${eventId}`;
+
+          for (const it of items) {
+            const goodChk = await client.query(
+              "SELECT 1 FROM ReliefGood WHERE good_id = $1",
+              [it.goodId]
+            );
+            if (goodChk.rows.length === 0) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                {
+                  error:
+                    "One or more selected relief items are no longer in the catalog. Please refresh.",
+                },
+                { status: 400 }
+              );
+            }
           }
 
           const orgId = oRes.rows[0].org_id;
@@ -1721,7 +1778,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
             "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
             [
               userId,
-              `Relief Request #${requestId} submitted for event #${eventId} and queued for Steward review.`,
+              `Relief Request ${requestId} submitted for ${eventName} and queued for Steward review.`,
             ]
           );
           await client.query("COMMIT");
@@ -1812,7 +1869,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
               "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
               [
                 uRes.rows[0].user_id,
-                `Relief Request #${requestId} status updated to: ${status}.`,
+                `Relief Request ${requestId} status updated to: ${status}.`,
               ]
             );
           }
@@ -1829,12 +1886,81 @@ async function handleRequest(req: NextRequest, subpath: string) {
         }
       } else if (req.method === "DELETE") {
         const id = Number(req.nextUrl.searchParams.get("id") || 0);
+        const ownerUserId = Number(req.nextUrl.searchParams.get("userId") || 0);
+        const onlyPending =
+          req.nextUrl.searchParams.get("onlyPending") === "true";
+
         if (!Number.isInteger(id) || id <= 0) {
           return NextResponse.json(
             { error: "Valid request id is required." },
             { status: 400 }
           );
         }
+
+        if (onlyPending || ownerUserId > 0) {
+          const client = await pool.connect();
+          try {
+            await client.query("BEGIN");
+            const checkRes = await client.query(
+              "SELECT r.status, o.user_id FROM ReliefRequest r JOIN Organization o ON r.org_id = o.org_id WHERE r.request_id = $1 FOR UPDATE",
+              [id]
+            );
+            if (checkRes.rows.length === 0) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                { error: "Relief request not found." },
+                { status: 404 }
+              );
+            }
+            const row = checkRes.rows[0];
+            if (ownerUserId > 0 && Number(row.user_id) !== ownerUserId) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                { error: "You can only cancel your own relief requests." },
+                { status: 403 }
+              );
+            }
+            if (
+              onlyPending &&
+              String(row.status || "").toLowerCase() !== "pending"
+            ) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                {
+                  error:
+                    "Only pending requests can be cancelled. Approved or fulfilled requests are already allocated.",
+                },
+                { status: 409 }
+              );
+            }
+            const delCheck = await client.query(
+              "SELECT delivery_id FROM Delivery WHERE request_id = $1 LIMIT 1",
+              [id]
+            );
+            if (delCheck.rows.length > 0) {
+              await client.query("ROLLBACK");
+              return NextResponse.json(
+                {
+                  error:
+                    "Cannot cancel a request that already has a delivery dispatch.",
+                },
+                { status: 409 }
+              );
+            }
+            await client.query(
+              "DELETE FROM ReliefRequest WHERE request_id = $1",
+              [id]
+            );
+            await client.query("COMMIT");
+            return NextResponse.json({ deleted: true });
+          } catch (e) {
+            await client.query("ROLLBACK");
+            throw e;
+          } finally {
+            client.release();
+          }
+        }
+
         const del = await pool.query(
           "DELETE FROM ReliefRequest WHERE request_id = $1",
           [id]
@@ -1885,9 +2011,23 @@ async function handleRequest(req: NextRequest, subpath: string) {
             await client.query("ROLLBACK");
             return NextResponse.json(
               {
-                error: `Only Approved relief requests can be dispatched (Request #${requestId} is ${reqStatus}).`,
+                error: `Only Approved relief requests can be dispatched (Request ${requestId} is ${reqStatus}).`,
               },
               { status: 400 }
+            );
+          }
+
+          const existingDel = await client.query(
+            "SELECT delivery_id FROM Delivery WHERE request_id = $1 LIMIT 1",
+            [requestId]
+          );
+          if (existingDel.rows.length > 0) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              {
+                error: `Request ${requestId} already has a delivery assignment (Delivery ${existingDel.rows[0].delivery_id}).`,
+              },
+              { status: 409 }
             );
           }
 
@@ -1918,12 +2058,20 @@ async function handleRequest(req: NextRequest, subpath: string) {
               "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
               [
                 volUserId,
-                `New Dispatch Assignment (#${deliveryId}): You have been assigned to Relief Request #${requestId}.`,
+                `New Dispatch Assignment (Delivery ${deliveryId}): You have been assigned to Relief Request ${requestId}.`,
               ]
             );
           }
 
-          if (deliveryStatus === "Delivered") {
+          if (deliveryStatus === "In Transit") {
+            await client.query(
+              "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
+              [
+                orgUserId,
+                `Delivery ${deliveryId} for Relief Request ${requestId} has been dispatched and is now In Transit.`,
+              ]
+            );
+          } else if (deliveryStatus === "Delivered") {
             await client.query(
               "UPDATE ReliefRequest SET status = 'Fulfilled' WHERE request_id = $1",
               [requestId]
@@ -1932,7 +2080,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
               "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
               [
                 orgUserId,
-                `Delivery #${deliveryId} for Relief Request #${requestId} has been delivered.`,
+                `Delivery ${deliveryId} for Relief Request ${requestId} has been delivered.`,
               ]
             );
           }
@@ -1965,7 +2113,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
         try {
           await client.query("BEGIN");
           const checkRes = await client.query(
-            "SELECT d.request_id, o.user_id FROM Delivery d JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id WHERE d.delivery_id = $1 FOR UPDATE",
+            "SELECT d.delivery_status, d.request_id, o.user_id FROM Delivery d JOIN ReliefRequest r ON d.request_id = r.request_id JOIN Organization o ON r.org_id = o.org_id WHERE d.delivery_id = $1 FOR UPDATE",
             [deliveryId]
           );
           if (checkRes.rows.length === 0) {
@@ -1975,15 +2123,44 @@ async function handleRequest(req: NextRequest, subpath: string) {
               { status: 404 }
             );
           }
+          const prevStatus = checkRes.rows[0].delivery_status;
           const requestId = checkRes.rows[0].request_id;
           const orgUserId = checkRes.rows[0].user_id;
+
+          if (
+            String(prevStatus || "").toLowerCase() === "delivered" &&
+            deliveryStatus !== "Delivered"
+          ) {
+            await client.query("ROLLBACK");
+            return NextResponse.json(
+              {
+                error:
+                  "Delivered shipments cannot be reverted to an earlier status.",
+              },
+              { status: 409 }
+            );
+          }
 
           await client.query(
             "UPDATE Delivery SET delivery_status = $1 WHERE delivery_id = $2",
             [deliveryStatus, deliveryId]
           );
 
-          if (deliveryStatus === "Delivered") {
+          if (
+            deliveryStatus === "In Transit" &&
+            String(prevStatus || "").toLowerCase() !== "in transit"
+          ) {
+            await client.query(
+              "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
+              [
+                orgUserId,
+                `Delivery ${deliveryId} for Relief Request ${requestId} is now In Transit.`,
+              ]
+            );
+          } else if (
+            deliveryStatus === "Delivered" &&
+            String(prevStatus || "").toLowerCase() !== "delivered"
+          ) {
             await client.query(
               "UPDATE ReliefRequest SET status = 'Fulfilled' WHERE request_id = $1",
               [requestId]
@@ -1992,7 +2169,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
               "INSERT INTO Notification (user_id, message, is_read) VALUES ($1, $2, false)",
               [
                 orgUserId,
-                `Delivery #${deliveryId} for Relief Request #${requestId} has arrived and is marked Fulfilled.`,
+                `Delivery ${deliveryId} for Relief Request ${requestId} has arrived and is marked Fulfilled.`,
               ]
             );
           }

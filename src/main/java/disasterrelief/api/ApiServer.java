@@ -697,10 +697,33 @@ public class ApiServer {
                                 sendJson(ex, 400, "{\"error\":\"Organization profile not found for userId.\"}");
                                 return;
                             }
-                            if (!recordExists(conn, "SELECT 1 FROM DisasterEvent WHERE event_id = ?", eventId)) {
+                            String eventName = null;
+                            String evStatus = null;
+                            try (PreparedStatement evPs = conn.prepareStatement("SELECT event_name, status FROM DisasterEvent WHERE event_id = ?")) {
+                                evPs.setInt(1, eventId);
+                                try (ResultSet rs = evPs.executeQuery()) {
+                                    if (rs.next()) {
+                                        eventName = rs.getString("event_name");
+                                        evStatus = rs.getString("status");
+                                    }
+                                }
+                            }
+                            if (evStatus == null) {
                                 conn.rollback();
                                 sendJson(ex, 400, "{\"error\":\"Selected disaster event does not exist.\"}");
                                 return;
+                            }
+                            if (!"Active".equalsIgnoreCase(evStatus)) {
+                                conn.rollback();
+                                sendJson(ex, 400, "{\"error\":\"Selected disaster event is resolved. Please select an Active disaster.\"}");
+                                return;
+                            }
+                            for (int[] pair : items) {
+                                if (!recordExists(conn, "SELECT 1 FROM ReliefGood WHERE good_id = ?", pair[0])) {
+                                    conn.rollback();
+                                    sendJson(ex, 400, "{\"error\":\"One or more selected relief items are no longer in the catalog. Please refresh.\"}");
+                                    return;
+                                }
                             }
 
                             int requestId;
@@ -728,7 +751,8 @@ public class ApiServer {
                             try (PreparedStatement notifStmt = conn.prepareStatement(
                                     "INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
                                 notifStmt.setInt(1, userId);
-                                notifStmt.setString(2, "Relief Request #" + requestId + " submitted for event #" + eventId + " and queued for Steward review.");
+                                String safeEventName = (eventName != null && !eventName.trim().isEmpty()) ? eventName : ("Event " + eventId);
+                                notifStmt.setString(2, "Relief Request " + requestId + " submitted for " + safeEventName + " and queued for Steward review.");
                                 notifStmt.executeUpdate();
                             }
 
@@ -835,7 +859,7 @@ public class ApiServer {
                                         int orgUserId = rs.getInt(1);
                                         try (PreparedStatement notif = conn.prepareStatement("INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
                                             notif.setInt(1, orgUserId);
-                                            notif.setString(2, "Relief Request #" + requestId + " status updated to: " + status + ".");
+                                            notif.setString(2, "Relief Request " + requestId + " status updated to: " + status + ".");
                                             notif.executeUpdate();
                                         }
                                     }
@@ -852,19 +876,68 @@ public class ApiServer {
                 } else if ("DELETE".equalsIgnoreCase(method)) {
                     Map<String, String> params = parseQuery(ex.getRequestURI().getRawQuery());
                     int id = parsePositiveInt(params.get("id"), 0);
+                    int ownerUserId = parsePositiveInt(params.get("userId"), 0);
+                    boolean onlyPending = "true".equalsIgnoreCase(params.get("onlyPending"));
                     if (id <= 0) {
                         sendJson(ex, 400, "{\"error\":\"Valid request id is required.\"}");
                         return;
                     }
-                    try (Connection conn = DatabaseConnection.getConnection();
-                         PreparedStatement ps = conn.prepareStatement("DELETE FROM ReliefRequest WHERE request_id = ?")) {
-                        ps.setInt(1, id);
-                        int affected = ps.executeUpdate();
-                        if (affected == 0) {
-                            sendJson(ex, 404, "{\"error\":\"Relief request not found.\"}");
-                            return;
+                    if (onlyPending || ownerUserId > 0) {
+                        try (Connection conn = DatabaseConnection.getConnection()) {
+                            conn.setAutoCommit(false);
+                            try {
+                                String status;
+                                int rowUserId;
+                                try (PreparedStatement chk = conn.prepareStatement(
+                                        "SELECT r.status, o.user_id FROM ReliefRequest r JOIN Organization o ON r.org_id = o.org_id WHERE r.request_id = ? FOR UPDATE")) {
+                                    chk.setInt(1, id);
+                                    try (ResultSet rs = chk.executeQuery()) {
+                                        if (!rs.next()) {
+                                            conn.rollback();
+                                            sendJson(ex, 404, "{\"error\":\"Relief request not found.\"}");
+                                            return;
+                                        }
+                                        status = rs.getString("status");
+                                        rowUserId = rs.getInt("user_id");
+                                    }
+                                }
+                                if (ownerUserId > 0 && rowUserId != ownerUserId) {
+                                    conn.rollback();
+                                    sendJson(ex, 403, "{\"error\":\"You can only cancel your own relief requests.\"}");
+                                    return;
+                                }
+                                if (onlyPending && !"Pending".equalsIgnoreCase(status)) {
+                                    conn.rollback();
+                                    sendJson(ex, 409, "{\"error\":\"Only pending requests can be cancelled. Approved or fulfilled requests are already allocated.\"}");
+                                    return;
+                                }
+                                if (recordExists(conn, "SELECT 1 FROM Delivery WHERE request_id = ?", id)) {
+                                    conn.rollback();
+                                    sendJson(ex, 409, "{\"error\":\"Cannot cancel a request that already has a delivery dispatch.\"}");
+                                    return;
+                                }
+                                try (PreparedStatement del = conn.prepareStatement("DELETE FROM ReliefRequest WHERE request_id = ?")) {
+                                    del.setInt(1, id);
+                                    del.executeUpdate();
+                                }
+                                conn.commit();
+                                sendJson(ex, 200, "{\"deleted\":true}");
+                            } catch (Exception e) {
+                                conn.rollback();
+                                throw e;
+                            }
                         }
-                        sendJson(ex, 200, "{\"deleted\":true}");
+                    } else {
+                        try (Connection conn = DatabaseConnection.getConnection();
+                             PreparedStatement ps = conn.prepareStatement("DELETE FROM ReliefRequest WHERE request_id = ?")) {
+                            ps.setInt(1, id);
+                            int affected = ps.executeUpdate();
+                            if (affected == 0) {
+                                sendJson(ex, 404, "{\"error\":\"Relief request not found.\"}");
+                                return;
+                            }
+                            sendJson(ex, 200, "{\"deleted\":true}");
+                        }
                     }
                 } else {
                     sendJson(ex, 405, "{\"error\":\"Method not allowed\"}");
@@ -911,8 +984,20 @@ public class ApiServer {
 
                             if (!"Approved".equalsIgnoreCase(reqStatus)) {
                                 conn.rollback();
-                                sendJson(ex, 400, "{\"error\":" + q("Only Approved relief requests can be dispatched (Request #" + requestId + " is " + reqStatus + ").") + "}");
+                                sendJson(ex, 400, "{\"error\":" + q("Only Approved relief requests can be dispatched (Request " + requestId + " is " + reqStatus + ").") + "}");
                                 return;
+                            }
+
+                            try (PreparedStatement dupDel = conn.prepareStatement("SELECT delivery_id FROM Delivery WHERE request_id = ? LIMIT 1")) {
+                                dupDel.setInt(1, requestId);
+                                try (ResultSet rs = dupDel.executeQuery()) {
+                                    if (rs.next()) {
+                                        int existingId = rs.getInt("delivery_id");
+                                        conn.rollback();
+                                        sendJson(ex, 409, "{\"error\":" + q("Request " + requestId + " already has a delivery assignment (Delivery " + existingId + ").") + "}");
+                                        return;
+                                    }
+                                }
                             }
 
                             Integer volUserId = null;
@@ -946,19 +1031,25 @@ public class ApiServer {
                             if (volUserId != null) {
                                 try (PreparedStatement notif = conn.prepareStatement("INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
                                     notif.setInt(1, volUserId);
-                                    notif.setString(2, "New Dispatch Assignment (#" + deliveryId + "): You have been assigned to Relief Request #" + requestId + ".");
+                                    notif.setString(2, "New Dispatch Assignment (Delivery " + deliveryId + "): You have been assigned to Relief Request " + requestId + ".");
                                     notif.executeUpdate();
                                 }
                             }
 
-                            if ("Delivered".equals(status)) {
+                            if ("In Transit".equals(status)) {
+                                try (PreparedStatement notifOrg = conn.prepareStatement("INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
+                                    notifOrg.setInt(1, orgUserId);
+                                    notifOrg.setString(2, "Delivery " + deliveryId + " for Relief Request " + requestId + " has been dispatched and is now In Transit.");
+                                    notifOrg.executeUpdate();
+                                }
+                            } else if ("Delivered".equals(status)) {
                                 try (PreparedStatement reqUpd = conn.prepareStatement("UPDATE ReliefRequest SET status = 'Fulfilled' WHERE request_id = ?")) {
                                     reqUpd.setInt(1, requestId);
                                     reqUpd.executeUpdate();
                                 }
                                 try (PreparedStatement notifOrg = conn.prepareStatement("INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
                                     notifOrg.setInt(1, orgUserId);
-                                    notifOrg.setString(2, "Delivery #" + deliveryId + " for Relief Request #" + requestId + " has been delivered.");
+                                    notifOrg.setString(2, "Delivery " + deliveryId + " for Relief Request " + requestId + " has been delivered.");
                                     notifOrg.executeUpdate();
                                 }
                             }
@@ -983,10 +1074,11 @@ public class ApiServer {
                     try (Connection conn = DatabaseConnection.getConnection()) {
                         conn.setAutoCommit(false);
                         try {
+                            String prevStatus;
                             int requestId;
                             int orgUserId;
                             try (PreparedStatement check = conn.prepareStatement(
-                                    "SELECT d.request_id, o.user_id FROM Delivery d " +
+                                    "SELECT d.delivery_status, d.request_id, o.user_id FROM Delivery d " +
                                     "JOIN ReliefRequest r ON d.request_id = r.request_id " +
                                     "JOIN Organization o ON r.org_id = o.org_id " +
                                     "WHERE d.delivery_id = ? FOR UPDATE")) {
@@ -997,9 +1089,16 @@ public class ApiServer {
                                         sendJson(ex, 404, "{\"error\":\"Delivery not found.\"}");
                                         return;
                                     }
+                                    prevStatus = rs.getString("delivery_status");
                                     requestId = rs.getInt("request_id");
                                     orgUserId = rs.getInt("user_id");
                                 }
+                            }
+
+                            if ("Delivered".equalsIgnoreCase(prevStatus) && !"Delivered".equals(status)) {
+                                conn.rollback();
+                                sendJson(ex, 409, "{\"error\":\"Delivered shipments cannot be reverted to an earlier status.\"}");
+                                return;
                             }
 
                             try (PreparedStatement upd = conn.prepareStatement("UPDATE Delivery SET delivery_status = ? WHERE delivery_id = ?")) {
@@ -1008,14 +1107,20 @@ public class ApiServer {
                                 upd.executeUpdate();
                             }
 
-                            if ("Delivered".equals(status)) {
+                            if ("In Transit".equals(status) && !"In Transit".equalsIgnoreCase(prevStatus)) {
+                                try (PreparedStatement notif = conn.prepareStatement("INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
+                                    notif.setInt(1, orgUserId);
+                                    notif.setString(2, "Delivery " + deliveryId + " for Relief Request " + requestId + " is now In Transit.");
+                                    notif.executeUpdate();
+                                }
+                            } else if ("Delivered".equals(status) && !"Delivered".equalsIgnoreCase(prevStatus)) {
                                 try (PreparedStatement ps = conn.prepareStatement("UPDATE ReliefRequest SET status = 'Fulfilled' WHERE request_id = ?")) {
                                     ps.setInt(1, requestId);
                                     ps.executeUpdate();
                                 }
                                 try (PreparedStatement notif = conn.prepareStatement("INSERT INTO Notification (user_id, message, is_read) VALUES (?, ?, false)")) {
                                     notif.setInt(1, orgUserId);
-                                    notif.setString(2, "Delivery #" + deliveryId + " for Relief Request #" + requestId + " has arrived and is marked Fulfilled.");
+                                    notif.setString(2, "Delivery " + deliveryId + " for Relief Request " + requestId + " has arrived and is marked Fulfilled.");
                                     notif.executeUpdate();
                                 }
                             }
@@ -1533,16 +1638,55 @@ public class ApiServer {
         return requests;
     }
 
+    private static void attachItemsToDeliveries(Connection conn, List<Delivery> list) throws SQLException {
+        if (list.isEmpty()) return;
+        Set<Integer> reqIds = new LinkedHashSet<>();
+        for (Delivery d : list) {
+            reqIds.add(d.getRequestId());
+        }
+        StringBuilder placeholders = new StringBuilder();
+        for (int i = 0; i < reqIds.size(); i++) {
+            if (i > 0) placeholders.append(",");
+            placeholders.append("?");
+        }
+        Map<Integer, List<RequestItem>> itemMap = new HashMap<>();
+        String itemSql = "SELECT ri.request_item_id, ri.request_id, ri.good_id, ri.quantity, " +
+                "rg.item_name, rg.category, rg.unit_of_measure " +
+                "FROM RequestItem ri JOIN ReliefGood rg ON ri.good_id = rg.good_id " +
+                "WHERE ri.request_id IN (" + placeholders + ") ORDER BY ri.request_item_id";
+        try (PreparedStatement ps = conn.prepareStatement(itemSql)) {
+            int idx = 1;
+            for (Integer reqId : reqIds) {
+                ps.setInt(idx++, reqId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int reqId = rs.getInt("request_id");
+                    itemMap.computeIfAbsent(reqId, k -> new ArrayList<>()).add(
+                            new RequestItem(rs.getInt("request_item_id"), reqId, rs.getInt("good_id"),
+                                    rs.getInt("quantity"), rs.getString("item_name"),
+                                    rs.getString("category"), rs.getString("unit_of_measure"))
+                    );
+                }
+            }
+        }
+        for (Delivery d : list) {
+            d.setItems(itemMap.get(d.getRequestId()));
+        }
+    }
+
     private static List<Delivery> queryDeliveries(Connection conn, Integer volunteerUserId) throws SQLException {
         List<Delivery> list = new ArrayList<>();
         String sql = "SELECT d.delivery_id, d.request_id, d.volunteer_id, d.dispatch_date, d.delivery_status, " +
-                "u.full_name AS volunteer_name, o.org_name, o.location " +
+                "u.full_name AS volunteer_name, u.contact_info AS volunteer_contact, v.vehicle_type, " +
+                "o.org_name, o.location, e.event_name " +
                 "FROM Delivery d " +
                 (volunteerUserId != null
                         ? "JOIN Volunteer v ON d.volunteer_id = v.volunteer_id JOIN UserAccount u ON v.user_id = u.user_id "
                         : "LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id LEFT JOIN UserAccount u ON v.user_id = u.user_id ") +
                 "JOIN ReliefRequest r ON d.request_id = r.request_id " +
                 "JOIN Organization o ON r.org_id = o.org_id " +
+                "LEFT JOIN DisasterEvent e ON r.event_id = e.event_id " +
                 (volunteerUserId != null ? "WHERE v.user_id = ? " : "") +
                 "ORDER BY d.delivery_id DESC";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -1553,24 +1697,30 @@ public class ApiServer {
                             (Integer) rs.getObject("volunteer_id"), rs.getDate("dispatch_date"),
                             rs.getString("delivery_status"));
                     del.setVolunteerName(rs.getString("volunteer_name"));
+                    del.setVolunteerContact(rs.getString("volunteer_contact"));
+                    del.setVehicleType(rs.getString("vehicle_type"));
                     del.setOrgName(rs.getString("org_name"));
                     del.setLocation(rs.getString("location"));
+                    del.setEventName(rs.getString("event_name"));
                     list.add(del);
                 }
             }
         }
+        attachItemsToDeliveries(conn, list);
         return list;
     }
 
     private static List<Delivery> queryDeliveriesForOrganizationUser(Connection conn, int orgUserId) throws SQLException {
         List<Delivery> list = new ArrayList<>();
         String sql = "SELECT d.delivery_id, d.request_id, d.volunteer_id, d.dispatch_date, d.delivery_status, " +
-                "u.full_name AS volunteer_name, o.org_name, o.location " +
+                "u.full_name AS volunteer_name, u.contact_info AS volunteer_contact, v.vehicle_type, " +
+                "o.org_name, o.location, e.event_name " +
                 "FROM Delivery d " +
                 "LEFT JOIN Volunteer v ON d.volunteer_id = v.volunteer_id " +
                 "LEFT JOIN UserAccount u ON v.user_id = u.user_id " +
                 "JOIN ReliefRequest r ON d.request_id = r.request_id " +
                 "JOIN Organization o ON r.org_id = o.org_id " +
+                "LEFT JOIN DisasterEvent e ON r.event_id = e.event_id " +
                 "WHERE o.user_id = ? " +
                 "ORDER BY d.delivery_id DESC";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -1581,12 +1731,16 @@ public class ApiServer {
                             (Integer) rs.getObject("volunteer_id"), rs.getDate("dispatch_date"),
                             rs.getString("delivery_status"));
                     del.setVolunteerName(rs.getString("volunteer_name"));
+                    del.setVolunteerContact(rs.getString("volunteer_contact"));
+                    del.setVehicleType(rs.getString("vehicle_type"));
                     del.setOrgName(rs.getString("org_name"));
                     del.setLocation(rs.getString("location"));
+                    del.setEventName(rs.getString("event_name"));
                     list.add(del);
                 }
             }
         }
+        attachItemsToDeliveries(conn, list);
         return list;
     }
 
@@ -2110,9 +2264,25 @@ public class ApiServer {
               .append(",\"dispatchDate\":").append(q(d.getDispatchDate() != null ? d.getDispatchDate().toString() : ""))
               .append(",\"deliveryStatus\":").append(q(d.getDeliveryStatus()))
               .append(",\"volunteerName\":").append(q(d.getVolunteerName() != null ? d.getVolunteerName() : "Unassigned"))
+              .append(",\"volunteerContact\":").append(q(d.getVolunteerContact() != null ? d.getVolunteerContact() : ""))
+              .append(",\"vehicleType\":").append(q(d.getVehicleType() != null ? d.getVehicleType() : ""))
               .append(",\"orgName\":").append(q(d.getOrgName()))
               .append(",\"location\":").append(q(d.getLocation()))
-              .append("}");
+              .append(",\"eventName\":").append(q(d.getEventName() != null ? d.getEventName() : ""))
+              .append(",\"items\":[");
+            List<RequestItem> items = d.getItems();
+            for (int j = 0; j < items.size(); j++) {
+                if (j > 0) sb.append(",");
+                RequestItem it = items.get(j);
+                sb.append("{\"requestItemId\":").append(it.getRequestItemId())
+                  .append(",\"goodId\":").append(it.getGoodId())
+                  .append(",\"quantity\":").append(it.getQuantity())
+                  .append(",\"itemName\":").append(q(it.getItemName()))
+                  .append(",\"category\":").append(q(it.getCategory()))
+                  .append(",\"unitOfMeasure\":").append(q(it.getUnitOfMeasure()))
+                  .append("}");
+            }
+            sb.append("]}");
         }
         return sb.append("]").toString();
     }

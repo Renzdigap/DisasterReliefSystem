@@ -421,214 +421,365 @@ interface DeliveryWaybillModalProps {
 
 export function DeliveryWaybillModal({
   delivery,
-  driverName = "Charlie Driver",
-  vehicle = "Relief Truck (Plate: NDL-4921)",
+  driverName,
+  vehicle,
   onClose,
 }: DeliveryWaybillModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    const handleNativeClose = () => {
+      dialog.returnValue = "";
+      onCloseRef.current();
+    };
+    dialog.addEventListener("close", handleNativeClose);
+
+    // Light-dismiss fallback when <dialog closedby="any"> is unsupported
+    let pressedOutside = false;
+    const isOutsideDialog = (e: PointerEvent) => {
+      const rect = dialog.getBoundingClientRect();
+      return (
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom
+      );
+    };
+    const handlePointerDown = (e: PointerEvent) => {
+      pressedOutside = isOutsideDialog(e);
+    };
+    const handlePointerUp = (e: PointerEvent) => {
+      if (pressedOutside && isOutsideDialog(e)) {
+        dialog.close();
+      }
+      pressedOutside = false;
+    };
+
+    const needsClosedByFallback = !("closedBy" in HTMLDialogElement.prototype);
+    if (needsClosedByFallback) {
+      dialog.addEventListener("pointerdown", handlePointerDown);
+      dialog.addEventListener("pointerup", handlePointerUp);
+    }
+
+    return () => {
+      dialog.removeEventListener("close", handleNativeClose);
+      if (needsClosedByFallback) {
+        dialog.removeEventListener("pointerdown", handlePointerDown);
+        dialog.removeEventListener("pointerup", handlePointerUp);
+      }
+      if (dialog.open) {
+        dialog.close();
+      }
+    };
+  }, [delivery]);
+
   if (!delivery) return null;
 
-  const waybillNo = `DRRMS-WB-2024-${String(
+  const requestClose = () => {
+    const dialog = dialogRef.current;
+    if (dialog && dialog.open) {
+      dialog.close();
+    } else {
+      onClose();
+    }
+  };
+
+  const dispatchYear =
+    delivery.dispatchDate && /^\d{4}/.test(String(delivery.dispatchDate))
+      ? String(delivery.dispatchDate).slice(0, 4)
+      : String(new Date().getFullYear());
+
+  const waybillNo = `DRRMS-WB-${dispatchYear}-${String(
     delivery.deliveryId || "0"
   ).padStart(5, "0")}`;
+
+  const resolvedDriver =
+    driverName || delivery.volunteerName || "Unassigned Driver";
+  const resolvedVehicle =
+    vehicle || delivery.vehicleType || "Registered Relief Vehicle";
+  const items: any[] = Array.isArray(delivery.items) ? delivery.items : [];
+  const totalUnits = items.reduce(
+    (sum, it) => sum + Number(it.quantity || 0),
+    0
+  );
+  const statusLower = (delivery.deliveryStatus || "").toLowerCase();
+  const statusPillClass =
+    statusLower === "delivered"
+      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+      : statusLower === "in transit"
+      ? "bg-amber-50 text-amber-800 border-amber-200"
+      : "bg-slate-100 text-slate-700 border-slate-200";
 
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6">
-        {/* Top Control Bar */}
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-3.5 no-print">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-emerald-600" />
-            <span className="text-xs font-bold text-slate-800">
-              Official Cargo Dispatch Waybill &bull; {waybillNo}
-            </span>
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      {...({ closedby: "any" } as any)}
+      className="certificate-dialog m-auto w-[min(94vw,44rem)] max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-0 text-slate-900 shadow-2xl border border-slate-200"
+    >
+      {/* Top Control Bar (Hidden on print) */}
+      <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-3.5 no-print">
+        <div className="flex items-center gap-2 min-w-0">
+          <FileText
+            className="h-4 w-4 text-emerald-600 shrink-0"
+            aria-hidden="true"
+          />
+          <span className="text-xs font-bold text-slate-800 truncate">
+            Cargo Waybill &bull; {waybillNo}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handlePrint}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
+          >
+            <Printer className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Print Waybill</span>
+          </button>
+          <button
+            type="button"
+            onClick={requestClose}
+            aria-label="Close waybill"
+            className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 active:scale-95 transition"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      {/* Printable Waybill Manifest Body */}
+      <div className="p-6 sm:p-8 space-y-6 bg-white">
+        {/* Header */}
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-[#002060] pb-4">
+          <div className="flex items-center gap-3">
+            <div className="h-12 w-12 rounded-xl bg-white p-1 border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
+              <img
+                src="/ndrrmc-logo.png"
+                alt="NDRRMC Seal"
+                className="h-full w-full object-contain"
+              />
+            </div>
+            <div>
+              <div className="text-[11px] font-semibold text-slate-500">
+                Republic of the Philippines &bull; DRRMS Logistics
+              </div>
+              <h2
+                id={titleId}
+                className="text-base sm:text-lg font-extrabold text-[#002060] tracking-tight"
+              >
+                Emergency Relief Cargo Waybill
+              </h2>
+              <p className="text-xs text-blue-700 font-semibold">
+                Dispatch &amp; Custody Transfer Manifest
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
+          <div className="text-right text-xs">
+            <span className="text-[11px] text-slate-500 font-semibold block">
+              Waybill ID
+            </span>
+            <span className="font-mono font-bold text-slate-900 text-sm block">
+              {waybillNo}
+            </span>
+            <span
+              className={`inline-block mt-1 px-2.5 py-0.5 rounded-full border text-xs font-bold ${statusPillClass}`}
             >
-              <Printer className="h-3.5 w-3.5" />
-              <span>Print Waybill</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl p-1.5 text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 transition"
-            >
-              <X className="h-4 w-4" />
-            </button>
+              {delivery.deliveryStatus || "In Transit"}
+            </span>
           </div>
         </div>
 
-        {/* Printable Waybill Manifest Body */}
-        <div className="p-8 sm:p-10 space-y-6">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b-2 border-slate-900 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl bg-white p-1 border border-slate-200 shadow-sm flex items-center justify-center">
-                <img
-                  src="/ndrrmc-logo.png"
-                  alt="NDRRMC Seal"
-                  className="h-full w-full object-contain"
-                />
+        {/* Carrier & Destination Coordinates */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <Truck className="h-4 w-4 text-blue-600" aria-hidden="true" />
+              <span>Carrier Dispatch Information</span>
+            </div>
+            <dl className="text-xs space-y-1.5">
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">Assigned Driver:</dt>
+                <dd className="font-bold text-slate-900 text-right">
+                  {resolvedDriver}
+                </dd>
               </div>
-              <div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                  Republic of the Philippines &bull; DRRMS Logistics
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">Vehicle Type:</dt>
+                <dd className="font-semibold text-slate-800 text-right">
+                  {resolvedVehicle}
+                </dd>
+              </div>
+              {delivery.volunteerContact && (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-slate-500">Driver Contact:</dt>
+                  <dd className="font-medium text-slate-800 text-right">
+                    {delivery.volunteerContact}
+                  </dd>
                 </div>
-                <h1 className="text-base sm:text-lg font-black text-slate-900">
-                  Emergency Relief Cargo Waybill
-                </h1>
-                <p className="text-xs text-blue-700 font-semibold">
-                  Field Transport Dispatch &amp; Custody Transfer Manifest
-                </p>
+              )}
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">Dispatch Date:</dt>
+                <dd className="font-semibold text-slate-800 tabular-nums text-right">
+                  {delivery.dispatchDate || "Recorded"}
+                </dd>
               </div>
-            </div>
-            <div className="text-right text-xs">
-              <span className="text-[10px] text-slate-400 font-bold block uppercase">
-                Waybill ID
-              </span>
-              <span className="font-mono font-bold text-slate-900 text-sm">
-                {waybillNo}
-              </span>
-              <span className="inline-block mt-0.5 px-2 py-0.5 rounded bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold">
-                {delivery.deliveryStatus || "In Transit"}
-              </span>
-            </div>
+            </dl>
           </div>
 
-          {/* Carrier & Destination Coordinates */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                <Truck className="h-4 w-4 text-blue-600" />
-                <span>Carrier Dispatch Information</span>
-              </div>
-              <div className="text-xs space-y-1">
-                <div>
-                  <span className="text-slate-400">Assigned Driver: </span>
-                  <span className="font-bold text-slate-900">{driverName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Logistics Vehicle: </span>
-                  <span className="font-semibold text-slate-800">{vehicle}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Dispatch Departure: </span>
-                  <span className="font-semibold text-slate-800">
-                    {delivery.dispatchDate || "Current Operational Cycle"}
-                  </span>
-                </div>
-              </div>
+          <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <MapPin className="h-4 w-4 text-rose-500" aria-hidden="true" />
+              <span>Recipient &amp; Destination</span>
             </div>
-
-            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4 space-y-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-                <MapPin className="h-4 w-4 text-rose-500" />
-                <span>Drop-off Destination &amp; Recipient</span>
+            <dl className="text-xs space-y-1.5">
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">Organization:</dt>
+                <dd className="font-bold text-slate-900 text-right">
+                  {delivery.orgName || "Local Relief Operations"}
+                </dd>
               </div>
-              <div className="text-xs space-y-1">
-                <div>
-                  <span className="text-slate-400">Recipient Organization: </span>
-                  <span className="font-bold text-slate-900">
-                    {delivery.orgName || "Local Relief Operations"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Evacuation Center Site: </span>
-                  <span className="font-semibold text-slate-800">
-                    {delivery.location || "Designated Ground Site"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-400">Linked Request ID: </span>
-                  <span className="font-semibold text-slate-800">
-                    #{delivery.requestId}
-                  </span>
-                </div>
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">Location:</dt>
+                <dd className="font-semibold text-slate-800 text-right">
+                  {delivery.location || "Designated Site"}
+                </dd>
               </div>
-            </div>
+              {delivery.eventName && (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-slate-500">Disaster Event:</dt>
+                  <dd className="font-semibold text-slate-800 text-right">
+                    {delivery.eventName}
+                  </dd>
+                </div>
+              )}
+              <div className="flex justify-between gap-2">
+                <dt className="text-slate-500">Request ID:</dt>
+                <dd className="font-semibold text-slate-800 tabular-nums text-right">
+                  {delivery.requestId}
+                </dd>
+              </div>
+            </dl>
           </div>
+        </div>
 
-          {/* Cargo Manifest Checklist */}
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
-              <span>Relief Cargo Manifest Inspection</span>
-              <span className="text-[10px] text-slate-500 lowercase font-normal">
-                check &amp; verify upon arrival
+        {/* Cargo Manifest Checklist */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <h3 className="font-bold text-slate-700">Dispatched Cargo Items</h3>
+            {items.length > 0 && (
+              <span className="font-semibold text-slate-600 tabular-nums">
+                Total: {totalUnits.toLocaleString()} units
               </span>
-            </h3>
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 font-bold text-slate-700">
-                  <tr>
-                    <th className="py-2.5 px-3">Cargo Spec / Good</th>
-                    <th className="py-2.5 px-3">Batch Condition</th>
-                    <th className="py-2.5 px-3 text-right">Verification</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
+            )}
+          </div>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                <tr>
+                  <th scope="col" className="py-2.5 px-3">
+                    Relief Item
+                  </th>
+                  <th scope="col" className="py-2.5 px-3">
+                    Category
+                  </th>
+                  <th scope="col" className="py-2.5 px-3 text-right">
+                    Quantity
+                  </th>
+                  <th scope="col" className="py-2.5 px-3 text-right">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {items.length > 0 ? (
+                  items.map((it: any, i: number) => (
+                    <tr key={it.requestItemId || it.goodId || i}>
+                      <td className="py-2.5 px-3 font-semibold text-slate-900">
+                        {it.itemName}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-600">
+                        {it.category || "Relief Commodity"}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-slate-900 tabular-nums">
+                        {Number(it.quantity || 0).toLocaleString()}{" "}
+                        {it.unitOfMeasure || "Units"}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-semibold text-emerald-700">
+                        {statusLower === "delivered"
+                          ? "Handed Over"
+                          : "Allocated"}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
                   <tr>
                     <td className="py-2.5 px-3 font-semibold text-slate-900">
-                      Standard Emergency Relief Requisition Pack
+                      Relief Requisition {delivery.requestId} Cargo
                     </td>
                     <td className="py-2.5 px-3 text-slate-600">
-                      Sealed &bull; Sanitized &bull; Undamaged
+                      Central Warehouse Allocation
                     </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-bold">
-                      [ ✓ Verified ]
+                    <td className="py-2.5 px-3 text-right font-semibold text-slate-700">
+                      See Request {delivery.requestId}
                     </td>
-                  </tr>
-                  <tr>
-                    <td className="py-2.5 px-3 font-semibold text-slate-900">
-                      Disaster Aid Package #{delivery.requestId}
-                    </td>
-                    <td className="py-2.5 px-3 text-slate-600">
-                      Central Warehouse Allocated
-                    </td>
-                    <td className="py-2.5 px-3 text-right text-emerald-700 font-bold">
-                      [ ✓ Sealed ]
+                    <td className="py-2.5 px-3 text-right font-semibold text-emerald-700">
+                      {statusLower === "delivered"
+                        ? "Handed Over"
+                        : "Allocated"}
                     </td>
                   </tr>
-                </tbody>
-              </table>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Handover & Custody Signature Protocol */}
+        <div className="pt-6 border-t-2 border-slate-300 grid grid-cols-2 gap-8 text-xs">
+          <div className="space-y-8">
+            <p className="font-semibold text-slate-600">
+              1. Driver Handover Sign-off:
+            </p>
+            <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+              {resolvedDriver}
+              <span className="block text-[11px] font-normal text-slate-500">
+                Volunteer Transport Driver
+              </span>
             </div>
           </div>
 
-          {/* Handover & Custody Signature Protocol */}
-          <div className="pt-6 border-t-2 border-slate-300 grid grid-cols-2 gap-8 text-xs">
-            <div className="space-y-8">
-              <p className="font-semibold text-slate-600">
-                1. Driver Handover Sign-off:
-              </p>
-              <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
-                {driverName}
-                <span className="block text-[10px] font-normal text-slate-500">
-                  Certified Relief Transport Driver
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-8">
-              <p className="font-semibold text-slate-600">
-                2. Recipient Officer Receipt Sign-off:
-              </p>
-              <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
-                Evacuation Center Incident Commander
-                <span className="block text-[10px] font-normal text-slate-500">
-                  {delivery.orgName} / Local Disaster Committee
-                </span>
-              </div>
+          <div className="space-y-8">
+            <p className="font-semibold text-slate-600">
+              2. Receiving Officer Sign-off:
+            </p>
+            <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+              {delivery.orgName || "Receiving LGU Officer"}
+              <span className="block text-[11px] font-normal text-slate-500">
+                {delivery.location || "Authorized LGU Representative"}
+              </span>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -1106,6 +1257,77 @@ export function EmergencyBroadcastModal({
   );
   const [sending, setSending] = useState(false);
   const [sentDone, setSentDone] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+  const zoneId = useId();
+  const tierId = useId();
+  const noteId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    const handleNativeClose = () => {
+      dialog.returnValue = "";
+      onCloseRef.current();
+    };
+    dialog.addEventListener("close", handleNativeClose);
+
+    let pressedOutside = false;
+    const isOutsideDialog = (e: PointerEvent) => {
+      const rect = dialog.getBoundingClientRect();
+      return (
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom
+      );
+    };
+    const handlePointerDown = (e: PointerEvent) => {
+      pressedOutside = isOutsideDialog(e);
+    };
+    const handlePointerUp = (e: PointerEvent) => {
+      if (pressedOutside && isOutsideDialog(e)) {
+        dialog.close();
+      }
+      pressedOutside = false;
+    };
+
+    const needsClosedByFallback = !("closedBy" in HTMLDialogElement.prototype);
+    if (needsClosedByFallback) {
+      dialog.addEventListener("pointerdown", handlePointerDown);
+      dialog.addEventListener("pointerup", handlePointerUp);
+    }
+
+    return () => {
+      dialog.removeEventListener("close", handleNativeClose);
+      if (needsClosedByFallback) {
+        dialog.removeEventListener("pointerdown", handlePointerDown);
+        dialog.removeEventListener("pointerup", handlePointerUp);
+      }
+      if (dialog.open) {
+        dialog.close();
+      }
+    };
+  }, []);
+
+  const requestClose = () => {
+    const dialog = dialogRef.current;
+    if (dialog && dialog.open) {
+      dialog.close();
+    } else {
+      onClose();
+    }
+  };
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1115,148 +1337,168 @@ export function EmergencyBroadcastModal({
       setSentDone(true);
       if (onBroadcastSent) {
         onBroadcastSent(
-          `Emergency Telecom Broadcast transmitted to 10 registered Volunteer Fleet Drivers for ${selectedZone}.`
+          `Fleet SMS broadcast sent to registered volunteer drivers for ${selectedZone}.`
         );
       }
     }, 600);
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-4 backdrop-blur-xs overflow-y-auto no-print">
-      <div className="relative w-full max-w-xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6 text-slate-900">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 px-6 py-4 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Radio className="h-5 w-5 animate-pulse" />
-            <div>
-              <h2 className="text-base font-extrabold">
-                NDRRMC Emergency Fleet SMS Broadcast Console
-              </h2>
-              <p className="text-[11px] text-rose-100">
-                Multi-Channel Telecom &amp; Radio Dispatch Alert Transmitter
-              </p>
-            </div>
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      {...({ closedby: "any" } as any)}
+      className="m-auto w-[min(94vw,38rem)] max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-0 text-slate-900 shadow-2xl border border-slate-200 no-print"
+    >
+      {/* Header */}
+      <div className="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 px-6 py-4 text-white flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <Radio className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <div className="min-w-0">
+            <h2 id={titleId} className="text-base font-extrabold truncate">
+              Fleet Alert Broadcast
+            </h2>
+            <p className="text-xs text-rose-100">
+              SMS &amp; Radio Dispatch Alert
+            </p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-1 text-white/80 hover:bg-white/15 hover:text-white transition"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
+        <button
+          type="button"
+          onClick={requestClose}
+          aria-label="Close fleet broadcast dialog"
+          className="rounded-xl p-1.5 text-white/80 hover:bg-white/15 hover:text-white transition shrink-0"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
 
-        <form onSubmit={handleSend} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Target Calamity Operation
-              </label>
-              <select
-                value={selectedZone}
-                onChange={(e) => setSelectedZone(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900"
-              >
-                {events.map((ev: any) => (
-                  <option key={ev.eventId} value={ev.eventName}>
-                    {ev.eventName} ({ev.location})
-                  </option>
-                ))}
-                <option value="All Active Calamity Sectors">
-                  All Active Calamity Sectors (National)
+      <form onSubmit={handleSend} className="p-6 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor={zoneId}
+              className="block text-xs font-bold text-slate-700 mb-1"
+            >
+              Target Operation
+            </label>
+            <select
+              id={zoneId}
+              value={selectedZone}
+              onChange={(e) => setSelectedZone(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900"
+            >
+              {events.map((ev: any) => (
+                <option key={ev.eventId} value={ev.eventName}>
+                  {ev.eventName} ({ev.location})
                 </option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Emergency Broadcast Priority
-              </label>
-              <select
-                value={alertTier}
-                onChange={(e) => setAlertTier(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900"
-              >
-                <option value="CRITICAL FLEET MOBILIZATION">
-                  🚨 CRITICAL FLEET MOBILIZATION
-                </option>
-                <option value="PRIORITY CONVOY ESCORT">
-                  🚚 PRIORITY CONVOY ESCORT
-                </option>
-                <option value="SEVERE WEATHER ROUTE WARNING">
-                  🌧️ SEVERE WEATHER ROUTE WARNING
-                </option>
-              </select>
-            </div>
+              ))}
+              <option value="All Active Calamity Sectors">
+                All Active Calamity Sectors (National)
+              </option>
+            </select>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Dispatch Directive Message
+            <label
+              htmlFor={tierId}
+              className="block text-xs font-bold text-slate-700 mb-1"
+            >
+              Broadcast Priority
             </label>
-            <textarea
-              rows={2}
-              value={customNote}
-              onChange={(e) => setCustomNote(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 font-medium"
-              required
-            />
+            <select
+              id={tierId}
+              value={alertTier}
+              onChange={(e) => setAlertTier(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-900"
+            >
+              <option value="CRITICAL FLEET MOBILIZATION">
+                CRITICAL FLEET MOBILIZATION
+              </option>
+              <option value="PRIORITY CONVOY ESCORT">
+                PRIORITY CONVOY ESCORT
+              </option>
+              <option value="SEVERE WEATHER ROUTE WARNING">
+                SEVERE WEATHER ROUTE WARNING
+              </option>
+            </select>
           </div>
+        </div>
 
-          {/* Realistic Mobile SMS Preview */}
-          <div className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white space-y-1.5">
-            <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-              <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                <Smartphone className="h-3.5 w-3.5" /> SMS GATEWAY PREVIEW (GOV-PH-NDRRMC)
-              </span>
-              <span>RECIPIENTS: 10 CERTIFIED DRIVERS</span>
-            </div>
-            <p className="text-xs font-mono leading-relaxed text-slate-100 bg-slate-800/90 p-3 rounded-xl border border-slate-700">
-              [NDRRMC-DRRMS {alertTier}] Operation: {selectedZone}. Directive:{" "}
-              {customNote} Acknowledge via Volunteer Portal immediately.
-            </p>
+        <div>
+          <label
+            htmlFor={noteId}
+            className="block text-xs font-bold text-slate-700 mb-1"
+          >
+            Dispatch Directive
+          </label>
+          <textarea
+            id={noteId}
+            rows={2}
+            value={customNote}
+            onChange={(e) => setCustomNote(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900 font-medium"
+            required
+          />
+        </div>
+
+        {/* Realistic Mobile SMS Preview */}
+        <div className="rounded-2xl border border-slate-200 bg-slate-900 p-4 text-white space-y-1.5">
+          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+            <span className="flex items-center gap-1 text-emerald-400 font-bold">
+              <Smartphone className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>SMS Preview (GOV-PH-NDRRMC)</span>
+            </span>
           </div>
+          <p className="text-xs font-mono leading-relaxed text-slate-100 bg-slate-800/90 p-3 rounded-xl border border-slate-700">
+            [NDRRMC-DRRMS {alertTier}] Operation: {selectedZone}. Directive:{" "}
+            {customNote} Acknowledge via Volunteer Portal immediately.
+          </p>
+        </div>
 
-          {sentDone ? (
-            <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 flex items-center justify-between text-xs text-emerald-900 font-bold">
-              <span className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                Broadcast transmitted to all active Volunteer Fleet Drivers!
+        {sentDone ? (
+          <div
+            role="status"
+            className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 flex items-center justify-between text-xs text-emerald-900 font-bold"
+          >
+            <span className="flex items-center gap-2">
+              <CheckCircle2
+                className="h-4 w-4 text-emerald-600 shrink-0"
+                aria-hidden="true"
+              />
+              Broadcast transmitted to all active Volunteer Fleet Drivers.
+            </span>
+            <button
+              type="button"
+              onClick={requestClose}
+              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 text-xs"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={requestClose}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={sending}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 px-5 py-2 text-xs font-bold text-white shadow-md transition disabled:opacity-50"
+            >
+              <Send className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>
+                {sending ? "Transmitting..." : "Transmit Broadcast"}
               </span>
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-lg bg-emerald-600 text-white px-3 py-1 text-xs"
-              >
-                Done
-              </button>
-            </div>
-          ) : (
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={sending}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 px-5 py-2 text-xs font-bold text-white shadow-md transition disabled:opacity-50"
-              >
-                <Send className="h-3.5 w-3.5" />
-                <span>
-                  {sending
-                    ? "Transmitting via Telecom Gateway..."
-                    : "Transmit Emergency Broadcast"}
-                </span>
-              </button>
-            </div>
-          )}
-        </form>
-      </div>
-    </div>
+            </button>
+          </div>
+        )}
+      </form>
+    </dialog>
   );
 }
 

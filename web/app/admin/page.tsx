@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Radio,
+  FileText,
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
@@ -31,6 +32,7 @@ import {
 } from "@/components/ReportCharts";
 import {
   EmergencyBroadcastModal,
+  DeliveryWaybillModal,
 } from "@/components/DisasterEnhancements";
 import {
   apiFetch,
@@ -153,6 +155,7 @@ export default function AdminPortalPage() {
     "operationalSummary" | "inventoryHealth" | "donorImpact"
   >("operationalSummary");
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [selectedWaybill, setSelectedWaybill] = useState<any>(null);
 
   // Delete confirmation modal
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -315,9 +318,19 @@ export default function AdminPortalPage() {
     [requests]
   );
 
+  const dispatchedRequestIds = useMemo(
+    () => new Set(deliveries.map((d) => Number(d.requestId))),
+    [deliveries]
+  );
+
   const approvedRequestsForDispatch = useMemo(
-    () => requests.filter((r) => r.status === "Approved"),
-    [requests]
+    () =>
+      requests.filter(
+        (r) =>
+          r.status === "Approved" &&
+          !dispatchedRequestIds.has(Number(r.requestId))
+      ),
+    [requests, dispatchedRequestIds]
   );
 
   const filteredEvents = useMemo(() => {
@@ -1990,7 +2003,7 @@ export default function AdminPortalPage() {
 
       {/* TAB 6: DELIVERIES */}
       {activeTab === "deliveries" && (
-        <div className="space-y-5">
+        <div className="space-y-5 no-print">
           <form
             onSubmit={handleCreateDelivery}
             className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
@@ -2044,7 +2057,7 @@ export default function AdminPortalPage() {
                 {volunteers.map((v) => (
                   <option key={v.volunteerId} value={v.volunteerId}>
                     {v.volunteerName} ({v.vehicleType} •{" "}
-                    {v.isAvailable ? "Available" : "Busy"})
+                    {v.isAvailable ? "Available" : "On Assignment"})
                   </option>
                 ))}
               </select>
@@ -2063,21 +2076,28 @@ export default function AdminPortalPage() {
           <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
-                {["ALL", "Pending", "In Transit", "Delivered"].map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    aria-pressed={statusFilter === st}
-                    onClick={() => setStatusFilter(st)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
-                      statusFilter === st
-                        ? "bg-blue-600 text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {st === "ALL" ? "All" : st}
-                  </button>
-                ))}
+                {["ALL", "Pending", "In Transit", "Delivered"].map((st) => {
+                  const count =
+                    st === "ALL"
+                      ? deliveries.length
+                      : deliveries.filter((d) => d.deliveryStatus === st)
+                          .length;
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      aria-pressed={statusFilter === st}
+                      onClick={() => setStatusFilter(st)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                        statusFilter === st
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {st === "ALL" ? "All" : st} ({count})
+                    </button>
+                  );
+                })}
               </div>
               <div className="relative">
                 <Search
@@ -2156,9 +2176,17 @@ export default function AdminPortalPage() {
                           </div>
                           <div className="text-xs text-slate-500">
                             {d.location}
+                            {d.eventName ? ` · ${d.eventName}` : ""}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-slate-700">{d.volunteerName}</td>
+                        <td className="px-4 py-3 text-slate-700">
+                          <div>{d.volunteerName}</div>
+                          {d.vehicleType && (
+                            <div className="text-[11px] text-slate-400">
+                              {d.vehicleType}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-slate-500 tabular-nums whitespace-nowrap">
                           {d.dispatchDate}
                         </td>
@@ -2167,6 +2195,17 @@ export default function AdminPortalPage() {
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedWaybill(d)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition"
+                            >
+                              <FileText
+                                className="h-3.5 w-3.5 text-slate-500"
+                                aria-hidden="true"
+                              />
+                              Waybill
+                            </button>
                             {d.deliveryStatus === "Pending" && (
                               <button
                                 type="button"
@@ -2928,6 +2967,16 @@ export default function AdminPortalPage() {
           events={events}
           onClose={() => setShowBroadcastModal(false)}
           onBroadcastSent={(msg) => showToast(msg, "success")}
+        />
+      )}
+
+      {/* Cargo Waybill Modal */}
+      {selectedWaybill && (
+        <DeliveryWaybillModal
+          delivery={selectedWaybill}
+          driverName={selectedWaybill.volunteerName}
+          vehicle={selectedWaybill.vehicleType}
+          onClose={() => setSelectedWaybill(null)}
         />
       )}
     </PortalSidebarLayout>
