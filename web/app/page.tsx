@@ -263,21 +263,6 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => {
-                setMode("login");
-                setErrorMsg("");
-                setSuccessMsg("");
-              }}
-              className={`rounded-lg py-2 text-xs font-semibold transition ${
-                mode === "login"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-900"
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
                 setMode("register");
                 setErrorMsg("");
                 setSuccessMsg("");
@@ -289,6 +274,21 @@ export default function LoginPage() {
               }`}
             >
               Create Account
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setErrorMsg("");
+                setSuccessMsg("");
+              }}
+              className={`rounded-lg py-2 text-xs font-semibold transition ${
+                mode === "login"
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              Sign In
             </button>
           </div>
 
