@@ -311,6 +311,8 @@ export default function OrganizationPortalPage() {
       onSelectTab={setActiveTab}
       unreadCount={unreadCount}
       onOpenNotifications={() => setActiveTab("notifications")}
+      notificationsList={notifications}
+      onMarkNotificationRead={handleMarkNotificationRead}
       onSync={() => session?.user && loadOrgPortal(session.user.userId, true)}
       syncing={refreshing}
     >

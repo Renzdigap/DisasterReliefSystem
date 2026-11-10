@@ -22,9 +22,14 @@ import {
   Boxes,
   Check,
   ShieldCheck,
+  Award,
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
+import {
+  DonationCertificateModal,
+  getDisasterAlertInfo,
+} from "@/components/DisasterEnhancements";
 import {
   apiFetch,
   getSavedSession,
@@ -70,6 +75,8 @@ export default function DonorPortalPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [selectedCertificateDonation, setSelectedCertificateDonation] =
+    useState<any>(null);
 
   const loadDonorPortal = useCallback(
     async (userId: number, isBackground = false) => {
@@ -294,6 +301,8 @@ export default function DonorPortalPage() {
       onSelectTab={setActiveTab}
       unreadCount={unreadCount}
       onOpenNotifications={() => setActiveTab("notifications")}
+      notificationsList={notifications}
+      onMarkNotificationRead={handleMarkNotificationRead}
       onSync={() => session?.user && loadDonorPortal(session.user.userId, true)}
       syncing={refreshing}
     >
@@ -609,12 +618,13 @@ export default function DonorPortalPage() {
                   <th scope="col" className="py-3 px-4">Date</th>
                   <th scope="col" className="py-3 px-4">Items</th>
                   <th scope="col" className="py-3 px-4">Status</th>
+                  <th scope="col" className="py-3 px-4 text-right">Certificate</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {filteredDonations.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-slate-400">
+                    <td colSpan={6} className="py-8 text-center text-slate-400">
                       No donations found.
                     </td>
                   </tr>
@@ -645,6 +655,16 @@ export default function DonorPortalPage() {
                       <td className="py-3.5 px-4">
                         <StatusBadge status={don.status} />
                       </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCertificateDonation(don)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 hover:bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-700 shadow-xs transition"
+                        >
+                          <Award className="h-3.5 w-3.5 text-blue-600" />
+                          <span>E-Receipt</span>
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -654,43 +674,85 @@ export default function DonorPortalPage() {
         </div>
       )}
 
-      {/* TAB 3: ACTIVE DISASTERS */}
+      {/* TAB 3: ACTIVE DISASTERS WITH PAGASA SEVERITY & RESOURCE DEMAND */}
       {activeTab === "needs" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {events.map((ev: any) => (
-            <div
-              key={ev.eventId}
-              className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between gap-4"
-            >
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-slate-900">
-                    {ev.eventName}
-                  </h3>
-                  <StatusBadge status={ev.status} />
-                </div>
-                <p className="text-xs text-slate-500 flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5 text-rose-500" />
-                  <span>{ev.location}</span>
-                  <span>•</span>
-                  <span>{ev.startDate}</span>
-                </p>
-              </div>
+          {events.map((ev: any) => {
+            const alertInfo = getDisasterAlertInfo(ev.eventName);
+            return (
+              <div
+                key={ev.eventId}
+                className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm flex flex-col justify-between gap-4 hover:shadow-md transition"
+              >
+                <div className="space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${alertInfo.badgeColor}`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${alertInfo.dotColor} animate-pulse`}
+                          />
+                          {alertInfo.severity}
+                        </span>
+                        <span className="text-[11px] font-bold text-slate-500">
+                          {alertInfo.warningType}
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-900 pt-0.5">
+                        {ev.eventName}
+                      </h3>
+                    </div>
+                    <StatusBadge status={ev.status} />
+                  </div>
 
-              <div className="pt-3 border-t border-slate-100 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedEventId(ev.eventId);
-                    setActiveTab("pledge");
-                  }}
-                  className="rounded-xl bg-blue-600 hover:bg-blue-700 px-3.5 py-1.5 text-xs font-semibold text-white transition"
-                >
-                  Donate to Event
-                </button>
+                  <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                    <span>{ev.location}</span>
+                    <span>•</span>
+                    <span>{ev.startDate}</span>
+                  </p>
+
+                  {/* Impact & Humanitarian Demands Strip */}
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 space-y-2 text-xs">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 font-medium">
+                        Ground Impact:
+                      </span>
+                      <span className="font-bold text-slate-800">
+                        {alertInfo.familiesAffected} &bull; {alertInfo.evacCenters} Evac Sites
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-slate-500 font-medium">
+                        Priority Goods:
+                      </span>
+                      <span className="font-semibold text-blue-700 truncate max-w-[200px]">
+                        {alertInfo.priorityDemand}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-emerald-700">
+                    🟢 Active Response Center
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedEventId(ev.eventId);
+                      setActiveTab("pledge");
+                    }}
+                    className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition"
+                  >
+                    Donate to Event
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -742,6 +804,15 @@ export default function DonorPortalPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Official Donation Acknowledgment Modal */}
+      {selectedCertificateDonation && (
+        <DonationCertificateModal
+          donation={selectedCertificateDonation}
+          donorName={session?.user?.fullName}
+          onClose={() => setSelectedCertificateDonation(null)}
+        />
       )}
     </PortalSidebarLayout>
   );

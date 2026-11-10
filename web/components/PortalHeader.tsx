@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Bell, RefreshCw } from "lucide-react";
+import { LogOut, Bell, RefreshCw, X, Check, ChevronRight, Inbox } from "lucide-react";
 import { clearSession, UserSession } from "@/lib/api";
 
 export interface SidebarNavItem {
@@ -11,6 +11,16 @@ export interface SidebarNavItem {
   icon: React.ReactNode;
   badge?: number | string;
   badgeTone?: "emerald" | "rose" | "amber" | "slate";
+}
+
+export interface NotificationItem {
+  notificationId?: number | string;
+  id?: number | string;
+  message?: string;
+  title?: string;
+  sentDate?: string;
+  createdAt?: string;
+  isRead?: boolean;
 }
 
 interface PortalSidebarLayoutProps {
@@ -23,6 +33,8 @@ interface PortalSidebarLayoutProps {
   onSelectTab: (id: any) => void;
   unreadCount?: number;
   onOpenNotifications?: () => void;
+  notificationsList?: NotificationItem[];
+  onMarkNotificationRead?: (id: any) => void;
   onSync?: () => void;
   syncing?: boolean;
   headerActions?: React.ReactNode;
@@ -39,12 +51,15 @@ export function PortalSidebarLayout({
   onSelectTab,
   unreadCount = 0,
   onOpenNotifications,
+  notificationsList,
+  onMarkNotificationRead,
   onSync,
   syncing = false,
   headerActions,
   children,
 }: PortalSidebarLayoutProps) {
   const router = useRouter();
+  const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
 
   const handleLogout = () => {
     clearSession();
@@ -221,19 +236,114 @@ export function PortalSidebarLayout({
               </button>
             )}
 
-            {onOpenNotifications && (
-              <button
-                onClick={onOpenNotifications}
-                className="relative rounded-xl border border-slate-200 bg-white hover:bg-slate-50 p-2 text-slate-600 transition shadow-xs"
-                title="Notifications"
-              >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm">
-                    {unreadCount}
-                  </span>
+            {/* Notification Bell & Interactive Popover Flyout */}
+            {(onOpenNotifications || (notificationsList && notificationsList.length > 0)) && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (notificationsList && notificationsList.length > 0) {
+                      setShowNotificationDrawer(!showNotificationDrawer);
+                    } else if (onOpenNotifications) {
+                      onOpenNotifications();
+                    }
+                  }}
+                  className="relative rounded-xl border border-slate-200 bg-white hover:bg-slate-50 p-2 text-slate-600 transition shadow-xs"
+                  title="Operational Notifications"
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Dropdown Popover Flyout */}
+                {showNotificationDrawer && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowNotificationDrawer(false)}
+                    />
+                    <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 px-1">
+                        <div className="flex items-center gap-2">
+                          <Bell className="h-4 w-4 text-blue-600" />
+                          <span className="text-xs font-bold text-slate-900">
+                            Disaster Relief Alerts
+                          </span>
+                        </div>
+                        {unreadCount > 0 && (
+                          <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                            {unreadCount} unread
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 py-1">
+                        {!notificationsList || notificationsList.length === 0 ? (
+                          <div className="py-6 text-center text-xs text-slate-400">
+                            No notifications at this time.
+                          </div>
+                        ) : (
+                          notificationsList.slice(0, 5).map((n) => {
+                            const nId = n.notificationId || n.id;
+                            const isUnread = !n.isRead;
+                            return (
+                              <div
+                                key={nId}
+                                className={`p-2.5 rounded-xl transition flex flex-col gap-1 text-xs ${
+                                  isUnread
+                                    ? "bg-blue-50/60 font-semibold"
+                                    : "hover:bg-slate-50 text-slate-700"
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="text-slate-900 line-clamp-2">
+                                    {n.message || n.title}
+                                  </span>
+                                  {isUnread && onMarkNotificationRead && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onMarkNotificationRead(nId)}
+                                      className="shrink-0 p-1 text-blue-600 hover:text-blue-800"
+                                      title="Mark read"
+                                    >
+                                      <Check className="h-3 w-3" />
+                                    </button>
+                                  )}
+                                </div>
+                                <span className="text-[10px] text-slate-400 font-normal">
+                                  {n.sentDate || n.createdAt || "Just now"}
+                                </span>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      <div className="border-t border-slate-100 pt-2 px-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowNotificationDrawer(false);
+                            if (onOpenNotifications) {
+                              onOpenNotifications();
+                            } else {
+                              onSelectTab("notifications");
+                            }
+                          }}
+                          className="w-full rounded-xl bg-slate-100 hover:bg-slate-200 py-2 text-center text-xs font-bold text-slate-700 transition flex items-center justify-center gap-1"
+                        >
+                          <span>Open All Notifications</span>
+                          <ChevronRight className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
-              </button>
+              </div>
             )}
           </div>
         </header>

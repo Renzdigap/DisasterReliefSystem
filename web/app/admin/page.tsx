@@ -28,6 +28,7 @@ import {
   InventoryHealthCharts,
   DonorImpactCharts,
 } from "@/components/ReportCharts";
+import { getDisasterAlertInfo } from "@/components/DisasterEnhancements";
 import {
   apiFetch,
   getCachedData,
@@ -844,6 +845,8 @@ export default function AdminPortalPage() {
         setSearchQuery("");
         setStatusFilter("ALL");
       }}
+      notificationsList={notifications}
+      onMarkNotificationRead={handleMarkNotificationRead}
       onSync={() => refreshData(true)}
       syncing={syncing}
     >
@@ -1207,8 +1210,35 @@ export default function AdminPortalPage() {
                     slicePage(filteredEvents).map((ev) => (
                       <tr key={ev.eventId} className="hover:bg-slate-50">
                         <td className="p-3 font-bold">#{ev.eventId}</td>
-                        <td className="p-3 font-semibold text-slate-900">
-                          {ev.eventName}
+                        <td className="p-3">
+                          <div className="space-y-1">
+                            <div className="font-semibold text-slate-900 flex items-center gap-2 flex-wrap">
+                              <span>{ev.eventName}</span>
+                              {(() => {
+                                const alert = getDisasterAlertInfo(ev.eventName);
+                                return (
+                                  <span
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${alert.badgeColor}`}
+                                  >
+                                    <span
+                                      className={`h-1.5 w-1.5 rounded-full ${alert.dotColor} animate-pulse`}
+                                    />
+                                    {alert.severity}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                            {(() => {
+                              const alert = getDisasterAlertInfo(ev.eventName);
+                              return (
+                                <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                                  <span>{alert.warningType}</span>
+                                  <span>&bull;</span>
+                                  <span className="text-slate-700 font-bold">{alert.familiesAffected}</span>
+                                </p>
+                              );
+                            })()}
+                          </div>
                         </td>
                         <td className="p-3 text-slate-600">{ev.location}</td>
                         <td className="p-3 text-slate-500">{ev.startDate}</td>

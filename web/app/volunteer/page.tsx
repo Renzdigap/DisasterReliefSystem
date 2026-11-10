@@ -13,9 +13,11 @@ import {
   Navigation,
   Check,
   ShieldCheck,
+  FileText,
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
+import { DeliveryWaybillModal } from "@/components/DisasterEnhancements";
 import {
   apiFetch,
   getSavedSession,
@@ -50,6 +52,7 @@ export default function VolunteerPortalPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [selectedWaybill, setSelectedWaybill] = useState<any>(null);
 
   const [fullName, setFullName] = useState("");
   const [contactInfo, setContactInfo] = useState("");
@@ -248,6 +251,8 @@ export default function VolunteerPortalPage() {
       onSelectTab={setActiveTab}
       unreadCount={unreadCount}
       onOpenNotifications={() => setActiveTab("notifications")}
+      notificationsList={notifications}
+      onMarkNotificationRead={handleMarkNotificationRead}
       onSync={() =>
         session?.user && loadVolunteerPortal(session.user.userId, true)
       }
@@ -449,6 +454,15 @@ export default function VolunteerPortalPage() {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="inline-flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedWaybill(del)}
+                            className="rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition flex items-center gap-1 shadow-xs"
+                            title="View Dispatch Waybill"
+                          >
+                            <FileText className="h-3.5 w-3.5 text-slate-500" />
+                            <span>Waybill</span>
+                          </button>
                           {del.deliveryStatus === "Pending" && (
                             <button
                               type="button"
@@ -643,6 +657,16 @@ export default function VolunteerPortalPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Official Cargo Waybill Modal */}
+      {selectedWaybill && (
+        <DeliveryWaybillModal
+          delivery={selectedWaybill}
+          driverName={fullName || session?.user?.fullName || "Charlie Driver"}
+          vehicle={vehicleType}
+          onClose={() => setSelectedWaybill(null)}
+        />
       )}
     </PortalSidebarLayout>
   );
