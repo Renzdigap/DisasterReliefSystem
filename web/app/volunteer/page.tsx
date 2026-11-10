@@ -283,22 +283,30 @@ export default function VolunteerPortalPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-blue-50/40 rounded-2xl border border-blue-100/80 p-5 shadow-sm hover:shadow-md transition">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
             <span>Total Assigned</span>
-            <Truck className="h-4 w-4 text-blue-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-600 shadow-sm">
+              <Truck className="h-4 w-4" />
+            </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-3 text-3xl font-extrabold text-slate-900 tracking-tight">
             {deliveries.length}
           </p>
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-blue-700">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+            <span>Active Logistics Queue</span>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-amber-50/40 rounded-2xl border border-amber-100/80 p-5 shadow-sm hover:shadow-md transition">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
             <span>In Transit</span>
-            <Navigation className="h-4 w-4 text-amber-500" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-100 text-amber-600 shadow-sm">
+              <Navigation className="h-4 w-4" />
+            </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-3 text-3xl font-extrabold text-slate-900 tracking-tight">
             {
               deliveries.filter(
                 (d: any) =>
@@ -307,33 +315,49 @@ export default function VolunteerPortalPage() {
               ).length
             }
           </p>
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-amber-700">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            <span>En Route to Site</span>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/40 rounded-2xl border border-emerald-100/80 p-5 shadow-sm hover:shadow-md transition">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
             <span>Completed</span>
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 shadow-sm">
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-3 text-3xl font-extrabold text-slate-900 tracking-tight">
             {
               deliveries.filter((d: any) => d.deliveryStatus === "Delivered")
                 .length
             }
           </p>
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-emerald-700">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <span>Verified Handed Over</span>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Status</span>
-            <ShieldCheck className="h-4 w-4 text-slate-400" />
+        <div className="relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/40 rounded-2xl border border-indigo-100/80 p-5 shadow-sm hover:shadow-md transition">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-500">
+            <span>Driver Status</span>
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 shadow-sm">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
           </div>
           <p
-            className={`mt-2 text-base font-bold ${
+            className={`mt-3 text-2xl font-extrabold tracking-tight ${
               isAvailable ? "text-emerald-600" : "text-amber-600"
             }`}
           >
-            {isAvailable ? "Available" : "Busy"}
+            {isAvailable ? "Available" : "On Mission"}
           </p>
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-indigo-700">
+            <span className={`inline-block h-1.5 w-1.5 rounded-full ${isAvailable ? "bg-emerald-500" : "bg-amber-500"}`} />
+            <span>Certified Relief Driver</span>
+          </div>
         </div>
       </div>
 
@@ -362,10 +386,10 @@ export default function VolunteerPortalPage() {
                   key={st}
                   type="button"
                   onClick={() => setStatusFilter(st)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+                  className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition-all shadow-sm ${
                     statusFilter === st
-                      ? "bg-blue-600 text-white"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-blue-500/25"
+                      : "bg-slate-100/80 text-slate-600 hover:bg-slate-200 border border-slate-200/60"
                   }`}
                 >
                   {st}

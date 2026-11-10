@@ -327,43 +327,63 @@ export default function DonorPortalPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Total Donations</span>
-            <HeartHandshake className="h-4 w-4 text-blue-600" />
+        <div className="bg-white hover:bg-blue-50/20 rounded-2xl border border-slate-200/80 hover:border-blue-300 p-5 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Donations</span>
+            <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-xs">
+              <HeartHandshake className="h-5 w-5" />
+            </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-3xl font-black text-slate-900 tracking-tight">
             {donations.length}
           </p>
+          <p className="text-[11px] text-blue-600 font-semibold mt-1">
+            Lifetime Contributed Pledges
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Items Donated</span>
-            <Boxes className="h-4 w-4 text-emerald-600" />
+        <div className="bg-white hover:bg-emerald-50/20 rounded-2xl border border-slate-200/80 hover:border-emerald-300 p-5 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Items Donated</span>
+            <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-xs">
+              <Boxes className="h-5 w-5" />
+            </div>
           </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
+          <p className="mt-2 text-3xl font-black text-slate-900 tracking-tight">
             {totalItemsDonated.toLocaleString()}
           </p>
-        </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Active Disasters</span>
-            <MapPin className="h-4 w-4 text-rose-500" />
-          </div>
-          <p className="mt-2 text-2xl font-bold text-slate-900">
-            {events.filter((e: any) => e.status === "Active").length}
+          <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+            Delivered &amp; In-Stock Units
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-medium text-slate-500">
-            <span>Donor Type</span>
-            <ShieldCheck className="h-4 w-4 text-slate-400" />
+        <div className="bg-white hover:bg-rose-50/20 rounded-2xl border border-slate-200/80 hover:border-rose-300 p-5 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Disasters</span>
+            <div className="h-10 w-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shadow-xs">
+              <MapPin className="h-5 w-5" />
+            </div>
           </div>
-          <p className="mt-2 text-lg font-bold text-slate-900 truncate">
+          <p className="mt-2 text-3xl font-black text-rose-600 tracking-tight">
+            {events.filter((e: any) => e.status === "Active").length}
+          </p>
+          <p className="text-[11px] text-rose-500 font-semibold mt-1">
+            Current Priority Calamity Zones
+          </p>
+        </div>
+
+        <div className="bg-white hover:bg-indigo-50/20 rounded-2xl border border-slate-200/80 hover:border-indigo-300 p-5 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Donor Profile</span>
+            <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shadow-xs">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+          </div>
+          <p className="mt-2 text-lg font-black text-slate-900 truncate tracking-tight">
             {data?.donor?.donorType || session?.donorType || "Individual"}
+          </p>
+          <p className="text-[11px] text-indigo-600 font-semibold mt-1">
+            Verified Stakeholder
           </p>
         </div>
       </div>
@@ -490,9 +510,9 @@ export default function DonorPortalPage() {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:opacity-50"
+                  className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition-all disabled:opacity-50"
                 >
-                  {submitting ? "Submitting..." : "Submit Donation"}
+                  {submitting ? "Submitting Pledge..." : "Submit Donation Pledge"}
                 </button>
               </div>
             </form>

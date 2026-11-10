@@ -409,7 +409,7 @@ export default function LoginPage() {
             </h2>
             <p className="text-xs text-slate-500">
               {mode === "login"
-                ? "Authenticate with your DRRMS credentials or launch an oral defense role below."
+                ? "Authenticate with your DRRMS credentials or select a quick role launcher below."
                 : "Register as a Citizen Donor, Partner LGU/NGO, or Volunteer Fleet Driver."}
             </p>
           </div>
@@ -564,7 +564,7 @@ export default function LoginPage() {
                       1-Click Role Switcher
                     </p>
                     <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
-                      Oral Defense Demo
+                      Direct Role Access
                     </span>
                   </div>
                   <div className="grid grid-cols-4 gap-2">

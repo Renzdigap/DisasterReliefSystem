@@ -770,51 +770,105 @@ export default function AdminPortalPage() {
 
       {/* Executive KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5 no-print">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">
-            Active Disasters
+        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-rose-50/20 hover:border-rose-300 p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Active Disasters
+            </span>
+            <div className="h-7 w-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+              <AlertTriangle className="h-3.5 w-3.5" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
+          <div className="text-2xl font-black text-rose-600 mt-2 tracking-tight">
             {metrics.activeDisasters ?? 0}
           </div>
+          <div className="text-[10px] font-semibold text-rose-500 mt-0.5">
+            Priority Calamities
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">
-            Pending Requests
+        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-amber-50/20 hover:border-amber-300 p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Pending Requests
+            </span>
+            <div className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Building2 className="h-3.5 w-3.5" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
+          <div className="text-2xl font-black text-amber-600 mt-2 tracking-tight">
             {metrics.pendingRequests ?? 0}
           </div>
+          <div className="text-[10px] font-semibold text-amber-600 mt-0.5">
+            Needs Review
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">Donations</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
+        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-blue-50/20 hover:border-blue-300 p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Donations
+            </span>
+            <div className="h-7 w-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <HeartHandshake className="h-3.5 w-3.5" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-blue-600 mt-2 tracking-tight">
             {metrics.totalDonations ?? 0}
           </div>
+          <div className="text-[10px] font-semibold text-blue-500 mt-0.5">
+            Pledged Batches
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">Relief Items</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
+        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-indigo-50/20 hover:border-indigo-300 p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Relief Items
+            </span>
+            <div className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <Package className="h-3.5 w-3.5" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-indigo-600 mt-2 tracking-tight">
             {metrics.reliefGoodsCount ?? 0}
           </div>
+          <div className="text-[10px] font-semibold text-indigo-500 mt-0.5">
+            Stock Catalog
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">Volunteers</div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
+        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-sky-50/20 hover:border-sky-300 p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Volunteers
+            </span>
+            <div className="h-7 w-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center">
+              <Users className="h-3.5 w-3.5" />
+            </div>
+          </div>
+          <div className="text-2xl font-black text-sky-600 mt-2 tracking-tight">
             {metrics.registeredVolunteers ?? 0}
           </div>
+          <div className="text-[10px] font-semibold text-sky-600 mt-0.5">
+            Fleet Drivers
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-          <div className="text-xs font-medium text-slate-500">
-            Deliveries Done
+        <div className="rounded-2xl border border-slate-200/80 bg-white hover:bg-emerald-50/20 hover:border-emerald-300 p-4 shadow-sm hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Deliveries Done
+            </span>
+            <div className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Truck className="h-3.5 w-3.5" />
+            </div>
           </div>
-          <div className="text-2xl font-bold text-slate-900 mt-1.5">
+          <div className="text-2xl font-black text-emerald-600 mt-2 tracking-tight">
             {metrics.completedDeliveries ?? 0}
+          </div>
+          <div className="text-[10px] font-semibold text-emerald-600 mt-0.5">
+            Confirmed Dispatches
           </div>
         </div>
       </div>
