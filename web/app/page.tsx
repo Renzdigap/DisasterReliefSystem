@@ -7,14 +7,12 @@ import {
   HeartHandshake,
   Building2,
   Truck,
-  ArrowRight,
   AlertCircle,
   CheckCircle2,
   Eye,
   EyeOff,
   MailCheck,
   RotateCcw,
-  ArrowLeft,
   PhoneCall,
   PackageCheck,
   User,
@@ -546,10 +544,9 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
+                    className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all flex items-center justify-center"
                   >
                     <span>{submitting ? "Signing in..." : "Sign In to Portal"}</span>
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </form>
 
@@ -736,14 +733,13 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center"
                     >
                       <span>
                         {submitting
                           ? "Verifying..."
                           : "Verify Email & Create Account"}
                       </span>
-                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     </button>
 
                     <div className="flex items-center justify-between gap-2 pt-1 text-xs">
@@ -754,9 +750,8 @@ export default function LoginPage() {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="inline-flex items-center gap-1 font-semibold text-slate-600 hover:text-slate-900 active:scale-[0.98] transition"
+                        className="inline-flex items-center font-semibold text-slate-600 hover:text-slate-900 active:scale-[0.98] transition"
                       >
-                        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>Edit Email / Details</span>
                       </button>
                       <button
@@ -1090,14 +1085,13 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center"
                     >
                       <span>
                         {submitting
                           ? "Sending Verification Code..."
                           : "Send Verification Code"}
                       </span>
-                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     </button>
 
                     <div className="text-center pt-2">
