@@ -4,6 +4,19 @@
 
 :root {
   color-scheme: light;
+  interpolate-size: allow-keywords;
+  --spring-settle: linear(
+    0,
+    0.312 8%,
+    0.678 18%,
+    0.946 28%,
+    1.045 36%,
+    1.052 43%,
+    1.028 52%,
+    1.006 65%,
+    0.998 80%,
+    1
+  );
 }
 
 body {
@@ -58,20 +71,227 @@ body {
   display: block;
 }
 
+/* ==========================================
+   TOP-LAYER <dialog> ENTRY & EXIT ANIMATIONS
+   ========================================== */
+dialog {
+  opacity: 0;
+  transition-property: opacity, transform, display, overlay;
+  transition-duration: 0.24s;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  transition-behavior: allow-discrete;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  dialog {
+    transform: scale(0.95) translateY(6px);
+  }
+}
+
 dialog:modal {
   overscroll-behavior: contain;
 }
 
-dialog::backdrop {
-  background-color: rgba(15, 23, 42, 0.45);
-  backdrop-filter: blur(2px);
-  overflow: hidden;
-  overscroll-behavior: contain;
+dialog[open]:where(:not([data-closing])) {
+  opacity: 1;
 }
 
-.tracker-dialog::backdrop {
+@media (prefers-reduced-motion: no-preference) {
+  dialog[open]:where(:not([data-closing])) {
+    transform: scale(1) translateY(0);
+  }
+}
+
+@starting-style {
+  dialog[open]:where(:not([data-closing])) {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @starting-style {
+    dialog[open]:where(:not([data-closing])) {
+      transform: scale(0.95) translateY(6px);
+    }
+  }
+}
+
+dialog::backdrop {
+  background-color: rgba(15, 23, 42, 0);
+  backdrop-filter: blur(0px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  transition-property: background-color, backdrop-filter, display, overlay;
+  transition-duration: 0.24s;
+  transition-timing-function: ease-out;
+  transition-behavior: allow-discrete;
+}
+
+dialog[open]:where(:not([data-closing]))::backdrop {
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(2px);
+}
+
+dialog.tracker-dialog[open]:where(:not([data-closing]))::backdrop {
   background-color: rgba(15, 23, 42, 0.62);
   backdrop-filter: blur(3px);
+}
+
+@starting-style {
+  dialog[open]:where(:not([data-closing]))::backdrop,
+  dialog.tracker-dialog[open]:where(:not([data-closing]))::backdrop {
+    background-color: rgba(15, 23, 42, 0);
+    backdrop-filter: blur(0px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog,
+  dialog::backdrop {
+    transition-duration: 0.1s;
+  }
+}
+
+/* ==========================================
+   MICRO-INTERACTIONS & VIEW TRANSITIONS
+   ========================================== */
+@keyframes drrmFadeUp {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drrmPanelIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drrmFlyoutIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes drrmBarGrowY {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+/* Opt in to spatial tab, toast, popover, and chart motion only when reduced motion is off */
+.tab-panel-enter {
+  opacity: 1;
+}
+
+.toast-enter {
+  opacity: 1;
+}
+
+.notif-flyout {
+  opacity: 1;
+  transform-origin: top right;
+}
+
+.chart-bar-grow {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+}
+
+@media screen and (prefers-reduced-motion: no-preference) {
+  .tab-panel-enter {
+    animation: drrmPanelIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .toast-enter {
+    animation: drrmPanelIn 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .notif-flyout {
+    animation: drrmFlyoutIn 0.18s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .chart-bar-grow {
+    animation: drrmBarGrowY 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+/* Dynamic sibling stagger using CSS sibling-index() + --sibling-index fallback */
+.stagger-grid > * {
+  --stagger-time: 36ms;
+  animation: drrmFadeUp 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--sibling-index, 0) * var(--stagger-time));
+  animation-delay: calc((sibling-index() - 1) * var(--stagger-time));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-grid > * {
+    animation: none;
+  }
+}
+
+/* Tactile spring lift for KPI buttons & interactive action tiles */
+.interactive-lift {
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1), ease, ease;
+  transition-timing-function: var(--spring-settle), ease, ease;
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .interactive-lift:hover {
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .interactive-lift:active {
+    transform: scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .interactive-lift {
+    transition: box-shadow 0.15s ease, border-color 0.15s ease;
+  }
+}
+
+/* Smooth intrinsic height reveal (`interpolate-size: allow-keywords` on :root) */
+.expandable-panel {
+  block-size: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: block-size 0.32s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.22s ease-out;
+}
+
+.expandable-panel.is-open {
+  block-size: auto;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .expandable-panel {
+    transition: none !important;
+  }
 }
 
 /* Native <input type="checkbox" switch> progressive enhancement */
@@ -154,6 +374,15 @@ input[type="checkbox"][switch]:focus-visible {
   .no-print {
     display: none !important;
   }
+  .tab-panel-enter,
+  .stagger-grid > *,
+  .chart-bar-grow,
+  .expandable-panel.is-open {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
   dialog.certificate-dialog {
     position: static !important;
     inset: auto !important;
@@ -165,6 +394,9 @@ input[type="checkbox"][switch]:focus-visible {
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
   }
   dialog::backdrop {
     display: none !important;
@@ -186,8 +418,14 @@ input[type="checkbox"][switch]:focus-visible {
 .flip-card-inner {
   transform-style: preserve-3d;
   -webkit-transform-style: preserve-3d;
-  transition: transform 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-card-inner {
+    transition: none;
+  }
 }
 
 .backface-hidden {
@@ -206,5 +444,3 @@ input[type="checkbox"][switch]:focus-visible {
   transform: rotateY(180deg) translateZ(0);
   -webkit-transform: rotateY(180deg) translateZ(0);
 }
-
-

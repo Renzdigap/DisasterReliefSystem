@@ -31,7 +31,17 @@ import {
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
-import { DonationCertificateModal } from "@/components/DisasterEnhancements";
+import {
+  DonationCertificateModal,
+  getDisasterAlertInfo,
+} from "@/components/DisasterEnhancements";
+import {
+  AnimatedNumber,
+  StockLevelBar,
+  closeTopLayer,
+  handleAnimatedDialogSubmit,
+  useSiblingStagger,
+} from "@/components/InteractiveMotion";
 import {
   apiFetch,
   getSavedSession,
@@ -175,6 +185,14 @@ export default function DonorPortalPage() {
   const pendingCancelRef = useRef<any>(null);
   const cancelDialogRef = useRef<HTMLDialogElement | null>(null);
   const keepBtnRef = useRef<HTMLButtonElement | null>(null);
+  const kpiGridRef = useRef<HTMLDivElement | null>(null);
+  const disastersGridRef = useRef<HTMLDivElement | null>(null);
+
+  useSiblingStagger(kpiGridRef, !loading);
+  useSiblingStagger(
+    disastersGridRef,
+    `${activeTab}-${disasterFilter}-${loading}`
+  );
 
   const nextRowKey = () => {
     const k = `row-${rowSeqRef.current}`;
@@ -294,7 +312,7 @@ export default function DonorPortalPage() {
     [loadDonorPortal, session, showBanner]
   );
 
-  // Hook native <dialog> close event reliably
+  // Hook native <dialog> close, cancel, and light-dismiss fallback reliably
   useEffect(() => {
     const dialog = cancelDialogRef.current;
     if (!dialog) return;
@@ -310,9 +328,45 @@ export default function DonorPortalPage() {
       }
     };
 
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "cancel");
+    };
+
+    let pressedOutside = false;
+    const isOutside = (e: PointerEvent) => {
+      const r = dialog.getBoundingClientRect();
+      return (
+        e.clientX < r.left ||
+        e.clientX > r.right ||
+        e.clientY < r.top ||
+        e.clientY > r.bottom
+      );
+    };
+    const onDown = (e: PointerEvent) => {
+      pressedOutside = isOutside(e);
+    };
+    const onUp = (e: PointerEvent) => {
+      if (pressedOutside && isOutside(e)) {
+        void closeTopLayer(dialog, "cancel");
+      }
+      pressedOutside = false;
+    };
+    const needsFallback = !("closedBy" in HTMLDialogElement.prototype);
+
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
+    if (needsFallback) {
+      dialog.addEventListener("pointerdown", onDown);
+      dialog.addEventListener("pointerup", onUp);
+    }
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
+      if (needsFallback) {
+        dialog.removeEventListener("pointerdown", onDown);
+        dialog.removeEventListener("pointerup", onUp);
+      }
     };
   }, [executeCancelDonation, loading]);
 
@@ -801,6 +855,7 @@ export default function DonorPortalPage() {
       onOpenNotifications={() => setActiveTab("notifications")}
       notificationsList={notifications}
       onMarkNotificationRead={handleMarkNotificationRead}
+      onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
       onSync={() => session?.user && loadDonorPortal(session.user.userId, true)}
       syncing={refreshing}
     >
@@ -809,7 +864,7 @@ export default function DonorPortalPage() {
           <div
             role={banner.type === "error" ? "alert" : "status"}
             aria-live="polite"
-            className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 text-xs sm:text-sm font-medium ${
+            className={`toast-enter rounded-xl border px-4 py-3 flex items-center justify-between gap-3 text-xs sm:text-sm font-medium ${
               banner.type === "success"
                 ? "bg-emerald-50 border-emerald-200 text-emerald-900"
                 : "bg-rose-50 border-rose-200 text-rose-900"
@@ -841,14 +896,17 @@ export default function DonorPortalPage() {
         )}
 
         {/* Interactive KPI Strip */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div
+          ref={kpiGridRef}
+          className="stagger-grid grid grid-cols-2 lg:grid-cols-4 gap-4"
+        >
           <button
             type="button"
             onClick={() => {
               setStatusFilter("ALL");
               setActiveTab("history");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -859,7 +917,7 @@ export default function DonorPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-slate-900 tracking-tight tabular-nums">
-              {donations.length.toLocaleString()}
+              <AnimatedNumber value={donations.length} />
             </p>
           </button>
 
@@ -869,7 +927,7 @@ export default function DonorPortalPage() {
               setStatusFilter("Pending");
               setActiveTab("history");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -880,7 +938,7 @@ export default function DonorPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-amber-600 tracking-tight tabular-nums">
-              {pendingDonationsCount.toLocaleString()}
+              <AnimatedNumber value={pendingDonationsCount} />
             </p>
           </button>
 
@@ -890,7 +948,7 @@ export default function DonorPortalPage() {
               setStatusFilter("Approved");
               setActiveTab("history");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -901,7 +959,7 @@ export default function DonorPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-emerald-600 tracking-tight tabular-nums">
-              {totalItemsDonated.toLocaleString()}
+              <AnimatedNumber value={totalItemsDonated} />
             </p>
           </button>
 
@@ -911,7 +969,7 @@ export default function DonorPortalPage() {
               setDisasterFilter("Active");
               setActiveTab("needs");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-rose-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-rose-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -922,14 +980,14 @@ export default function DonorPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-rose-600 tracking-tight tabular-nums">
-              {activeEvents.length.toLocaleString()}
+              <AnimatedNumber value={activeEvents.length} />
             </p>
           </button>
         </div>
 
         {/* TAB 1: NEW DONATION BUILDER + INTERACTIVE WAREHOUSE NEEDS */}
         {activeTab === "pledge" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 tab-panel-enter">
             <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 isolated-panel">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h2 className="text-base font-bold text-slate-900">
@@ -1299,7 +1357,7 @@ export default function DonorPortalPage() {
                             : "border-slate-200/70 bg-slate-50/50 hover:bg-white hover:border-blue-300 hover:shadow-xs"
                         }`}
                       >
-                        <div className="min-w-0 space-y-1">
+                        <div className="min-w-0 flex-1 space-y-1">
                           <div className="text-xs font-semibold text-slate-900 truncate">
                             {item.itemName}
                           </div>
@@ -1309,6 +1367,7 @@ export default function DonorPortalPage() {
                               {stock.toLocaleString()} {item.unitOfMeasure}
                             </span>
                           </div>
+                          <StockLevelBar stock={stock} className="mt-1.5" />
                         </div>
 
                         <div className="shrink-0 text-right">
@@ -1350,7 +1409,7 @@ export default function DonorPortalPage() {
 
         {/* TAB 2: MY DONATIONS HISTORY */}
         {activeTab === "history" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden tab-panel-enter">
             <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 {[
@@ -1547,7 +1606,7 @@ export default function DonorPortalPage() {
 
         {/* TAB 3: ACTIVE DISASTERS */}
         {activeTab === "needs" && (
-          <div className="space-y-4">
+          <div className="space-y-4 tab-panel-enter">
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 {[
@@ -1601,7 +1660,10 @@ export default function DonorPortalPage() {
                 No disaster events match your selected filter.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div
+                ref={disastersGridRef}
+                className="stagger-grid grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
                 {filteredDisasters.map((ev: any) => {
                   const isActive =
                     (ev.status || "").toLowerCase() === "active";
@@ -1609,11 +1671,12 @@ export default function DonorPortalPage() {
                     (d) => d.eventId === ev.eventId
                   ).length;
                   const topNeeds = prioritizedInventory.slice(0, 3);
+                  const alertInfo = getDisasterAlertInfo(ev.eventName);
 
                   return (
                     <div
                       key={ev.eventId}
-                      className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between gap-4 hover:border-slate-300 hover:shadow-sm transition"
+                      className="interactive-lift bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between gap-4 hover:border-slate-300 hover:shadow-sm"
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-3">
@@ -1621,6 +1684,20 @@ export default function DonorPortalPage() {
                             {ev.eventName}
                           </h3>
                           <StatusBadge status={ev.status} />
+                        </div>
+
+                        <div
+                          aria-hidden="true"
+                          className="h-1 w-full rounded-full bg-slate-100 overflow-hidden"
+                        >
+                          <div
+                            style={{
+                              width: `${isActive ? alertInfo.progressPct : 100}%`,
+                            }}
+                            className={`h-full rounded-full transition-[width] duration-300 ${
+                              isActive ? alertInfo.dotColor : "bg-slate-300"
+                            }`}
+                          />
                         </div>
 
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-600">
@@ -1706,7 +1783,7 @@ export default function DonorPortalPage() {
 
         {/* TAB 4: NOTIFICATIONS */}
         {activeTab === "notifications" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden tab-panel-enter">
             <div className="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-slate-900">
@@ -1806,6 +1883,7 @@ export default function DonorPortalPage() {
           ref={cancelDialogRef}
           aria-labelledby="cancel-pledge-title"
           aria-describedby="cancel-pledge-desc"
+          {...({ closedby: "any" } as any)}
           className="p-0 rounded-2xl border border-slate-200 bg-white shadow-xl max-w-md w-[calc(100%-2rem)] m-auto text-slate-900"
         >
           <div className="p-6 space-y-4">
@@ -1822,7 +1900,11 @@ export default function DonorPortalPage() {
                   : "Are you sure you want to cancel this pending donation?"}
               </p>
             </div>
-            <form method="dialog" className="flex justify-end gap-2 pt-2">
+            <form
+              method="dialog"
+              onSubmit={(e) => handleAnimatedDialogSubmit(e, cancelDialogRef.current)}
+              className="flex justify-end gap-2 pt-2"
+            >
               <button
                 ref={keepBtnRef}
                 value="cancel"

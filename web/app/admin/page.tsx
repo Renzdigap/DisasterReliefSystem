@@ -22,6 +22,7 @@ import {
   ChevronRight,
   Radio,
   FileText,
+  Award,
 } from "lucide-react";
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
@@ -33,7 +34,16 @@ import {
 import {
   EmergencyBroadcastModal,
   DeliveryWaybillModal,
+  DonationCertificateModal,
 } from "@/components/DisasterEnhancements";
+import {
+  AnimatedNumber,
+  DeliveryStepBar,
+  StockLevelBar,
+  closeTopLayer,
+  handleAnimatedDialogSubmit,
+  useSiblingStagger,
+} from "@/components/InteractiveMotion";
 import {
   apiFetch,
   getCachedData,
@@ -156,6 +166,12 @@ export default function AdminPortalPage() {
   >("operationalSummary");
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [selectedWaybill, setSelectedWaybill] = useState<any>(null);
+  const [selectedCertificateDonation, setSelectedCertificateDonation] =
+    useState<any>(null);
+  const [notifFilter, setNotifFilter] = useState<"ALL" | "UNREAD">("ALL");
+  const [markingAllRead, setMarkingAllRead] = useState(false);
+  const [appealPublished, setAppealPublished] = useState(false);
+  const kpiGridRef = useRef<HTMLDivElement | null>(null);
 
   // Delete confirmation modal
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -221,9 +237,11 @@ export default function AdminPortalPage() {
     refreshData(false);
   }, [router, refreshData]);
 
+  useSiblingStagger(kpiGridRef, `${activeTab}-${loading}`);
+
   useEffect(() => {
     setPage(1);
-  }, [activeTab, searchQuery, statusFilter]);
+  }, [activeTab, searchQuery, statusFilter, notifFilter]);
 
   const executeDeleteTarget = useCallback(
     async (target: DeleteTarget) => {
@@ -260,7 +278,7 @@ export default function AdminPortalPage() {
     [refreshData, showToast]
   );
 
-  // Hook native <dialog> close event reliably in React 18
+  // Hook native <dialog> close, cancel, and light-dismiss fallback reliably in React 18
   useEffect(() => {
     const dialog = confirmDialogRef.current;
     if (!dialog) return;
@@ -276,9 +294,45 @@ export default function AdminPortalPage() {
       }
     };
 
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "cancel");
+    };
+
+    let pressedOutside = false;
+    const isOutside = (e: PointerEvent) => {
+      const r = dialog.getBoundingClientRect();
+      return (
+        e.clientX < r.left ||
+        e.clientX > r.right ||
+        e.clientY < r.top ||
+        e.clientY > r.bottom
+      );
+    };
+    const onDown = (e: PointerEvent) => {
+      pressedOutside = isOutside(e);
+    };
+    const onUp = (e: PointerEvent) => {
+      if (pressedOutside && isOutside(e)) {
+        void closeTopLayer(dialog, "cancel");
+      }
+      pressedOutside = false;
+    };
+    const needsFallback = !("closedBy" in HTMLDialogElement.prototype);
+
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
+    if (needsFallback) {
+      dialog.addEventListener("pointerdown", onDown);
+      dialog.addEventListener("pointerup", onUp);
+    }
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
+      if (needsFallback) {
+        dialog.removeEventListener("pointerdown", onDown);
+        dialog.removeEventListener("pointerup", onUp);
+      }
     };
   }, [executeDeleteTarget, loading]);
 
@@ -331,6 +385,22 @@ export default function AdminPortalPage() {
           !dispatchedRequestIds.has(Number(r.requestId))
       ),
     [requests, dispatchedRequestIds]
+  );
+
+  const dispatchReq = useMemo(
+    () =>
+      approvedRequestsForDispatch.find(
+        (r) => Number(r.requestId) === dispatchReqId
+      ) || null,
+    [approvedRequestsForDispatch, dispatchReqId]
+  );
+
+  const filteredNotifications = useMemo(
+    () =>
+      notifFilter === "UNREAD"
+        ? notifications.filter((n) => !n.isRead)
+        : notifications,
+    [notifications, notifFilter]
   );
 
   const filteredEvents = useMemo(() => {
@@ -651,6 +721,32 @@ export default function AdminPortalPage() {
     }
   };
 
+  const handleMarkAllNotificationsRead = async () => {
+    const unreadIds = notifications
+      .filter((n) => !n.isRead && n.notificationId)
+      .map((n) => n.notificationId);
+    if (unreadIds.length === 0 || markingAllRead) return;
+    setMarkingAllRead(true);
+    try {
+      await Promise.allSettled(
+        unreadIds.map((id) =>
+          apiFetch("/api/notifications/read", {
+            method: "PUT",
+            body: JSON.stringify({ notificationId: id }),
+          })
+        )
+      );
+      showToast(
+        `Marked ${unreadIds.length} notification${unreadIds.length === 1 ? "" : "s"} as read.`
+      );
+      await refreshData(true);
+    } catch (err: any) {
+      showToast(err.message || "Failed to mark all notifications read.", "error");
+    } finally {
+      setMarkingAllRead(false);
+    }
+  };
+
   const exportReportCsv = () => {
     const rows = reports[activeReport] || [];
     if (!rows.length) {
@@ -866,6 +962,7 @@ export default function AdminPortalPage() {
       }}
       notificationsList={notifications}
       onMarkNotificationRead={handleMarkNotificationRead}
+      onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
       onSync={() => refreshData(true)}
       syncing={syncing}
       headerActions={
@@ -884,7 +981,7 @@ export default function AdminPortalPage() {
         <div
           role={toast.type === "error" ? "alert" : "status"}
           aria-live="polite"
-          className={`rounded-xl border px-4 py-3 text-xs sm:text-sm font-medium flex items-center justify-between gap-3 no-print ${
+          className={`toast-enter rounded-xl border px-4 py-3 text-xs sm:text-sm font-medium flex items-center justify-between gap-3 no-print ${
             toast.type === "success"
               ? "border-emerald-200 bg-emerald-50 text-emerald-900"
               : "border-rose-200 bg-rose-50 text-rose-900"
@@ -910,10 +1007,21 @@ export default function AdminPortalPage() {
 
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
-        <div className="space-y-6">
-          {/* Executive KPI Summary */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 no-print">
-            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-rose-300 p-4 shadow-xs transition">
+        <div className="space-y-6 tab-panel-enter">
+          {/* Executive KPI Summary (Interactive Quick Navigation, Zero Subtexts) */}
+          <div
+            ref={kpiGridRef}
+            className="stagger-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 no-print"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("events");
+                setStatusFilter("Active");
+                setSearchQuery("");
+              }}
+              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-rose-300 hover:shadow-sm p-4 shadow-xs"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-600">
                   Active Disasters
@@ -923,11 +1031,19 @@ export default function AdminPortalPage() {
                 </div>
               </div>
               <div className="text-2xl font-black text-rose-600 mt-2 tracking-tight tabular-nums">
-                {Number(metrics.activeDisasters ?? 0).toLocaleString()}
+                <AnimatedNumber value={Number(metrics.activeDisasters ?? 0)} />
               </div>
-            </div>
+            </button>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 p-4 shadow-xs transition">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("requests");
+                setStatusFilter("Pending");
+                setSearchQuery("");
+              }}
+              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm p-4 shadow-xs"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-600">
                   Pending Requests
@@ -937,11 +1053,19 @@ export default function AdminPortalPage() {
                 </div>
               </div>
               <div className="text-2xl font-black text-amber-600 mt-2 tracking-tight tabular-nums">
-                {Number(metrics.pendingRequests ?? 0).toLocaleString()}
+                <AnimatedNumber value={Number(metrics.pendingRequests ?? 0)} />
               </div>
-            </div>
+            </button>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 p-4 shadow-xs transition">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("donations");
+                setStatusFilter("ALL");
+                setSearchQuery("");
+              }}
+              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm p-4 shadow-xs"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-600">
                   Donations
@@ -951,11 +1075,19 @@ export default function AdminPortalPage() {
                 </div>
               </div>
               <div className="text-2xl font-black text-blue-600 mt-2 tracking-tight tabular-nums">
-                {Number(metrics.totalDonations ?? 0).toLocaleString()}
+                <AnimatedNumber value={Number(metrics.totalDonations ?? 0)} />
               </div>
-            </div>
+            </button>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 p-4 shadow-xs transition">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("inventory");
+                setStatusFilter("ALL");
+                setSearchQuery("");
+              }}
+              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 hover:shadow-sm p-4 shadow-xs"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-600">
                   Relief Items
@@ -965,11 +1097,19 @@ export default function AdminPortalPage() {
                 </div>
               </div>
               <div className="text-2xl font-black text-indigo-600 mt-2 tracking-tight tabular-nums">
-                {Number(metrics.reliefGoodsCount ?? 0).toLocaleString()}
+                <AnimatedNumber value={Number(metrics.reliefGoodsCount ?? 0)} />
               </div>
-            </div>
+            </button>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-sky-300 p-4 shadow-xs transition">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("stakeholders");
+                setStatusFilter("Volunteer");
+                setSearchQuery("");
+              }}
+              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-sky-300 hover:shadow-sm p-4 shadow-xs"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-600">
                   Volunteers
@@ -979,11 +1119,19 @@ export default function AdminPortalPage() {
                 </div>
               </div>
               <div className="text-2xl font-black text-sky-600 mt-2 tracking-tight tabular-nums">
-                {Number(metrics.registeredVolunteers ?? 0).toLocaleString()}
+                <AnimatedNumber value={Number(metrics.registeredVolunteers ?? 0)} />
               </div>
-            </div>
+            </button>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 p-4 shadow-xs transition">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab("deliveries");
+                setStatusFilter("Delivered");
+                setSearchQuery("");
+              }}
+              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm p-4 shadow-xs"
+            >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-600">
                   Deliveries Done
@@ -993,9 +1141,9 @@ export default function AdminPortalPage() {
                 </div>
               </div>
               <div className="text-2xl font-black text-emerald-600 mt-2 tracking-tight tabular-nums">
-                {Number(metrics.completedDeliveries ?? 0).toLocaleString()}
+                <AnimatedNumber value={Number(metrics.completedDeliveries ?? 0)} />
               </div>
-            </div>
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1092,29 +1240,29 @@ export default function AdminPortalPage() {
                 {inventory.slice(0, 6).map((inv) => {
                   const low = inv.currentStock <= 200;
                   return (
-                    <div
-                      key={inv.inventoryId}
-                      className="py-2.5 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="min-w-0 truncate">
-                        <span className="font-semibold text-slate-900">
-                          {inv.itemName}
-                        </span>
-                        <span className="text-slate-400 ml-2">
-                          {inv.category}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-semibold text-slate-900 tabular-nums">
-                          {Number(inv.currentStock ?? 0).toLocaleString()}{" "}
-                          {inv.unitOfMeasure}
-                        </span>
-                        {low && (
-                          <span className="rounded-full bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 text-xs font-semibold">
-                            Low
+                    <div key={inv.inventoryId} className="py-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 truncate">
+                          <span className="font-semibold text-slate-900">
+                            {inv.itemName}
                           </span>
-                        )}
+                          <span className="text-slate-400 ml-2">
+                            {inv.category}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-semibold text-slate-900 tabular-nums">
+                            {Number(inv.currentStock ?? 0).toLocaleString()}{" "}
+                            {inv.unitOfMeasure}
+                          </span>
+                          {low && (
+                            <span className="rounded-full bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 text-xs font-semibold">
+                              Low
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <StockLevelBar stock={inv.currentStock} className="mt-1.5" />
                     </div>
                   );
                 })}
@@ -1126,7 +1274,7 @@ export default function AdminPortalPage() {
 
       {/* TAB 2: DISASTER EVENTS */}
       {activeTab === "events" && (
-        <div className="space-y-5">
+        <div className="space-y-5 tab-panel-enter">
           <form
             onSubmit={handleCreateEvent}
             className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col sm:flex-row items-end gap-3"
@@ -1146,7 +1294,7 @@ export default function AdminPortalPage() {
                 value={newEventName}
                 onChange={(e) => setNewEventName(e.target.value)}
                 placeholder="e.g. Super Typhoon Pepito"
-                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600"
               />
             </div>
             <div className="flex-1 w-full">
@@ -1164,7 +1312,7 @@ export default function AdminPortalPage() {
                 value={newEventLocation}
                 onChange={(e) => setNewEventLocation(e.target.value)}
                 placeholder="e.g. Ilocos Norte / Cagayan Valley"
-                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600"
               />
             </div>
             <button
@@ -1180,21 +1328,27 @@ export default function AdminPortalPage() {
           <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                {["ALL", "Active", "Resolved"].map((st) => (
-                  <button
-                    key={st}
-                    type="button"
-                    aria-pressed={statusFilter === st}
-                    onClick={() => setStatusFilter(st)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
-                      statusFilter === st
-                        ? "bg-blue-600 text-white shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    {st === "ALL" ? "All" : st}
-                  </button>
-                ))}
+                {["ALL", "Active", "Resolved"].map((st) => {
+                  const count =
+                    st === "ALL"
+                      ? events.length
+                      : events.filter((ev) => ev.status === st).length;
+                  return (
+                    <button
+                      key={st}
+                      type="button"
+                      aria-pressed={statusFilter === st}
+                      onClick={() => setStatusFilter(st)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                        statusFilter === st
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {st === "ALL" ? "All" : st} ({count})
+                    </button>
+                  );
+                })}
               </div>
               <div className="relative">
                 <Search
@@ -1207,7 +1361,7 @@ export default function AdminPortalPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search events or locations..."
-                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
+                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600"
                 />
               </div>
             </div>
@@ -1320,24 +1474,30 @@ export default function AdminPortalPage() {
 
       {/* TAB 3: RELIEF REQUESTS */}
       {activeTab === "requests" && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden tab-panel-enter">
           <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {["ALL", "Pending", "Approved", "Fulfilled"].map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  aria-pressed={statusFilter === st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
-                    statusFilter === st
-                      ? "bg-blue-600 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {st === "ALL" ? "All" : st}
-                </button>
-              ))}
+              {["ALL", "Pending", "Approved", "Fulfilled"].map((st) => {
+                const count =
+                  st === "ALL"
+                    ? requests.length
+                    : requests.filter((r) => r.status === st).length;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    aria-pressed={statusFilter === st}
+                    onClick={() => setStatusFilter(st)}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                      statusFilter === st
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {st === "ALL" ? "All" : st} ({count})
+                  </button>
+                );
+              })}
             </div>
             <div className="relative">
               <Search
@@ -1350,7 +1510,7 @@ export default function AdminPortalPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search organization or disaster..."
-                className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
+                className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600"
               />
             </div>
           </div>
@@ -1502,24 +1662,30 @@ export default function AdminPortalPage() {
 
       {/* TAB 4: DONATIONS LEDGER */}
       {activeTab === "donations" && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden tab-panel-enter">
           <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-              {["ALL", "Pending", "Approved"].map((st) => (
-                <button
-                  key={st}
-                  type="button"
-                  aria-pressed={statusFilter === st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
-                    statusFilter === st
-                      ? "bg-blue-600 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  {st === "ALL" ? "All" : st}
-                </button>
-              ))}
+              {["ALL", "Pending", "Approved"].map((st) => {
+                const count =
+                  st === "ALL"
+                    ? donations.length
+                    : donations.filter((d) => d.status === st).length;
+                return (
+                  <button
+                    key={st}
+                    type="button"
+                    aria-pressed={statusFilter === st}
+                    onClick={() => setStatusFilter(st)}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                      statusFilter === st
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {st === "ALL" ? "All" : st} ({count})
+                  </button>
+                );
+              })}
             </div>
             <div className="relative">
               <Search
@@ -1532,7 +1698,7 @@ export default function AdminPortalPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search donor or event..."
-                className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
+                className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600"
               />
             </div>
           </div>
@@ -1615,6 +1781,17 @@ export default function AdminPortalPage() {
                       </td>
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCertificateDonation(d)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50/80 hover:bg-blue-100 active:scale-[0.98] px-2.5 py-1 text-xs font-semibold text-blue-700 transition"
+                          >
+                            <Award
+                              className="h-3.5 w-3.5 text-blue-600"
+                              aria-hidden="true"
+                            />
+                            <span>Receipt</span>
+                          </button>
                           {d.status === "Pending" && (
                             <button
                               type="button"
@@ -1667,7 +1844,7 @@ export default function AdminPortalPage() {
 
       {/* TAB 5: WAREHOUSE INVENTORY */}
       {activeTab === "inventory" && (
-        <div className="space-y-5">
+        <div className="space-y-5 tab-panel-enter">
           {/* Low Stock Alert */}
           {(() => {
             const criticalOrLowItems = inventory.filter(
@@ -1706,18 +1883,25 @@ export default function AdminPortalPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    setAppealPublished(true);
                     showToast(
                       `Urgent donor appeal published for: ${criticalOrLowItems
                         .slice(0, 3)
                         .map((i) => i.itemName)
                         .join(", ")}.`,
                       "success"
-                    )
-                  }
-                  className="rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] px-4 py-2 text-xs font-semibold text-white shadow-xs transition shrink-0"
+                    );
+                  }}
+                  className={`rounded-xl active:scale-[0.98] px-4 py-2 text-xs font-semibold text-white shadow-xs transition shrink-0 ${
+                    appealPublished
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-rose-600 hover:bg-rose-700"
+                  }`}
                 >
-                  Publish Urgent Donor Appeal
+                  {appealPublished
+                    ? "Urgent Appeal Published"
+                    : "Publish Urgent Donor Appeal"}
                 </button>
               </div>
             );
@@ -1742,7 +1926,7 @@ export default function AdminPortalPage() {
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 placeholder="e.g. Family Hygiene Kit"
-                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600"
               />
             </div>
             <div>
@@ -1757,7 +1941,7 @@ export default function AdminPortalPage() {
                 name="category"
                 value={newItemCategory}
                 onChange={(e) => setNewItemCategory(e.target.value)}
-                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600 focus:outline-none"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600"
               >
                 <option value="Food">Food</option>
                 <option value="Water">Water</option>
@@ -1783,7 +1967,7 @@ export default function AdminPortalPage() {
                 value={newItemUnit}
                 onChange={(e) => setNewItemUnit(e.target.value)}
                 placeholder="Packs"
-                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600"
               />
             </div>
             <div>
@@ -1802,7 +1986,7 @@ export default function AdminPortalPage() {
                 required
                 value={newItemStock}
                 onChange={(e) => setNewItemStock(Number(e.target.value))}
-                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600"
               />
             </div>
             <button
@@ -1819,27 +2003,42 @@ export default function AdminPortalPage() {
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 {["ALL", "CRITICAL ALERT", "LOW STOCK", "SUFFICIENT"].map(
-                  (st) => (
-                    <button
-                      key={st}
-                      type="button"
-                      aria-pressed={statusFilter === st}
-                      onClick={() => setStatusFilter(st)}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
-                        statusFilter === st
-                          ? "bg-blue-600 text-white shadow-xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                    >
-                      {st === "ALL"
-                        ? "All"
-                        : st === "CRITICAL ALERT"
-                        ? "Critical Alert"
-                        : st === "LOW STOCK"
-                        ? "Low Stock"
-                        : "Sufficient"}
-                    </button>
-                  )
+                  (st) => {
+                    const count =
+                      st === "ALL"
+                        ? inventory.length
+                        : inventory.filter((inv) => {
+                            const health =
+                              inv.currentStock <= 200
+                                ? "CRITICAL ALERT"
+                                : inv.currentStock <= 1000
+                                ? "LOW STOCK"
+                                : "SUFFICIENT";
+                            return health === st;
+                          }).length;
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        aria-pressed={statusFilter === st}
+                        onClick={() => setStatusFilter(st)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                          statusFilter === st
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {st === "ALL"
+                          ? "All"
+                          : st === "CRITICAL ALERT"
+                          ? "Critical Alert"
+                          : st === "LOW STOCK"
+                          ? "Low Stock"
+                          : "Sufficient"}{" "}
+                        ({count})
+                      </button>
+                    );
+                  }
                 )}
               </div>
               <div className="relative">
@@ -1853,7 +2052,7 @@ export default function AdminPortalPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search item or category..."
-                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
+                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600"
                 />
               </div>
             </div>
@@ -1921,7 +2120,13 @@ export default function AdminPortalPage() {
                           </td>
                           <td className="px-4 py-3 text-slate-600">{inv.category}</td>
                           <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums whitespace-nowrap">
-                            {Number(inv.currentStock ?? 0).toLocaleString()} {inv.unitOfMeasure}
+                            <div>
+                              {Number(inv.currentStock ?? 0).toLocaleString()} {inv.unitOfMeasure}
+                            </div>
+                            <StockLevelBar
+                              stock={inv.currentStock}
+                              className="mt-1.5 max-w-[110px]"
+                            />
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <StatusBadge status={healthLabel} />
@@ -1956,7 +2161,7 @@ export default function AdminPortalPage() {
                                     [inv.inventoryId]: e.target.value,
                                   }))
                                 }
-                                className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold tabular-nums focus:border-blue-600 focus:outline-none"
+                                className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold tabular-nums focus:border-blue-600"
                               />
                               <button
                                 type="button"
@@ -2003,75 +2208,106 @@ export default function AdminPortalPage() {
 
       {/* TAB 6: DELIVERIES */}
       {activeTab === "deliveries" && (
-        <div className="space-y-5 no-print">
-          <form
-            onSubmit={handleCreateDelivery}
-            className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
-          >
-            <div>
-              <label
-                htmlFor="dispatch-request-id"
-                className="block text-xs font-semibold text-slate-700 mb-1"
-              >
-                Approved Request
-              </label>
-              <select
-                id="dispatch-request-id"
-                name="requestId"
-                required
-                value={dispatchReqId}
-                onChange={(e) => setDispatchReqId(Number(e.target.value))}
-                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600 focus:outline-none"
-              >
-                {approvedRequestsForDispatch.length === 0 ? (
-                  <option value={0}>
-                    No approved requests awaiting dispatch
-                  </option>
-                ) : (
-                  <>
-                    <option value={0}>-- Choose Approved Request --</option>
-                    {approvedRequestsForDispatch.map((r) => (
-                      <option key={r.requestId} value={r.requestId}>
-                        Request {r.requestId} — {r.orgName} ({r.eventName})
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-            </div>
-            <div>
-              <label
-                htmlFor="dispatch-volunteer-id"
-                className="block text-xs font-semibold text-slate-700 mb-1"
-              >
-                Assign Volunteer
-              </label>
-              <select
-                id="dispatch-volunteer-id"
-                name="volunteerId"
-                value={dispatchVolId}
-                onChange={(e) => setDispatchVolId(Number(e.target.value))}
-                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600 focus:outline-none"
-              >
-                <option value={0}>-- Unassigned / Select Volunteer --</option>
-                {volunteers.map((v) => (
-                  <option key={v.volunteerId} value={v.volunteerId}>
-                    {v.volunteerName} ({v.vehicleType} •{" "}
-                    {v.isAvailable ? "Available" : "On Assignment"})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              type="submit"
-              disabled={isBusy || approvedRequestsForDispatch.length === 0}
-              className="min-h-[40px] rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 py-2 px-4 text-xs font-bold text-white transition"
+        <div className="space-y-5 no-print tab-panel-enter">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-3">
+            <form
+              onSubmit={handleCreateDelivery}
+              className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
             >
-              {busyKey === "create-delivery"
-                ? "Dispatching..."
-                : "Dispatch Delivery"}
-            </button>
-          </form>
+              <div>
+                <label
+                  htmlFor="dispatch-request-id"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  Approved Request
+                </label>
+                <select
+                  id="dispatch-request-id"
+                  name="requestId"
+                  required
+                  value={dispatchReqId}
+                  onChange={(e) => setDispatchReqId(Number(e.target.value))}
+                  className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600"
+                >
+                  {approvedRequestsForDispatch.length === 0 ? (
+                    <option value={0}>
+                      No approved requests awaiting dispatch
+                    </option>
+                  ) : (
+                    <>
+                      <option value={0}>-- Choose Approved Request --</option>
+                      {approvedRequestsForDispatch.map((r) => (
+                        <option key={r.requestId} value={r.requestId}>
+                          Request {r.requestId} — {r.orgName} ({r.eventName})
+                        </option>
+                      ))}
+                    </>
+                  )}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="dispatch-volunteer-id"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
+                >
+                  Assign Volunteer
+                </label>
+                <select
+                  id="dispatch-volunteer-id"
+                  name="volunteerId"
+                  value={dispatchVolId}
+                  onChange={(e) => setDispatchVolId(Number(e.target.value))}
+                  className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600"
+                >
+                  <option value={0}>-- Unassigned / Select Volunteer --</option>
+                  {volunteers.map((v) => (
+                    <option key={v.volunteerId} value={v.volunteerId}>
+                      {v.volunteerName} ({v.vehicleType} •{" "}
+                      {v.isAvailable ? "Available" : "On Assignment"})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="submit"
+                disabled={isBusy || approvedRequestsForDispatch.length === 0}
+                className="min-h-[40px] rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 py-2 px-4 text-xs font-bold text-white transition"
+              >
+                {busyKey === "create-delivery"
+                  ? "Dispatching..."
+                  : "Dispatch Delivery"}
+              </button>
+            </form>
+
+            <div
+              aria-hidden={!dispatchReq}
+              className={`expandable-panel ${dispatchReq ? "is-open" : ""}`}
+            >
+              {dispatchReq && (
+                <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="space-y-0.5">
+                    <span className="font-bold text-slate-900">
+                      Cargo Preview: {dispatchReq.orgName}
+                    </span>
+                    <span className="text-slate-500 ml-2">
+                      {dispatchReq.eventName}
+                      {dispatchReq.location ? ` · ${dispatchReq.location}` : ""}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(dispatchReq.items || []).map((it: any, idx: number) => (
+                      <span
+                        key={it.requestItemId || idx}
+                        className="rounded-lg bg-blue-50 border border-blue-200 px-2 py-0.5 text-[11px] font-semibold text-blue-800 tabular-nums"
+                      >
+                        {Number(it.quantity).toLocaleString()} {it.unitOfMeasure} · {it.itemName}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -2110,7 +2346,7 @@ export default function AdminPortalPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search organization, volunteer..."
-                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
+                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600"
                 />
               </div>
             </div>
@@ -2192,6 +2428,7 @@ export default function AdminPortalPage() {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <StatusBadge status={d.deliveryStatus} />
+                          <DeliveryStepBar status={d.deliveryStatus} />
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
@@ -2274,7 +2511,7 @@ export default function AdminPortalPage() {
 
       {/* TAB 7: MASTER STAKEHOLDERS & SYSTEM USERS */}
       {activeTab === "stakeholders" && (
-        <div className="space-y-6">
+        <div className="space-y-6 tab-panel-enter">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
               <h2 className="text-sm font-bold text-slate-900 mb-2">
@@ -2364,21 +2601,30 @@ export default function AdminPortalPage() {
               </h2>
               <div className="flex flex-wrap items-center gap-2">
                 {["ALL", "Admin", "Donor", "Organization", "Volunteer"].map(
-                  (role) => (
-                    <button
-                      key={role}
-                      type="button"
-                      aria-pressed={statusFilter === role}
-                      onClick={() => setStatusFilter(role)}
-                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
-                        statusFilter === role
-                          ? "bg-blue-600 text-white shadow-xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                    >
-                      {role === "ALL" ? "All" : role}
-                    </button>
-                  )
+                  (role) => {
+                    const count =
+                      role === "ALL"
+                        ? users.length
+                        : users.filter(
+                            (u) =>
+                              (u.role || "").toLowerCase() === role.toLowerCase()
+                          ).length;
+                    return (
+                      <button
+                        key={role}
+                        type="button"
+                        aria-pressed={statusFilter === role}
+                        onClick={() => setStatusFilter(role)}
+                        className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                          statusFilter === role
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
+                      >
+                        {role === "ALL" ? "All" : role} ({count})
+                      </button>
+                    );
+                  }
                 )}
                 <div className="relative">
                   <Search
@@ -2391,7 +2637,7 @@ export default function AdminPortalPage() {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search user, username..."
-                    className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-52 focus:border-blue-600 focus:outline-none"
+                    className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-52 focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -2503,22 +2749,59 @@ export default function AdminPortalPage() {
 
       {/* TAB 8: NOTIFICATIONS */}
       {activeTab === "notifications" && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-base font-bold text-slate-900">
-              Notifications
-            </h2>
-            <span className="text-xs font-medium text-slate-500">
-              {unreadCount} unread
-            </span>
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden tab-panel-enter">
+          <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-pressed={notifFilter === "ALL"}
+                onClick={() => setNotifFilter("ALL")}
+                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                  notifFilter === "ALL"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                All ({notifications.length})
+              </button>
+              <button
+                type="button"
+                aria-pressed={notifFilter === "UNREAD"}
+                onClick={() => setNotifFilter("UNREAD")}
+                className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
+                  notifFilter === "UNREAD"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                Unread ({unreadCount})
+              </button>
+            </div>
+
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                disabled={markingAllRead || isBusy}
+                onClick={handleMarkAllNotificationsRead}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 active:scale-[0.98] disabled:opacity-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition"
+              >
+                <Check
+                  className="h-3.5 w-3.5 text-emerald-600"
+                  aria-hidden="true"
+                />
+                {markingAllRead ? "Marking..." : "Mark All Read"}
+              </button>
+            )}
           </div>
           <div className="divide-y divide-slate-100">
-            {notifications.length === 0 ? (
+            {filteredNotifications.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400">
-                No notifications recorded yet.
+                {notifFilter === "UNREAD"
+                  ? "No unread notifications."
+                  : "No notifications recorded yet."}
               </div>
             ) : (
-              slicePage(notifications).map((n) => (
+              slicePage(filteredNotifications).map((n) => (
                 <div
                   key={n.notificationId}
                   className={`p-4 flex items-center justify-between gap-4 ${
@@ -2554,7 +2837,7 @@ export default function AdminPortalPage() {
             )}
           </div>
           <PaginationControls
-            totalItems={notifications.length}
+            totalItems={filteredNotifications.length}
             page={page}
             pageSize={PAGE_SIZE}
             onPageChange={setPage}
@@ -2564,7 +2847,7 @@ export default function AdminPortalPage() {
 
       {/* TAB 9: REPORTS */}
       {activeTab === "reports" && (
-        <div className="space-y-4">
+        <div className="space-y-4 tab-panel-enter">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
             <div className="flex flex-wrap gap-2">
               <button
@@ -2624,7 +2907,10 @@ export default function AdminPortalPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+          <div
+            key={activeReport}
+            className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs tab-panel-enter"
+          >
             {/* Printable Official Header (Shows when printing) */}
             <div className="hidden print:block mb-6 border-b-2 border-slate-900 pb-4">
               <div className="flex items-center justify-between">
@@ -2926,7 +3212,8 @@ export default function AdminPortalPage() {
         ref={confirmDialogRef}
         aria-labelledby="confirm-delete-title"
         aria-describedby="confirm-delete-desc"
-        className="p-0 rounded-2xl border border-slate-200 bg-white shadow-xl max-w-md w-[calc(100%-2rem)] m-auto text-slate-900"
+        {...({ closedby: "any" } as any)}
+        className="p-0 rounded-2xl border border-slate-200 bg-white shadow-xl max-w-md w-[calc(100%-2rem)] m-auto text-slate-900 no-print"
       >
         <div className="p-6 space-y-4">
           <div className="space-y-1.5">
@@ -2942,18 +3229,22 @@ export default function AdminPortalPage() {
                 : "Are you sure you want to delete this record?"}
             </p>
           </div>
-          <form method="dialog" className="flex justify-end gap-2 pt-2">
+          <form
+            method="dialog"
+            onSubmit={(e) => handleAnimatedDialogSubmit(e, confirmDialogRef.current)}
+            className="flex justify-end gap-2 pt-2"
+          >
             <button
               ref={cancelBtnRef}
               value="cancel"
               autoFocus
-              className="rounded-xl border border-slate-300 bg-white hover:bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-700"
+              className="rounded-xl border border-slate-300 bg-white hover:bg-slate-100 active:scale-[0.98] px-4 py-2 text-xs font-semibold text-slate-700 transition"
             >
               Cancel
             </button>
             <button
               value="delete"
-              className="rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-2 text-xs font-semibold text-white"
+              className="rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] px-4 py-2 text-xs font-semibold text-white transition"
             >
               Delete Record
             </button>
@@ -2977,6 +3268,15 @@ export default function AdminPortalPage() {
           driverName={selectedWaybill.volunteerName}
           vehicle={selectedWaybill.vehicleType}
           onClose={() => setSelectedWaybill(null)}
+        />
+      )}
+
+      {/* Official Donation Receipt Modal */}
+      {selectedCertificateDonation && (
+        <DonationCertificateModal
+          donation={selectedCertificateDonation}
+          donorName={selectedCertificateDonation.donorName}
+          onClose={() => setSelectedCertificateDonation(null)}
         />
       )}
     </PortalSidebarLayout>

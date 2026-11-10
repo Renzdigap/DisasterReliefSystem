@@ -33,6 +33,14 @@ import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
 import { DeliveryWaybillModal } from "@/components/DisasterEnhancements";
 import {
+  AnimatedNumber,
+  DeliveryStepBar,
+  StockLevelBar,
+  closeTopLayer,
+  handleAnimatedDialogSubmit,
+  useSiblingStagger,
+} from "@/components/InteractiveMotion";
+import {
   apiFetch,
   getSavedSession,
   getCachedData,
@@ -179,6 +187,9 @@ export default function OrganizationPortalPage() {
   const pendingReceiptRef = useRef<any>(null);
   const receiptDialogRef = useRef<HTMLDialogElement | null>(null);
   const keepReceiptBtnRef = useRef<HTMLButtonElement | null>(null);
+  const kpiGridRef = useRef<HTMLDivElement | null>(null);
+
+  useSiblingStagger(kpiGridRef, !loading);
 
   const nextRowKey = () => {
     const k = `row-${rowSeqRef.current}`;
@@ -345,7 +356,7 @@ export default function OrganizationPortalPage() {
     [loadOrgPortal, session, showBanner]
   );
 
-  // Hook native <dialog> close + light-dismiss fallback for Cancel Request dialog
+  // Hook native <dialog> close, cancel, and light-dismiss fallback for Cancel Request dialog
   useEffect(() => {
     const dialog = cancelDialogRef.current;
     if (!dialog) return;
@@ -361,7 +372,13 @@ export default function OrganizationPortalPage() {
       }
     };
 
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "cancel");
+    };
+
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
 
     let pressedOutside = false;
     const isOutside = (e: PointerEvent) => {
@@ -377,7 +394,9 @@ export default function OrganizationPortalPage() {
       pressedOutside = isOutside(e);
     };
     const onUp = (e: PointerEvent) => {
-      if (pressedOutside && isOutside(e)) dialog.close();
+      if (pressedOutside && isOutside(e)) {
+        void closeTopLayer(dialog, "cancel");
+      }
       pressedOutside = false;
     };
     const needsFallback = !("closedBy" in HTMLDialogElement.prototype);
@@ -388,6 +407,7 @@ export default function OrganizationPortalPage() {
 
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
       if (needsFallback) {
         dialog.removeEventListener("pointerdown", onDown);
         dialog.removeEventListener("pointerup", onUp);
@@ -395,7 +415,7 @@ export default function OrganizationPortalPage() {
     };
   }, [executeCancelRequest, loading]);
 
-  // Hook native <dialog> close + light-dismiss fallback for Confirm Receipt dialog
+  // Hook native <dialog> close, cancel, and light-dismiss fallback for Confirm Receipt dialog
   useEffect(() => {
     const dialog = receiptDialogRef.current;
     if (!dialog) return;
@@ -411,7 +431,13 @@ export default function OrganizationPortalPage() {
       }
     };
 
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "cancel");
+    };
+
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
 
     let pressedOutside = false;
     const isOutside = (e: PointerEvent) => {
@@ -427,7 +453,9 @@ export default function OrganizationPortalPage() {
       pressedOutside = isOutside(e);
     };
     const onUp = (e: PointerEvent) => {
-      if (pressedOutside && isOutside(e)) dialog.close();
+      if (pressedOutside && isOutside(e)) {
+        void closeTopLayer(dialog, "cancel");
+      }
       pressedOutside = false;
     };
     const needsFallback = !("closedBy" in HTMLDialogElement.prototype);
@@ -438,6 +466,7 @@ export default function OrganizationPortalPage() {
 
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
       if (needsFallback) {
         dialog.removeEventListener("pointerdown", onDown);
         dialog.removeEventListener("pointerup", onUp);
@@ -450,6 +479,7 @@ export default function OrganizationPortalPage() {
     setCancelTarget(reqItem);
     const dialog = cancelDialogRef.current;
     if (dialog) {
+      dialog.removeAttribute("data-closing");
       dialog.returnValue = "";
       if (!dialog.open) dialog.showModal();
       keepRequestBtnRef.current?.focus();
@@ -461,6 +491,7 @@ export default function OrganizationPortalPage() {
     setReceiptTarget(delItem);
     const dialog = receiptDialogRef.current;
     if (dialog) {
+      dialog.removeAttribute("data-closing");
       dialog.returnValue = "";
       if (!dialog.open) dialog.showModal();
       keepReceiptBtnRef.current?.focus();
@@ -973,6 +1004,7 @@ export default function OrganizationPortalPage() {
       onOpenNotifications={() => setActiveTab("notifications")}
       notificationsList={notifications}
       onMarkNotificationRead={handleMarkNotificationRead}
+      onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
       onSync={() => session?.user && loadOrgPortal(session.user.userId, true)}
       syncing={refreshing}
     >
@@ -981,7 +1013,7 @@ export default function OrganizationPortalPage() {
           <div
             role={banner.type === "error" ? "alert" : "status"}
             aria-live="polite"
-            className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 text-xs sm:text-sm font-medium ${
+            className={`toast-enter rounded-xl border px-4 py-3 flex items-center justify-between gap-3 text-xs sm:text-sm font-medium ${
               banner.type === "success"
                 ? "bg-emerald-50 border-emerald-200 text-emerald-900"
                 : "bg-rose-50 border-rose-200 text-rose-900"
@@ -1013,14 +1045,17 @@ export default function OrganizationPortalPage() {
         )}
 
         {/* Clickable KPI Cards (Clean, No Subtexts) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div
+          ref={kpiGridRef}
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-grid"
+        >
           <button
             type="button"
             onClick={() => {
               setStatusFilter("ALL");
               setActiveTab("history");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -1031,7 +1066,7 @@ export default function OrganizationPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-slate-900 tracking-tight tabular-nums">
-              {requests.length.toLocaleString()}
+              <AnimatedNumber value={requests.length} />
             </p>
           </button>
 
@@ -1041,7 +1076,7 @@ export default function OrganizationPortalPage() {
               setStatusFilter("Pending");
               setActiveTab("history");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -1052,7 +1087,7 @@ export default function OrganizationPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-amber-600 tracking-tight tabular-nums">
-              {pendingRequestsCount.toLocaleString()}
+              <AnimatedNumber value={pendingRequestsCount} />
             </p>
           </button>
 
@@ -1062,7 +1097,7 @@ export default function OrganizationPortalPage() {
               setStatusFilter("Approved");
               setActiveTab("history");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -1073,7 +1108,7 @@ export default function OrganizationPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-emerald-600 tracking-tight tabular-nums">
-              {approvedCount.toLocaleString()}
+              <AnimatedNumber value={approvedCount} />
             </p>
           </button>
 
@@ -1083,7 +1118,7 @@ export default function OrganizationPortalPage() {
               setDelStatusFilter("ALL");
               setActiveTab("deliveries");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -1094,14 +1129,14 @@ export default function OrganizationPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-indigo-600 tracking-tight tabular-nums">
-              {deliveries.length.toLocaleString()}
+              <AnimatedNumber value={deliveries.length} />
             </p>
           </button>
         </div>
 
         {/* TAB 1: NEW REQUEST BUILDER */}
         {activeTab === "request" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 tab-panel-enter">
             <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 isolated-panel">
               <div className="flex items-center justify-between gap-3 mb-4">
                 <h2 className="text-base font-bold text-slate-900">
@@ -1444,7 +1479,7 @@ export default function OrganizationPortalPage() {
                         key={item.inventoryId || item.goodId}
                         className="rounded-xl border border-slate-200/80 p-3 flex items-center justify-between gap-2 bg-slate-50/50 hover:bg-slate-50 transition"
                       >
-                        <div className="min-w-0 space-y-1">
+                        <div className="min-w-0 flex-1 space-y-1">
                           <div className="text-xs font-semibold text-slate-900 truncate">
                             {item.itemName}
                           </div>
@@ -1455,6 +1490,7 @@ export default function OrganizationPortalPage() {
                               {stock.toLocaleString()} {item.unitOfMeasure}
                             </span>
                           </div>
+                          <StockLevelBar stock={stock} className="mt-1.5" />
                           <div>
                             <StatusBadge status={health} />
                           </div>
@@ -1482,7 +1518,7 @@ export default function OrganizationPortalPage() {
 
         {/* TAB 2: REQUESTS HISTORY */}
         {activeTab === "history" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden tab-panel-enter">
             <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 {["ALL", "Pending", "Approved", "Fulfilled"].map((st) => {
@@ -1639,7 +1675,7 @@ export default function OrganizationPortalPage() {
 
         {/* TAB 3: INCOMING DELIVERIES */}
         {activeTab === "deliveries" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden tab-panel-enter">
             <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 {["ALL", "Pending", "In Transit", "Delivered"].map((st) => {
@@ -1777,6 +1813,7 @@ export default function OrganizationPortalPage() {
                         </td>
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <StatusBadge status={del.deliveryStatus} />
+                          <DeliveryStepBar status={del.deliveryStatus} />
                         </td>
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">
                           <div className="inline-flex items-center justify-end gap-1.5">
@@ -1825,7 +1862,7 @@ export default function OrganizationPortalPage() {
 
         {/* TAB 4: NOTIFICATIONS */}
         {activeTab === "notifications" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden tab-panel-enter">
             <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <button
@@ -1940,7 +1977,13 @@ export default function OrganizationPortalPage() {
                 : "Are you sure you want to cancel this pending relief request?"}
             </p>
           </div>
-          <form method="dialog" className="flex justify-end gap-2 pt-2">
+          <form
+            method="dialog"
+            onSubmit={(e) =>
+              handleAnimatedDialogSubmit(e, cancelDialogRef.current)
+            }
+            className="flex justify-end gap-2 pt-2"
+          >
             <button
               ref={keepRequestBtnRef}
               value="cancel"
@@ -1981,7 +2024,13 @@ export default function OrganizationPortalPage() {
                 : "Confirm that this shipment has arrived cleanly at your evacuation site."}
             </p>
           </div>
-          <form method="dialog" className="flex justify-end gap-2 pt-2">
+          <form
+            method="dialog"
+            onSubmit={(e) =>
+              handleAnimatedDialogSubmit(e, receiptDialogRef.current)
+            }
+            className="flex justify-end gap-2 pt-2"
+          >
             <button
               ref={keepReceiptBtnRef}
               value="cancel"

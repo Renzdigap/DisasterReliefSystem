@@ -25,6 +25,7 @@ import {
   Smartphone,
   Sparkles,
 } from "lucide-react";
+import { closeTopLayer, useSiblingStagger } from "@/components/InteractiveMotion";
 
 // ==========================================
 // 1. DISASTER SEVERITY & PAGASA ALERT HELPER
@@ -134,7 +135,12 @@ export function DonationCertificateModal({
       dialog.returnValue = "";
       onCloseRef.current();
     };
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "");
+    };
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
 
     // Light-dismiss fallback when <dialog closedby="any"> is unsupported
     let pressedOutside = false;
@@ -152,7 +158,7 @@ export function DonationCertificateModal({
     };
     const handlePointerUp = (e: PointerEvent) => {
       if (pressedOutside && isOutsideDialog(e)) {
-        dialog.close();
+        void closeTopLayer(dialog, "");
       }
       pressedOutside = false;
     };
@@ -165,6 +171,7 @@ export function DonationCertificateModal({
 
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
       if (needsClosedByFallback) {
         dialog.removeEventListener("pointerdown", handlePointerDown);
         dialog.removeEventListener("pointerup", handlePointerUp);
@@ -180,7 +187,7 @@ export function DonationCertificateModal({
   const requestClose = () => {
     const dialog = dialogRef.current;
     if (dialog && dialog.open) {
-      dialog.close();
+      void closeTopLayer(dialog, "");
     } else {
       onClose();
     }
@@ -445,7 +452,12 @@ export function DeliveryWaybillModal({
       dialog.returnValue = "";
       onCloseRef.current();
     };
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "");
+    };
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
 
     // Light-dismiss fallback when <dialog closedby="any"> is unsupported
     let pressedOutside = false;
@@ -463,7 +475,7 @@ export function DeliveryWaybillModal({
     };
     const handlePointerUp = (e: PointerEvent) => {
       if (pressedOutside && isOutsideDialog(e)) {
-        dialog.close();
+        void closeTopLayer(dialog, "");
       }
       pressedOutside = false;
     };
@@ -476,6 +488,7 @@ export function DeliveryWaybillModal({
 
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
       if (needsClosedByFallback) {
         dialog.removeEventListener("pointerdown", handlePointerDown);
         dialog.removeEventListener("pointerup", handlePointerUp);
@@ -491,7 +504,7 @@ export function DeliveryWaybillModal({
   const requestClose = () => {
     const dialog = dialogRef.current;
     if (dialog && dialog.open) {
-      dialog.close();
+      void closeTopLayer(dialog, "");
     } else {
       onClose();
     }
@@ -918,10 +931,22 @@ export function PublicAidTrackerModal({
       SAMPLE_TRACKING_RECORDS.find((r) => r.code === initialCode) ||
       SAMPLE_TRACKING_RECORDS[0]
   );
+  const [selectedStepIdx, setSelectedStepIdx] = useState<number>(
+    () =>
+      (SAMPLE_TRACKING_RECORDS.find((r) => r.code === initialCode) ||
+        SAMPLE_TRACKING_RECORDS[0]).currentStage - 1
+  );
   const [notFoundMsg, setNotFoundMsg] = useState("");
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const timelineRef = useRef<HTMLOListElement>(null);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
+
+  useSiblingStagger(timelineRef, selectedRecord.code);
+
+  useEffect(() => {
+    setSelectedStepIdx(Math.max(0, selectedRecord.currentStage - 1));
+  }, [selectedRecord.code, selectedRecord.currentStage]);
 
   useEffect(() => {
     onCloseRef.current = onClose;
@@ -938,7 +963,12 @@ export function PublicAidTrackerModal({
     const handleNativeClose = () => {
       onCloseRef.current();
     };
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "");
+    };
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
 
     // Light-dismiss fallback when <dialog closedby="any"> is unsupported
     let pressedOutside = false;
@@ -956,7 +986,7 @@ export function PublicAidTrackerModal({
     };
     const handlePointerUp = (e: PointerEvent) => {
       if (pressedOutside && isOutsideDialog(e)) {
-        dialog.close();
+        void closeTopLayer(dialog, "");
       }
       pressedOutside = false;
     };
@@ -969,6 +999,7 @@ export function PublicAidTrackerModal({
 
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
       if (needsClosedByFallback) {
         dialog.removeEventListener("pointerdown", handlePointerDown);
         dialog.removeEventListener("pointerup", handlePointerUp);
@@ -982,7 +1013,7 @@ export function PublicAidTrackerModal({
   const requestClose = () => {
     const dialog = dialogRef.current;
     if (dialog && dialog.open) {
-      dialog.close();
+      void closeTopLayer(dialog, "");
     } else {
       onClose();
     }
@@ -1023,6 +1054,13 @@ export function PublicAidTrackerModal({
       : selectedRecord.status === "In Transit"
       ? "bg-amber-100 text-amber-800 border-amber-200"
       : "bg-blue-100 text-blue-800 border-blue-200";
+  const progressPct = Math.round((selectedRecord.currentStage / 4) * 100);
+  const progressFillClass =
+    selectedRecord.status === "Delivered"
+      ? "bg-emerald-500"
+      : selectedRecord.status === "In Transit"
+      ? "bg-amber-500"
+      : "bg-blue-600";
 
   return (
     <dialog
@@ -1077,7 +1115,7 @@ export function PublicAidTrackerModal({
                   if (notFoundMsg) setNotFoundMsg("");
                 }}
                 placeholder="Enter Tracking ID (e.g. DRRMS-WB-2024-00001)"
-                className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-600 focus:outline-none"
+                className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-600 focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1"
               />
             </div>
             <button
@@ -1097,12 +1135,12 @@ export function PublicAidTrackerModal({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {SAMPLE_TRACKING_RECORDS.map((rec) => {
               const isSelected = selectedRecord.code === rec.code;
-              const dotClass =
+              const statusTextClass =
                 rec.status === "Delivered"
-                  ? "bg-emerald-500"
+                  ? "text-emerald-700"
                   : rec.status === "In Transit"
-                  ? "bg-amber-500"
-                  : "bg-blue-500";
+                  ? "text-amber-700"
+                  : "text-blue-700";
 
               return (
                 <button
@@ -1114,7 +1152,7 @@ export function PublicAidTrackerModal({
                     setSelectedRecord(rec);
                     setNotFoundMsg("");
                   }}
-                  className={`rounded-xl border px-3 py-2 text-left transition active:scale-[0.98] ${
+                  className={`interactive-lift rounded-xl border px-3 py-2 text-left transition ${
                     isSelected
                       ? "border-blue-600 bg-blue-50 text-slate-900 shadow-xs ring-1 ring-blue-600"
                       : "border-slate-200 bg-slate-50/70 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
@@ -1123,12 +1161,8 @@ export function PublicAidTrackerModal({
                   <span className="block font-mono text-xs font-bold truncate">
                     {rec.code}
                   </span>
-                  <span className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                    <span
-                      className={`h-2 w-2 rounded-full shrink-0 ${dotClass}`}
-                      aria-hidden="true"
-                    />
-                    <span>{rec.status}</span>
+                  <span className={`mt-0.5 block text-xs font-semibold ${statusTextClass}`}>
+                    {rec.status}
                   </span>
                 </button>
               );
@@ -1157,6 +1191,19 @@ export function PublicAidTrackerModal({
             </span>
           </div>
 
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-slate-600">
+              <span>Stage {selectedRecord.currentStage} of 4</span>
+              <span className="tabular-nums">{progressPct}%</span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-slate-200/80 overflow-hidden">
+              <div
+                style={{ width: `${progressPct}%` }}
+                className={`h-full rounded-full ${progressFillClass} transition-[width] duration-300 ease-out`}
+              />
+            </div>
+          </div>
+
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pt-3 border-t border-slate-200/80 text-xs">
             <div>
               <dt className="font-semibold text-slate-500">Recipient</dt>
@@ -1179,51 +1226,76 @@ export function PublicAidTrackerModal({
           </dl>
         </section>
 
-        {/* Clean 4-Step Delivery Progress Timeline (Zero Redundant Text) */}
+        {/* Interactive 4-Step Delivery Progress Timeline */}
         <section aria-label="Delivery progress" className="space-y-3">
           <h4 className="text-sm font-bold text-slate-900">
             Delivery Progress
           </h4>
-          <ol className="space-y-2">
+          <ol key={selectedRecord.code} ref={timelineRef} className="space-y-2 stagger-grid">
             {selectedRecord.steps.map((step, index) => {
               const stepNumber = index + 1;
               const isDone = stepNumber <= selectedRecord.currentStage;
               const isCurrent = stepNumber === selectedRecord.currentStage;
+              const isExpanded = selectedStepIdx === index;
 
               return (
                 <li
                   key={step.label}
-                  className={`flex items-start justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition ${
-                    isCurrent
-                      ? "border-blue-300 bg-blue-50/70"
+                  className={`rounded-xl border transition ${
+                    isExpanded
+                      ? "border-blue-400 bg-blue-50/75 shadow-xs"
+                      : isCurrent
+                      ? "border-blue-300 bg-blue-50/60"
                       : isDone
                       ? "border-emerald-200/80 bg-emerald-50/35"
-                      : "border-slate-200/80 bg-slate-50/50 opacity-70"
+                      : "border-slate-200/80 bg-slate-50/50 opacity-75"
                   }`}
                 >
-                  <div className="flex items-start gap-3 min-w-0">
-                    <span
-                      aria-hidden="true"
-                      className={`mt-0.5 h-6 w-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${
-                        isDone
-                          ? "bg-emerald-600 text-white"
-                          : "bg-slate-200 text-slate-600"
-                      }`}
-                    >
-                      {isDone ? "✓" : stepNumber}
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    onClick={() =>
+                      setSelectedStepIdx((prev) => (prev === index ? -1 : index))
+                    }
+                    className="w-full text-left px-3.5 py-2.5 flex items-start justify-between gap-3 rounded-xl"
+                  >
+                    <div className="flex items-start gap-3 min-w-0">
+                      <span
+                        aria-hidden="true"
+                        className={`mt-0.5 h-6 w-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 transition-colors ${
+                          isDone
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-200 text-slate-600"
+                        }`}
+                      >
+                        {isDone ? "✓" : stepNumber}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                          {step.label}
+                        </p>
+                        <p className="text-xs text-slate-600 mt-0.5">
+                          {step.detail}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-medium text-slate-500 whitespace-nowrap shrink-0">
+                      {step.time}
                     </span>
-                    <div className="min-w-0">
-                      <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
-                        {step.label}
-                      </p>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        {step.detail}
-                      </p>
+                  </button>
+                  <div
+                    aria-hidden={!isExpanded}
+                    className={`expandable-panel ${isExpanded ? "is-open" : ""}`}
+                  >
+                    <div className="px-3.5 pb-2.5 pl-12 text-[11px] font-medium text-slate-600 border-t border-slate-200/60 pt-2">
+                      Checkpoint {stepNumber}:{" "}
+                      <span className="font-semibold text-slate-800">
+                        {isDone ? "Verified" : "Scheduled"}
+                      </span>
+                      {" · "}
+                      <span>{step.time}</span>
                     </div>
                   </div>
-                  <span className="text-xs font-medium text-slate-500 whitespace-nowrap shrink-0">
-                    {step.time}
-                  </span>
                 </li>
               );
             })}
@@ -1280,7 +1352,12 @@ export function EmergencyBroadcastModal({
       dialog.returnValue = "";
       onCloseRef.current();
     };
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "");
+    };
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
 
     let pressedOutside = false;
     const isOutsideDialog = (e: PointerEvent) => {
@@ -1297,7 +1374,7 @@ export function EmergencyBroadcastModal({
     };
     const handlePointerUp = (e: PointerEvent) => {
       if (pressedOutside && isOutsideDialog(e)) {
-        dialog.close();
+        void closeTopLayer(dialog, "");
       }
       pressedOutside = false;
     };
@@ -1310,6 +1387,7 @@ export function EmergencyBroadcastModal({
 
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
       if (needsClosedByFallback) {
         dialog.removeEventListener("pointerdown", handlePointerDown);
         dialog.removeEventListener("pointerup", handlePointerUp);
@@ -1323,7 +1401,7 @@ export function EmergencyBroadcastModal({
   const requestClose = () => {
     const dialog = dialogRef.current;
     if (dialog && dialog.open) {
-      dialog.close();
+      void closeTopLayer(dialog, "");
     } else {
       onClose();
     }

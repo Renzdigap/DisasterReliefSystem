@@ -54,6 +54,7 @@ interface PortalSidebarLayoutProps {
   onOpenNotifications?: () => void;
   notificationsList?: NotificationItem[];
   onMarkNotificationRead?: (id: any) => void;
+  onMarkAllNotificationsRead?: () => void;
   onSync?: () => void;
   syncing?: boolean;
   headerActions?: React.ReactNode;
@@ -72,6 +73,7 @@ export function PortalSidebarLayout({
   onOpenNotifications,
   notificationsList,
   onMarkNotificationRead,
+  onMarkAllNotificationsRead,
   onSync,
   syncing = false,
   headerActions,
@@ -143,11 +145,12 @@ export function PortalSidebarLayout({
                   <button
                     key={item.id}
                     type="button"
+                    aria-current={isActive ? "page" : undefined}
                     onClick={() => onSelectTab(item.id)}
-                    className={`group flex items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all shrink-0 lg:w-full active:scale-[0.98] ${
+                    className={`group flex items-center justify-between gap-2.5 rounded-xl px-3 py-2.5 text-xs sm:text-sm font-semibold transition-all duration-150 shrink-0 lg:w-full active:scale-[0.98] ${
                       isActive
                         ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25"
-                        : "text-slate-600 hover:bg-slate-100/90 hover:text-slate-900"
+                        : "text-slate-600 hover:bg-slate-100/90 hover:text-slate-900 hover:translate-x-0.5"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
@@ -304,18 +307,29 @@ export function PortalSidebarLayout({
                       className="fixed inset-0 z-40"
                       onClick={() => setShowNotificationDrawer(false)}
                     />
-                    <div className="absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                      <div className="flex items-center justify-between border-b border-slate-100 pb-2 px-1">
-                        <div className="flex items-center gap-2">
-                          <Bell className="h-4 w-4 text-blue-600" />
-                          <span className="text-xs font-bold text-slate-900">
+                    <div className="notif-flyout absolute right-0 mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl z-50">
+                      <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-2 px-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Bell className="h-4 w-4 text-blue-600 shrink-0" aria-hidden="true" />
+                          <span className="text-xs font-bold text-slate-900 truncate">
                             Disaster Relief Alerts
                           </span>
                         </div>
                         {unreadCount > 0 && (
-                          <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-600">
-                            {unreadCount} unread
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {onMarkAllNotificationsRead && (
+                              <button
+                                type="button"
+                                onClick={onMarkAllNotificationsRead}
+                                className="rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 active:scale-95 px-2 py-0.5 text-[10px] font-bold text-blue-700 transition"
+                              >
+                                Mark all
+                              </button>
+                            )}
+                            <span className="rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-600">
+                              {unreadCount} unread
+                            </span>
+                          </div>
                         )}
                       </div>
 

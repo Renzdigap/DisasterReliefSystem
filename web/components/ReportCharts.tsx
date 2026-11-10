@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
   TrendingUp,
   PackageCheck,
@@ -13,11 +13,17 @@ import {
   Award,
   Layers,
 } from "lucide-react";
+import { AnimatedNumber, useSiblingStagger } from "@/components/InteractiveMotion";
 
 // ==========================================
 // 1. DISASTER OPERATIONAL SUMMARY CHARTS
 // ==========================================
 export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const kpiRef = useRef<HTMLDivElement | null>(null);
+  useSiblingStagger(kpiRef, rows?.length ?? 0);
+
   if (!rows || rows.length === 0) return null;
 
   const totalEvents = rows.length;
@@ -37,6 +43,10 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
     totalRequests > 0
       ? Math.min(100, Math.round((totalDeliveries / totalRequests) * 100))
       : 0;
+
+  const activeFocusIdx = hoveredIdx !== null ? hoveredIdx : selectedIdx;
+  const selectedRow =
+    selectedIdx !== null && rows[selectedIdx] ? rows[selectedIdx] : null;
 
   // Find max value across all metrics to scale SVG bars properly
   const maxValue = Math.max(
@@ -66,66 +76,69 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
   return (
     <div className="space-y-4 mb-6">
       {/* Executive Statistical KPI Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
+      <div
+        ref={kpiRef}
+        className="grid grid-cols-2 lg:grid-cols-5 gap-3 stagger-grid"
+      >
+        <div className="interactive-lift rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Calamities</span>
-            <AlertTriangle className="h-4 w-4 text-blue-600" />
+            <AlertTriangle className="h-4 w-4 text-blue-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-slate-900">
-            {totalEvents}
+          <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
+            <AnimatedNumber value={totalEvents} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-blue-700">
             Tracked Disaster Zones
           </div>
         </div>
 
-        <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Donations</span>
-            <HeartHandshake className="h-4 w-4 text-blue-600" />
+            <HeartHandshake className="h-4 w-4 text-blue-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-blue-700">
-            {totalDonations}
+          <div className="mt-1.5 text-2xl font-black text-blue-700 tabular-nums">
+            <AnimatedNumber value={totalDonations} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-blue-600">
             Total Pledges Logged
           </div>
         </div>
 
-        <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Requisitions</span>
-            <TrendingUp className="h-4 w-4 text-amber-600" />
+            <TrendingUp className="h-4 w-4 text-amber-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-amber-700">
-            {totalRequests}
+          <div className="mt-1.5 text-2xl font-black text-amber-700 tabular-nums">
+            <AnimatedNumber value={totalRequests} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-amber-600">
             LGU Relief Demands
           </div>
         </div>
 
-        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Dispatched</span>
-            <Truck className="h-4 w-4 text-emerald-600" />
+            <Truck className="h-4 w-4 text-emerald-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-emerald-700">
-            {totalDeliveries}
+          <div className="mt-1.5 text-2xl font-black text-emerald-700 tabular-nums">
+            <AnimatedNumber value={totalDeliveries} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-emerald-600">
             Fulfilled Missions
           </div>
         </div>
 
-        <div className="col-span-2 lg:col-span-1 rounded-xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift col-span-2 lg:col-span-1 rounded-xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Fulfillment</span>
-            <CheckCircle2 className="h-4 w-4 text-indigo-600" />
+            <CheckCircle2 className="h-4 w-4 text-indigo-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-indigo-700">
-            {fulfillmentRate}%
+          <div className="mt-1.5 text-2xl font-black text-indigo-700 tabular-nums">
+            <AnimatedNumber value={fulfillmentRate} suffix="%" />
           </div>
           <div className="mt-1 text-[11px] font-medium text-indigo-600">
             Demand-to-Delivery Ratio
@@ -138,14 +151,14 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
-              <BarChart3 className="h-4 w-4" />
+              <BarChart3 className="h-4 w-4" aria-hidden="true" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">
                 Disaster Event Resource Distribution (Comparison Analysis)
               </h3>
               <p className="text-[11px] text-slate-500">
-                Side-by-side volume comparison of Pledges vs Demands vs Field Deliveries
+                Click any calamity bar group to inspect exact fulfillment breakdown
               </p>
             </div>
           </div>
@@ -173,6 +186,7 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             className="w-full h-auto min-w-[580px] max-h-[300px]"
             preserveAspectRatio="xMidYMid meet"
+            onMouseLeave={() => setHoveredIdx(null)}
           >
             {/* Background grid lines */}
             {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
@@ -225,15 +239,47 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
               );
 
               const baseY = paddingTop + availableHeight;
-
-              // Truncate name for axis label
               const shortLabel =
                 r.eventName.length > 14
                   ? r.eventName.slice(0, 12) + "…"
                   : r.eventName;
 
+              const isFocused = activeFocusIdx === idx;
+              const groupOpacity =
+                activeFocusIdx === null || isFocused ? 1 : 0.42;
+
               return (
-                <g key={r.eventId || idx} className="cursor-pointer">
+                <g
+                  key={r.eventId || idx}
+                  tabIndex={0}
+                  role="button"
+                  aria-pressed={selectedIdx === idx}
+                  aria-label={`${r.eventName}: ${dVal} donations, ${rVal} requests, ${delVal} deliveries`}
+                  onClick={() =>
+                    setSelectedIdx((prev) => (prev === idx ? null : idx))
+                  }
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedIdx((prev) => (prev === idx ? null : idx));
+                    }
+                  }}
+                  onMouseEnter={() => setHoveredIdx(idx)}
+                  style={{ opacity: groupOpacity, transition: "opacity 160ms ease" }}
+                  className="cursor-pointer"
+                >
+                  {/* Selection highlight backdrop */}
+                  <rect
+                    x={groupCenterX - groupWidth * 0.44}
+                    y={paddingTop - 6}
+                    width={groupWidth * 0.88}
+                    height={availableHeight + 36}
+                    rx="8"
+                    fill={isFocused ? "#EFF6FF" : "transparent"}
+                    stroke={selectedIdx === idx ? "#93C5FD" : "transparent"}
+                    strokeWidth="1"
+                  />
+
                   {/* Donations Bar (Blue) */}
                   <rect
                     x={groupCenterX - barWidth * 1.6}
@@ -242,6 +288,7 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
                     height={dHeight}
                     rx="3"
                     fill="#2563EB"
+                    className="chart-bar-grow"
                   />
                   {dVal > 0 && (
                     <text
@@ -264,6 +311,7 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
                     height={rHeight}
                     rx="3"
                     fill="#F59E0B"
+                    className="chart-bar-grow"
                   />
                   {rVal > 0 && (
                     <text
@@ -286,6 +334,7 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
                     height={delHeight}
                     rx="3"
                     fill="#059669"
+                    className="chart-bar-grow"
                   />
                   {delVal > 0 && (
                     <text
@@ -306,8 +355,8 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
                     y={baseY + 20}
                     textAnchor="middle"
                     fontSize="10"
-                    fill="#334155"
-                    fontWeight="600"
+                    fill={isFocused ? "#1E3A8A" : "#334155"}
+                    fontWeight={isFocused ? "700" : "600"}
                   >
                     {shortLabel}
                   </text>
@@ -315,6 +364,43 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
               );
             })}
           </svg>
+        </div>
+
+        {/* Interactive Calamity Drilldown Strip */}
+        <div
+          aria-hidden={!selectedRow}
+          className={`expandable-panel no-print ${
+            selectedRow ? "is-open mt-3" : ""
+          }`}
+        >
+          {selectedRow && (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/70 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex flex-wrap items-center gap-2 text-slate-700">
+                <span className="font-bold text-slate-900">
+                  {selectedRow.eventName}
+                </span>
+                <span className="text-slate-400">&middot;</span>
+                <span>{selectedRow.location}</span>
+                <span className="text-slate-400">&middot;</span>
+                <span className="font-semibold text-blue-700 tabular-nums">
+                  {Number(selectedRow.totalDonations || 0)} pledges
+                </span>
+                <span className="font-semibold text-amber-700 tabular-nums">
+                  {Number(selectedRow.totalRequests || 0)} requests
+                </span>
+                <span className="font-semibold text-emerald-700 tabular-nums">
+                  {Number(selectedRow.totalDeliveries || 0)} deliveries
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedIdx(null)}
+                className="font-semibold text-blue-700 hover:underline"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -325,6 +411,10 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
 // 2. INVENTORY HEALTH & STOCK CHARTS
 // ==========================================
 export function InventoryHealthCharts({ rows }: { rows: any[] }) {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const kpiRef = useRef<HTMLDivElement | null>(null);
+  useSiblingStagger(kpiRef, rows?.length ?? 0);
+
   if (!rows || rows.length === 0) return null;
 
   // Aggregate Category Data
@@ -341,9 +431,13 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
 
   rows.forEach((r) => {
     const cat = r.category || "General";
-    const stock = Number(
-      String(r.currentStockFormatted || r.currentStock || "0").replace(/,/g, "")
-    ) || 0;
+    const stock =
+      Number(
+        String(r.currentStockFormatted || r.currentStock || "0").replace(
+          /,/g,
+          ""
+        )
+      ) || 0;
     const donated = Number(r.totalDonatedQty || 0);
     const requested = Number(r.totalRequestedQty || 0);
 
@@ -383,69 +477,89 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
     General: "#64748B",
   };
 
+  const displayedTopRows = selectedCategory
+    ? rows.filter((r) => (r.category || "General") === selectedCategory).slice(0, 4)
+    : rows.slice(0, 4);
+
+  const maxStockRow = Math.max(
+    1,
+    ...rows.map(
+      (item) =>
+        Number(
+          String(item.currentStockFormatted || item.currentStock || "0").replace(
+            /,/g,
+            ""
+          )
+        ) || 1
+    )
+  );
+
   return (
     <div className="space-y-4 mb-6">
       {/* Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
+      <div
+        ref={kpiRef}
+        className="grid grid-cols-2 lg:grid-cols-5 gap-3 stagger-grid"
+      >
+        <div className="interactive-lift rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Tracked SKUs</span>
-            <Layers className="h-4 w-4 text-blue-600" />
+            <Layers className="h-4 w-4 text-blue-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-slate-900">
-            {rows.length}
+          <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
+            <AnimatedNumber value={rows.length} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-blue-700">
             Relief Commodity Types
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Total Units</span>
-            <PackageCheck className="h-4 w-4 text-slate-700" />
+            <PackageCheck className="h-4 w-4 text-slate-700" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-slate-900">
-            {totalStockCount.toLocaleString()}
+          <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
+            <AnimatedNumber value={totalStockCount} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-slate-600">
             Central Warehouse Stock
           </div>
         </div>
 
-        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Cumulative Inflow</span>
-            <HeartHandshake className="h-4 w-4 text-emerald-600" />
+            <HeartHandshake className="h-4 w-4 text-emerald-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-emerald-700">
-            +{totalDonatedCount.toLocaleString()}
+          <div className="mt-1.5 text-2xl font-black text-emerald-700 tabular-nums">
+            <AnimatedNumber value={totalDonatedCount} prefix="+" />
           </div>
           <div className="mt-1 text-[11px] font-medium text-emerald-600">
             Donated Inflow Units
           </div>
         </div>
 
-        <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Cumulative Outflow</span>
-            <Truck className="h-4 w-4 text-amber-600" />
+            <Truck className="h-4 w-4 text-amber-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-amber-700">
-            -{totalRequestedCount.toLocaleString()}
+          <div className="mt-1.5 text-2xl font-black text-amber-700 tabular-nums">
+            <AnimatedNumber value={totalRequestedCount} prefix="-" />
           </div>
           <div className="mt-1 text-[11px] font-medium text-amber-600">
             Requested Outflow Units
           </div>
         </div>
 
-        <div className="col-span-2 lg:col-span-1 rounded-xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift col-span-2 lg:col-span-1 rounded-xl border border-rose-100 bg-gradient-to-br from-white to-rose-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Stock Alerts</span>
-            <AlertTriangle className="h-4 w-4 text-rose-600" />
+            <AlertTriangle className="h-4 w-4 text-rose-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-rose-700">
-            {criticalCount + lowCount}
+          <div className="mt-1.5 text-2xl font-black text-rose-700 tabular-nums">
+            <AnimatedNumber value={criticalCount + lowCount} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-rose-600">
             {criticalCount} Critical &bull; {lowCount} Low Stock
@@ -457,18 +571,29 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Category Breakdown Card */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
-              <PieChart className="h-4 w-4" />
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
+                <PieChart className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Warehouse Stock Distribution by Commodity Class
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Select a class below to focus top commodity bars
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                Warehouse Stock Distribution by Commodity Class
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Proportion of units stockpiled across essential relief categories
-              </p>
-            </div>
+            {selectedCategory && (
+              <button
+                type="button"
+                onClick={() => setSelectedCategory(null)}
+                className="text-[11px] font-semibold text-blue-600 hover:underline no-print shrink-0"
+              >
+                Show all
+              </button>
+            )}
           </div>
 
           {/* Segmented Volume Progress Bar */}
@@ -476,39 +601,66 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
             <div className="h-4 w-full rounded-full overflow-hidden flex bg-slate-100 p-0.5">
               {categories.map((c) => {
                 const color = categoryColors[c.name] || "#64748B";
+                const isDimmed =
+                  selectedCategory !== null && selectedCategory !== c.name;
                 return (
-                  <div
+                  <button
                     key={c.name}
-                    style={{ width: `${Math.max(c.pct, 4)}%`, backgroundColor: color }}
-                    className="h-full first:rounded-l-full last:rounded-r-full transition-all"
+                    type="button"
+                    aria-label={`${c.name}: ${c.stock.toLocaleString()} units (${c.pct}%)`}
+                    aria-pressed={selectedCategory === c.name}
+                    onClick={() =>
+                      setSelectedCategory((prev) =>
+                        prev === c.name ? null : c.name
+                      )
+                    }
+                    style={{
+                      width: `${Math.max(c.pct, 4)}%`,
+                      backgroundColor: color,
+                      opacity: isDimmed ? 0.35 : 1,
+                    }}
+                    className="h-full first:rounded-l-full last:rounded-r-full transition-all duration-200"
                     title={`${c.name}: ${c.stock.toLocaleString()} units (${c.pct}%)`}
                   />
                 );
               })}
             </div>
 
-            {/* Category breakdown pills */}
+            {/* Category breakdown buttons */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
               {categories.map((c) => {
                 const color = categoryColors[c.name] || "#64748B";
+                const isSelected = selectedCategory === c.name;
                 return (
-                  <div
+                  <button
                     key={c.name}
-                    className="rounded-xl border border-slate-100 bg-slate-50/70 p-2 text-xs flex items-center justify-between"
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() =>
+                      setSelectedCategory((prev) =>
+                        prev === c.name ? null : c.name
+                      )
+                    }
+                    className={`rounded-xl border p-2 text-xs flex items-center justify-between transition active:scale-[0.98] ${
+                      isSelected
+                        ? "border-blue-400 bg-blue-50/70 ring-1 ring-blue-300"
+                        : "border-slate-100 bg-slate-50/70 hover:border-slate-300 hover:bg-white"
+                    }`}
                   >
                     <div className="flex items-center gap-1.5 min-w-0">
                       <span
-                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        className="h-2.5 w-2.5 rounded-sm shrink-0"
                         style={{ backgroundColor: color }}
+                        aria-hidden="true"
                       />
                       <span className="font-semibold text-slate-800 truncate">
                         {c.name}
                       </span>
                     </div>
-                    <span className="font-extrabold text-slate-900 ml-1">
+                    <span className="font-extrabold text-slate-900 ml-1 tabular-nums">
                       {c.pct}%
                     </span>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -519,11 +671,12 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
         <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-700">
-              <BarChart3 className="h-4 w-4" />
+              <BarChart3 className="h-4 w-4" aria-hidden="true" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">
-                Top Stock Commodities &amp; Net Inflow Balance
+                Top Stock Commodities{" "}
+                {selectedCategory ? `(${selectedCategory})` : ""}
               </h3>
               <p className="text-[11px] text-slate-500">
                 Current inventory levels vs cumulative distributed demand
@@ -532,18 +685,17 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
           </div>
 
           <div className="space-y-3">
-            {rows.slice(0, 4).map((r) => {
-              const stock = Number(
-                String(r.currentStockFormatted || r.currentStock || "0").replace(/,/g, "")
-              ) || 0;
-              const maxStockRow = Math.max(
-                ...rows.map((item) =>
-                  Number(
-                    String(item.currentStockFormatted || item.currentStock || "0").replace(/,/g, "")
-                  ) || 1
-                )
+            {displayedTopRows.map((r) => {
+              const stock =
+                Number(
+                  String(
+                    r.currentStockFormatted || r.currentStock || "0"
+                  ).replace(/,/g, "")
+                ) || 0;
+              const barPercent = Math.min(
+                100,
+                Math.round((stock / maxStockRow) * 100)
               );
-              const barPercent = Math.min(100, Math.round((stock / maxStockRow) * 100));
 
               return (
                 <div key={r.goodId} className="space-y-1">
@@ -551,14 +703,14 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
                     <span className="text-slate-800 truncate max-w-[200px]">
                       {r.itemName}
                     </span>
-                    <span className="text-slate-900 font-extrabold">
+                    <span className="text-slate-900 font-extrabold tabular-nums">
                       {stock.toLocaleString()} units
                     </span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                     <div
                       style={{ width: `${barPercent}%` }}
-                      className={`h-full rounded-full ${
+                      className={`h-full rounded-full transition-[width] duration-300 ease-out ${
                         (r.stockHealth || "").toLowerCase().includes("critical")
                           ? "bg-rose-500"
                           : (r.stockHealth || "").toLowerCase() === "low stock"
@@ -581,6 +733,10 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
 // 3. DONOR CONTRIBUTION & IMPACT CHARTS
 // ==========================================
 export function DonorImpactCharts({ rows }: { rows: any[] }) {
+  const [selectedSector, setSelectedSector] = useState<string | null>(null);
+  const kpiRef = useRef<HTMLDivElement | null>(null);
+  useSiblingStagger(kpiRef, rows?.length ?? 0);
+
   if (!rows || rows.length === 0) return null;
 
   const totalDonors = rows.length;
@@ -613,8 +769,11 @@ export function DonorImpactCharts({ rows }: { rows: any[] }) {
         : 0,
   }));
 
-  // Top 5 Donors by volume
-  const topDonors = [...rows]
+  // Top 5 Donors by volume (filtered by sector when selected)
+  const leaderboardSource = selectedSector
+    ? rows.filter((r) => (r.donorType || "Individual") === selectedSector)
+    : rows;
+  const topDonors = [...leaderboardSource]
     .sort(
       (a, b) =>
         Number(b.totalItemsDonated || 0) - Number(a.totalItemsDonated || 0)
@@ -629,53 +788,56 @@ export function DonorImpactCharts({ rows }: { rows: any[] }) {
   return (
     <div className="space-y-4 mb-6">
       {/* Metric Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
+      <div
+        ref={kpiRef}
+        className="grid grid-cols-2 lg:grid-cols-4 gap-3 stagger-grid"
+      >
+        <div className="interactive-lift rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Benefactors</span>
-            <HeartHandshake className="h-4 w-4 text-blue-600" />
+            <HeartHandshake className="h-4 w-4 text-blue-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-slate-900">
-            {totalDonors}
+          <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
+            <AnimatedNumber value={totalDonors} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-blue-700">
             Registered Active Donors
           </div>
         </div>
 
-        <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Pledges</span>
-            <TrendingUp className="h-4 w-4 text-indigo-600" />
+            <TrendingUp className="h-4 w-4 text-indigo-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-indigo-700">
-            {totalDonations}
+          <div className="mt-1.5 text-2xl font-black text-indigo-700 tabular-nums">
+            <AnimatedNumber value={totalDonations} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-indigo-600">
             Verified Submissions
           </div>
         </div>
 
-        <div className="rounded-xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Volume</span>
-            <PackageCheck className="h-4 w-4 text-emerald-600" />
+            <PackageCheck className="h-4 w-4 text-emerald-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-emerald-700">
-            {totalItemsDonated.toLocaleString()}
+          <div className="mt-1.5 text-2xl font-black text-emerald-700 tabular-nums">
+            <AnimatedNumber value={totalItemsDonated} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-emerald-600">
             Relief Units Contributed
           </div>
         </div>
 
-        <div className="rounded-xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/60 p-3.5 shadow-xs">
+        <div className="interactive-lift rounded-xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/60 p-3.5 shadow-xs">
           <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
             <span>Average / Donor</span>
-            <Award className="h-4 w-4 text-amber-600" />
+            <Award className="h-4 w-4 text-amber-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-amber-700">
-            {avgItemsPerDonor.toLocaleString()}
+          <div className="mt-1.5 text-2xl font-black text-amber-700 tabular-nums">
+            <AnimatedNumber value={avgItemsPerDonor} />
           </div>
           <div className="mt-1 text-[11px] font-medium text-amber-600">
             Avg Units Per Benefactor
@@ -687,24 +849,39 @@ export function DonorImpactCharts({ rows }: { rows: any[] }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Top Donors Leaderboard */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-            <div className="p-1.5 rounded-lg bg-amber-50 text-amber-700">
-              <Award className="h-4 w-4" />
+          <div className="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-amber-50 text-amber-700">
+                <Award className="h-4 w-4" aria-hidden="true" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Top Humanitarian Benefactors{" "}
+                  {selectedSector ? `(${selectedSector})` : ""}
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Leaderboard of contributors by total relief goods pledged
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                Top Humanitarian Benefactors (Volume Ranking)
-              </h3>
-              <p className="text-[11px] text-slate-500">
-                Leaderboard of contributors by total relief goods pledged
-              </p>
-            </div>
+            {selectedSector && (
+              <button
+                type="button"
+                onClick={() => setSelectedSector(null)}
+                className="text-[11px] font-semibold text-blue-600 hover:underline no-print shrink-0"
+              >
+                All sectors
+              </button>
+            )}
           </div>
 
           <div className="space-y-3">
             {topDonors.map((d, rank) => {
               const donated = Number(d.totalItemsDonated || 0);
-              const barPercent = Math.min(100, Math.round((donated / maxDonated) * 100));
+              const barPercent = Math.min(
+                100,
+                Math.round((donated / maxDonated) * 100)
+              );
               const medal =
                 rank === 0
                   ? "🥇"
@@ -728,14 +905,14 @@ export function DonorImpactCharts({ rows }: { rows: any[] }) {
                         {d.donorType}
                       </span>
                     </div>
-                    <span className="text-emerald-700 font-extrabold shrink-0 ml-2">
+                    <span className="text-emerald-700 font-extrabold shrink-0 ml-2 tabular-nums">
                       {donated.toLocaleString()} units
                     </span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
                     <div
                       style={{ width: `${barPercent}%` }}
-                      className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600"
+                      className="h-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 transition-[width] duration-300 ease-out"
                     />
                   </div>
                 </div>
@@ -748,42 +925,54 @@ export function DonorImpactCharts({ rows }: { rows: any[] }) {
         <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <div className="p-1.5 rounded-lg bg-blue-50 text-blue-700">
-              <PieChart className="h-4 w-4" />
+              <PieChart className="h-4 w-4" aria-hidden="true" />
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-900">
                 Contribution Share by Donor Classification
               </h3>
               <p className="text-[11px] text-slate-500">
-                Comparison of Individual, Corporate, and Organization support
+                Click a sector to filter the benefactor leaderboard
               </p>
             </div>
           </div>
 
           <div className="space-y-3 pt-1">
             {donorTypes.map((dt) => {
+              const isSelected = selectedSector === dt.type;
               return (
-                <div
+                <button
                   key={dt.type}
-                  className="rounded-xl border border-slate-100 bg-slate-50/70 p-3 flex items-center justify-between"
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() =>
+                    setSelectedSector((prev) =>
+                      prev === dt.type ? null : dt.type
+                    )
+                  }
+                  className={`w-full text-left rounded-xl border p-3 flex items-center justify-between transition active:scale-[0.98] ${
+                    isSelected
+                      ? "border-indigo-400 bg-indigo-50/70 ring-1 ring-indigo-300"
+                      : "border-slate-100 bg-slate-50/70 hover:border-slate-300 hover:bg-white"
+                  }`}
                 >
                   <div className="space-y-0.5 min-w-0">
                     <div className="text-xs font-bold text-slate-900">
                       {dt.type} Sector
                     </div>
-                    <div className="text-[11px] text-slate-500">
+                    <div className="text-[11px] text-slate-500 tabular-nums">
                       {dt.count} Benefactors &bull; {dt.items.toLocaleString()} units
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-base font-black text-indigo-700">
+                    <div className="text-base font-black text-indigo-700 tabular-nums">
                       {dt.pct}%
                     </div>
                     <div className="text-[10px] text-slate-400 font-medium">
                       of total aid
                     </div>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

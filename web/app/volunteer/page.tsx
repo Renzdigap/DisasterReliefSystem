@@ -29,6 +29,13 @@ import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
 import { DeliveryWaybillModal } from "@/components/DisasterEnhancements";
 import {
+  AnimatedNumber,
+  DeliveryStepBar,
+  closeTopLayer,
+  handleAnimatedDialogSubmit,
+  useSiblingStagger,
+} from "@/components/InteractiveMotion";
+import {
   apiFetch,
   getSavedSession,
   saveSession,
@@ -152,6 +159,9 @@ export default function VolunteerPortalPage() {
   // Notifications filter
   const [notifFilter, setNotifFilter] = useState<"ALL" | "UNREAD">("ALL");
   const [markingAllRead, setMarkingAllRead] = useState(false);
+  const kpiGridRef = useRef<HTMLDivElement | null>(null);
+
+  useSiblingStagger(kpiGridRef, !loading);
 
   const showBanner = useCallback(
     (text: string, type: "success" | "error" = "success") => {
@@ -309,7 +319,7 @@ export default function VolunteerPortalPage() {
     [loadVolunteerPortal, session, showBanner]
   );
 
-  // Hook native <dialog> close + light-dismiss fallback for Confirm Handover dialog
+  // Hook native <dialog> close, cancel, and light-dismiss fallback for Confirm Handover dialog
   useEffect(() => {
     const dialog = handoverDialogRef.current;
     if (!dialog) return;
@@ -325,7 +335,13 @@ export default function VolunteerPortalPage() {
       }
     };
 
+    const handleNativeCancel = (e: Event) => {
+      e.preventDefault();
+      void closeTopLayer(dialog, "cancel");
+    };
+
     dialog.addEventListener("close", handleNativeClose);
+    dialog.addEventListener("cancel", handleNativeCancel);
 
     let pressedOutside = false;
     const isOutside = (e: PointerEvent) => {
@@ -341,7 +357,9 @@ export default function VolunteerPortalPage() {
       pressedOutside = isOutside(e);
     };
     const onUp = (e: PointerEvent) => {
-      if (pressedOutside && isOutside(e)) dialog.close();
+      if (pressedOutside && isOutside(e)) {
+        void closeTopLayer(dialog, "cancel");
+      }
       pressedOutside = false;
     };
     const needsFallback = !("closedBy" in HTMLDialogElement.prototype);
@@ -352,6 +370,7 @@ export default function VolunteerPortalPage() {
 
     return () => {
       dialog.removeEventListener("close", handleNativeClose);
+      dialog.removeEventListener("cancel", handleNativeCancel);
       if (needsFallback) {
         dialog.removeEventListener("pointerdown", onDown);
         dialog.removeEventListener("pointerup", onUp);
@@ -364,6 +383,7 @@ export default function VolunteerPortalPage() {
     setHandoverTarget(del);
     const dialog = handoverDialogRef.current;
     if (dialog) {
+      dialog.removeAttribute("data-closing");
       dialog.returnValue = "";
       if (!dialog.open) dialog.showModal();
       cancelHandoverBtnRef.current?.focus();
@@ -612,6 +632,7 @@ export default function VolunteerPortalPage() {
       onOpenNotifications={() => setActiveTab("notifications")}
       notificationsList={notifications}
       onMarkNotificationRead={handleMarkNotificationRead}
+      onMarkAllNotificationsRead={handleMarkAllNotificationsRead}
       onSync={() =>
         session?.user && loadVolunteerPortal(session.user.userId, true)
       }
@@ -622,7 +643,7 @@ export default function VolunteerPortalPage() {
           <div
             role={banner.type === "error" ? "alert" : "status"}
             aria-live="polite"
-            className={`rounded-xl border px-4 py-3 flex items-center justify-between gap-3 text-xs sm:text-sm font-medium ${
+            className={`toast-enter rounded-xl border px-4 py-3 flex items-center justify-between gap-3 text-xs sm:text-sm font-medium ${
               banner.type === "success"
                 ? "bg-emerald-50 border-emerald-200 text-emerald-900"
                 : "bg-rose-50 border-rose-200 text-rose-900"
@@ -654,14 +675,17 @@ export default function VolunteerPortalPage() {
         )}
 
         {/* Clickable KPI Cards (Clean, No Subtexts or Dots) */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div
+          ref={kpiGridRef}
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-grid"
+        >
           <button
             type="button"
             onClick={() => {
               setStatusFilter("ALL");
               setActiveTab("deliveries");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -672,7 +696,7 @@ export default function VolunteerPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-slate-900 tracking-tight tabular-nums">
-              {deliveries.length.toLocaleString()}
+              <AnimatedNumber value={deliveries.length} />
             </p>
           </button>
 
@@ -688,7 +712,7 @@ export default function VolunteerPortalPage() {
               );
               setActiveTab("deliveries");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -699,7 +723,7 @@ export default function VolunteerPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-amber-600 tracking-tight tabular-nums">
-              {activeDispatchCount.toLocaleString()}
+              <AnimatedNumber value={activeDispatchCount} />
             </p>
           </button>
 
@@ -709,7 +733,7 @@ export default function VolunteerPortalPage() {
               setStatusFilter("Delivered");
               setActiveTab("deliveries");
             }}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -720,14 +744,14 @@ export default function VolunteerPortalPage() {
               </div>
             </div>
             <p className="mt-2 text-2xl font-black text-emerald-600 tracking-tight tabular-nums">
-              {deliveredCount.toLocaleString()}
+              <AnimatedNumber value={deliveredCount} />
             </p>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("profile")}
-            className="text-left rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 hover:shadow-sm active:scale-[0.98] p-4 shadow-xs transition"
+            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 hover:shadow-sm p-4 shadow-xs"
           >
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-600">
@@ -738,7 +762,7 @@ export default function VolunteerPortalPage() {
               </div>
             </div>
             <p
-              className={`mt-2 text-xl sm:text-2xl font-black tracking-tight ${
+              className={`mt-2 text-xl sm:text-2xl font-black tracking-tight transition-colors duration-200 ${
                 isAvailable ? "text-emerald-600" : "text-amber-600"
               }`}
             >
@@ -748,10 +772,16 @@ export default function VolunteerPortalPage() {
         </div>
 
         {/* Quick Duty Availability Switch Bar */}
-        <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div
+          className={`rounded-2xl border px-4 py-3 shadow-xs flex flex-wrap items-center justify-between gap-3 transition-colors duration-200 ${
+            isAvailable
+              ? "border-emerald-200/80 bg-emerald-50/30"
+              : "border-amber-200/80 bg-amber-50/25"
+          }`}
+        >
           <div className="flex items-center gap-2.5 text-xs">
             <span className="font-semibold text-slate-700">Assigned Fleet:</span>
-            <span className="rounded-lg bg-slate-100 px-2.5 py-1 font-semibold text-slate-800">
+            <span className="rounded-lg bg-white/90 border border-slate-200/70 px-2.5 py-1 font-semibold text-slate-800">
               {vehicleType}
             </span>
             <StatusBadge
@@ -777,7 +807,7 @@ export default function VolunteerPortalPage() {
 
         {/* TAB 1: ASSIGNED DELIVERIES */}
         {activeTab === "deliveries" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden tab-panel-enter">
             <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-2">
                 {["ALL", "Pending", "In Transit", "Delivered"].map((st) => {
@@ -917,6 +947,7 @@ export default function VolunteerPortalPage() {
                         </td>
                         <td className="py-3.5 px-4 whitespace-nowrap">
                           <StatusBadge status={del.deliveryStatus} />
+                          <DeliveryStepBar status={del.deliveryStatus} />
                         </td>
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">
                           <div className="inline-flex items-center justify-end gap-1.5">
@@ -984,7 +1015,7 @@ export default function VolunteerPortalPage() {
 
         {/* TAB 2: VEHICLE PROFILE */}
         {activeTab === "profile" && (
-          <div className="max-w-xl bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6">
+          <div className="max-w-xl bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 sm:p-6 tab-panel-enter">
             <h2 className="text-base font-bold text-slate-900 mb-4">
               Vehicle &amp; Duty Profile
             </h2>
@@ -1133,7 +1164,7 @@ export default function VolunteerPortalPage() {
 
         {/* TAB 3: NOTIFICATIONS */}
         {activeTab === "notifications" && (
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden tab-panel-enter">
             <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <button
@@ -1248,7 +1279,13 @@ export default function VolunteerPortalPage() {
                 : "Confirm that this relief shipment has been physically handed over at the destination site."}
             </p>
           </div>
-          <form method="dialog" className="flex justify-end gap-2 pt-2">
+          <form
+            method="dialog"
+            onSubmit={(e) =>
+              handleAnimatedDialogSubmit(e, handoverDialogRef.current)
+            }
+            className="flex justify-end gap-2 pt-2"
+          >
             <button
               ref={cancelHandoverBtnRef}
               value="cancel"

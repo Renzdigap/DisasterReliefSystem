@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ShieldCheck,
@@ -24,11 +24,31 @@ import {
 } from "lucide-react";
 import { apiFetch, saveSession, UserSession } from "@/lib/api";
 import { PublicAidTrackerModal } from "@/components/DisasterEnhancements";
+import { AnimatedNumber, useSiblingStagger } from "@/components/InteractiveMotion";
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [showTracker, setShowTracker] = useState(false);
+
+  const pillarsRef = useRef<HTMLDivElement>(null);
+  const metricsRef = useRef<HTMLDivElement>(null);
+  const switcherRef = useRef<HTMLDivElement>(null);
+  const frontFaceRef = useRef<HTMLDivElement>(null);
+  const backFaceRef = useRef<HTMLDivElement>(null);
+
+  useSiblingStagger(pillarsRef);
+  useSiblingStagger(metricsRef);
+  useSiblingStagger(switcherRef, mode);
+
+  useEffect(() => {
+    if (frontFaceRef.current) {
+      frontFaceRef.current.inert = mode !== "login";
+    }
+    if (backFaceRef.current) {
+      backFaceRef.current.inert = mode !== "register";
+    }
+  }, [mode]);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -283,7 +303,7 @@ export default function LoginPage() {
             </div>
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-blue-500/20 border border-blue-400/30 text-[11px] font-semibold text-blue-300 shadow-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                <ShieldCheck className="h-3.5 w-3.5 text-blue-300" aria-hidden="true" />
                 Republic of the Philippines
               </div>
               <p className="text-base sm:text-lg font-bold tracking-tight text-white leading-tight">
@@ -302,47 +322,79 @@ export default function LoginPage() {
             </h1>
           </div>
 
-          {/* Value Pillars (Clean icon + title) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-blue-400/40 p-3.5 backdrop-blur-md transition-all duration-300 shadow-lg group flex items-center gap-3 sm:block">
+          {/* Value Pillars (Interactive shortcuts, clean icon + title) */}
+          <div ref={pillarsRef} className="stagger-grid grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowTracker(true)}
+              className="interactive-lift text-left rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-blue-400/40 p-3.5 backdrop-blur-md transition-[background-color,border-color,transform] duration-200 shadow-lg group flex items-center gap-3 sm:block"
+            >
               <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
                 <PackageCheck className="h-4.5 w-4.5" aria-hidden="true" />
               </div>
               <h2 className="text-xs font-bold text-white">Verified Aid Tracking</h2>
-            </div>
+            </button>
 
-            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-emerald-400/40 p-3.5 backdrop-blur-md transition-all duration-300 shadow-lg group flex items-center gap-3 sm:block">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("register");
+                setRegStep("form");
+                setRegRole("Volunteer");
+                setErrorMsg("");
+                setSuccessMsg("");
+              }}
+              className="interactive-lift text-left rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-emerald-400/40 p-3.5 backdrop-blur-md transition-[background-color,border-color,transform] duration-200 shadow-lg group flex items-center gap-3 sm:block"
+            >
               <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
                 <Truck className="h-4.5 w-4.5" aria-hidden="true" />
               </div>
               <h2 className="text-xs font-bold text-white">Volunteer Dispatch</h2>
-            </div>
+            </button>
 
-            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-amber-400/40 p-3.5 backdrop-blur-md transition-all duration-300 shadow-lg group flex items-center gap-3 sm:block">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("register");
+                setRegStep("form");
+                setRegRole("Organization");
+                setErrorMsg("");
+                setSuccessMsg("");
+              }}
+              className="interactive-lift text-left rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-amber-400/40 p-3.5 backdrop-blur-md transition-[background-color,border-color,transform] duration-200 shadow-lg group flex items-center gap-3 sm:block"
+            >
               <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-amber-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
                 <Building2 className="h-4.5 w-4.5" aria-hidden="true" />
               </div>
               <h2 className="text-xs font-bold text-white">LGU Requisitions</h2>
-            </div>
+            </button>
           </div>
 
           {/* Live DRRM Operational Metrics Strip (Matches the Live Dashboard Stats!) */}
           <div className="pt-2">
-            <div className="grid grid-cols-4 gap-2 rounded-2xl bg-white/[0.06] border border-white/15 p-3 backdrop-blur-md shadow-inner">
+            <div ref={metricsRef} className="stagger-grid grid grid-cols-4 gap-2 rounded-2xl bg-white/[0.06] border border-white/15 p-3 backdrop-blur-md shadow-inner">
               <div className="text-center">
-                <p className="text-base sm:text-lg font-black text-rose-400">5</p>
+                <p className="text-base sm:text-lg font-black text-rose-400 tabular-nums">
+                  <AnimatedNumber value={5} />
+                </p>
                 <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Calamities</p>
               </div>
               <div className="text-center border-l border-white/10">
-                <p className="text-base sm:text-lg font-black text-blue-400">13</p>
+                <p className="text-base sm:text-lg font-black text-blue-400 tabular-nums">
+                  <AnimatedNumber value={13} />
+                </p>
                 <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Pledges</p>
               </div>
               <div className="text-center border-l border-white/10">
-                <p className="text-base sm:text-lg font-black text-amber-400">10</p>
+                <p className="text-base sm:text-lg font-black text-amber-400 tabular-nums">
+                  <AnimatedNumber value={10} />
+                </p>
                 <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Stock Items</p>
               </div>
               <div className="text-center border-l border-white/10">
-                <p className="text-base sm:text-lg font-black text-emerald-400">10</p>
+                <p className="text-base sm:text-lg font-black text-emerald-400 tabular-nums">
+                  <AnimatedNumber value={10} />
+                </p>
                 <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Fleet Units</p>
               </div>
             </div>
@@ -417,6 +469,8 @@ export default function LoginPage() {
             >
               {/* FRONT FACE: Sign In */}
               <div
+                ref={frontFaceRef}
+                aria-hidden={mode !== "login"}
                 className={`w-full bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_-10px_rgba(30,58,138,0.12),0_1px_3px_rgba(0,0,0,0.05)] p-7 sm:p-8 space-y-5 backface-hidden ${
                   mode === "register"
                     ? "absolute top-0 left-0 pointer-events-none"
@@ -427,12 +481,14 @@ export default function LoginPage() {
                 <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100/90 p-1.5 border border-slate-200/80 shadow-inner">
                   <button
                     type="button"
+                    aria-pressed={mode === "login"}
                     className="rounded-xl py-2.5 text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 transition-all"
                   >
                     Sign In
                   </button>
                   <button
                     type="button"
+                    aria-pressed={mode === "register"}
                     onClick={() => {
                       setMode("register");
                       setErrorMsg("");
@@ -448,7 +504,7 @@ export default function LoginPage() {
                   <div
                     role="alert"
                     aria-live="assertive"
-                    className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
+                    className="toast-enter rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
                   >
                     <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" aria-hidden="true" />
                     <span>{errorMsg}</span>
@@ -459,7 +515,7 @@ export default function LoginPage() {
                   <div
                     role="status"
                     aria-live="polite"
-                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
+                    className="toast-enter rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
                     <span>{successMsg}</span>
@@ -494,7 +550,7 @@ export default function LoginPage() {
                           if (errorMsg) setErrorMsg("");
                         }}
                         placeholder="Enter username or verified email"
-                        className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-3.5 py-2.5 text-base sm:text-sm text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition shadow-sm"
+                        className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-3.5 py-2.5 text-base sm:text-sm text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                       />
                     </div>
                   </div>
@@ -523,7 +579,7 @@ export default function LoginPage() {
                           if (errorMsg) setErrorMsg("");
                         }}
                         placeholder="Enter password"
-                        className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-11 py-2.5 text-base sm:text-sm text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition shadow-sm"
+                        className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-11 py-2.5 text-base sm:text-sm text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                       />
                       <button
                         type="button"
@@ -555,12 +611,12 @@ export default function LoginPage() {
                   <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
                     1-Click Role Switcher
                   </p>
-                  <div className="grid grid-cols-4 gap-2">
+                  <div ref={switcherRef} className="stagger-grid grid grid-cols-4 gap-2">
                     <button
                       type="button"
                       disabled={submitting}
                       onClick={() => handleQuickDemo("admin", "admin123")}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-blue-200/90 bg-gradient-to-b from-blue-50/80 to-blue-100/50 hover:from-blue-100 hover:to-blue-200/70 hover:border-blue-500 active:scale-[0.97] hover:shadow-md hover:shadow-blue-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
+                      className="interactive-lift group flex flex-col items-center gap-1.5 rounded-xl border border-blue-200/90 bg-gradient-to-b from-blue-50/80 to-blue-100/50 hover:from-blue-100 hover:to-blue-200/70 hover:border-blue-500 hover:shadow-md hover:shadow-blue-500/10 disabled:opacity-50 py-2.5 px-1"
                     >
                       <div className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
                         <ShieldCheck className="h-4 w-4" aria-hidden="true" />
@@ -574,7 +630,7 @@ export default function LoginPage() {
                       type="button"
                       disabled={submitting}
                       onClick={() => handleQuickDemo("donor1", "pass123")}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-rose-200/90 bg-gradient-to-b from-rose-50/80 to-rose-100/50 hover:from-rose-100 hover:to-rose-200/70 hover:border-rose-500 active:scale-[0.97] hover:shadow-md hover:shadow-rose-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
+                      className="interactive-lift group flex flex-col items-center gap-1.5 rounded-xl border border-rose-200/90 bg-gradient-to-b from-rose-50/80 to-rose-100/50 hover:from-rose-100 hover:to-rose-200/70 hover:border-rose-500 hover:shadow-md hover:shadow-rose-500/10 disabled:opacity-50 py-2.5 px-1"
                     >
                       <div className="h-8 w-8 rounded-lg bg-rose-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
                         <HeartHandshake className="h-4 w-4" aria-hidden="true" />
@@ -588,7 +644,7 @@ export default function LoginPage() {
                       type="button"
                       disabled={submitting}
                       onClick={() => handleQuickDemo("org1", "pass123")}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-amber-200/90 bg-gradient-to-b from-amber-50/80 to-amber-100/50 hover:from-amber-100 hover:to-amber-200/70 hover:border-amber-500 active:scale-[0.97] hover:shadow-md hover:shadow-amber-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
+                      className="interactive-lift group flex flex-col items-center gap-1.5 rounded-xl border border-amber-200/90 bg-gradient-to-b from-amber-50/80 to-amber-100/50 hover:from-amber-100 hover:to-amber-200/70 hover:border-amber-500 hover:shadow-md hover:shadow-amber-500/10 disabled:opacity-50 py-2.5 px-1"
                     >
                       <div className="h-8 w-8 rounded-lg bg-amber-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
                         <Building2 className="h-4 w-4" aria-hidden="true" />
@@ -602,7 +658,7 @@ export default function LoginPage() {
                       type="button"
                       disabled={submitting}
                       onClick={() => handleQuickDemo("vol1", "pass123")}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-emerald-200/90 bg-gradient-to-b from-emerald-50/80 to-emerald-100/50 hover:from-emerald-100 hover:to-emerald-200/70 hover:border-emerald-500 active:scale-[0.97] hover:shadow-md hover:shadow-emerald-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
+                      className="interactive-lift group flex flex-col items-center gap-1.5 rounded-xl border border-emerald-200/90 bg-gradient-to-b from-emerald-50/80 to-emerald-100/50 hover:from-emerald-100 hover:to-emerald-200/70 hover:border-emerald-500 hover:shadow-md hover:shadow-emerald-500/10 disabled:opacity-50 py-2.5 px-1"
                     >
                       <div className="h-8 w-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
                         <Truck className="h-4 w-4" aria-hidden="true" />
@@ -617,6 +673,8 @@ export default function LoginPage() {
 
               {/* BACK FACE: Create Account / Verify OTP */}
               <div
+                ref={backFaceRef}
+                aria-hidden={mode !== "register"}
                 className={`w-full bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_-10px_rgba(30,58,138,0.12),0_1px_3px_rgba(0,0,0,0.05)] p-7 sm:p-8 space-y-5 backface-hidden flip-card-back ${
                   mode === "register"
                     ? "relative pointer-events-auto"
@@ -627,6 +685,7 @@ export default function LoginPage() {
                 <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100/90 p-1.5 border border-slate-200/80 shadow-inner">
                   <button
                     type="button"
+                    aria-pressed={mode === "login"}
                     onClick={() => {
                       setMode("login");
                       setErrorMsg("");
@@ -638,6 +697,7 @@ export default function LoginPage() {
                   </button>
                   <button
                     type="button"
+                    aria-pressed={mode === "register"}
                     className="rounded-xl py-2.5 text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 transition-all"
                   >
                     Create Account
@@ -648,7 +708,7 @@ export default function LoginPage() {
                   <div
                     role="alert"
                     aria-live="assertive"
-                    className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
+                    className="toast-enter rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
                   >
                     <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" aria-hidden="true" />
                     <span>{errorMsg}</span>
@@ -659,7 +719,7 @@ export default function LoginPage() {
                   <div
                     role="status"
                     aria-live="polite"
-                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
+                    className="toast-enter rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
                   >
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
                     <span>{successMsg}</span>
@@ -723,7 +783,7 @@ export default function LoginPage() {
                         }}
                         onBlur={handleFieldBlur}
                         placeholder="000000"
-                        className="auth-input w-full min-h-[50px] rounded-xl border border-slate-300 bg-slate-50/80 focus:bg-white px-4 py-2.5 text-center font-mono text-lg font-black tracking-[0.4em] text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition shadow-sm"
+                        className="auth-input w-full min-h-[50px] rounded-xl border border-slate-300 bg-slate-50/80 focus:bg-white px-4 py-2.5 text-center font-mono text-lg font-black tracking-[0.4em] text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                       />
                       <div id="otp-error" className="field-error-msg">
                         Please enter the 6-digit numeric verification code.
@@ -829,7 +889,7 @@ export default function LoginPage() {
                           }}
                           onBlur={handleFieldBlur}
                           placeholder="you@example.com"
-                          className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition shadow-sm"
+                          className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                         />
                       </div>
                       <div id="reg-email-error" className="field-error-msg">
@@ -878,7 +938,7 @@ export default function LoginPage() {
                               }
                             }}
                             onBlur={handleFieldBlur}
-                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition shadow-sm"
+                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                           />
                         </div>
                         <div id="reg-username-error" className="field-error-msg">
@@ -920,7 +980,7 @@ export default function LoginPage() {
                               }
                             }}
                             onBlur={handleFieldBlur}
-                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-9 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition shadow-sm"
+                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-9 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                           />
                           <button
                             type="button"
@@ -962,7 +1022,7 @@ export default function LoginPage() {
                           value={regFullName}
                           onChange={(e) => setRegFullName(e.target.value)}
                           onBlur={handleFieldBlur}
-                          className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white px-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition shadow-sm"
+                          className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white px-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                         />
                       </div>
                       <div>
@@ -985,7 +1045,7 @@ export default function LoginPage() {
                             placeholder="0917-000-0000"
                             value={regContactInfo}
                             onChange={(e) => setRegContactInfo(e.target.value)}
-                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition shadow-sm"
+                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                           />
                         </div>
                       </div>
@@ -1029,7 +1089,7 @@ export default function LoginPage() {
                             value={regOrgName}
                             onChange={(e) => setRegOrgName(e.target.value)}
                             onBlur={handleFieldBlur}
-                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white px-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:outline-none shadow-sm"
+                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white px-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                           />
                         </div>
                         <div>
@@ -1051,7 +1111,7 @@ export default function LoginPage() {
                               value={regLocation}
                               onChange={(e) => setRegLocation(e.target.value)}
                               onBlur={handleFieldBlur}
-                              className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:outline-none shadow-sm"
+                              className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
                             />
                           </div>
                         </div>
