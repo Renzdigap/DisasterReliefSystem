@@ -53,6 +53,12 @@ dialog::backdrop {
   .no-print {
     display: none !important;
   }
+  body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 }
 
 /* 3D Card Flip Animation */

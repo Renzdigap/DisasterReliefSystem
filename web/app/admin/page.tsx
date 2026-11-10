@@ -24,6 +24,11 @@ import {
 import { PortalSidebarLayout, SidebarNavItem } from "@/components/PortalHeader";
 import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
 import {
+  OperationalSummaryCharts,
+  InventoryHealthCharts,
+  DonorImpactCharts,
+} from "@/components/ReportCharts";
+import {
   apiFetch,
   getCachedData,
   setCachedData,
@@ -634,8 +639,110 @@ export default function AdminPortalPage() {
       showToast("No report rows available to export.", "error");
       return;
     }
+
+    const timestamp = new Date().toLocaleString("en-US", {
+      timeZone: "Asia/Manila",
+    });
+
+    let statisticalSummary = "";
+    if (activeReport === "operationalSummary") {
+      const totalEvents = rows.length;
+      const totalDonations = rows.reduce(
+        (s: number, r: any) => s + Number(r.totalDonations || 0),
+        0
+      );
+      const totalRequests = rows.reduce(
+        (s: number, r: any) => s + Number(r.totalRequests || 0),
+        0
+      );
+      const totalDeliveries = rows.reduce(
+        (s: number, r: any) => s + Number(r.totalDeliveries || 0),
+        0
+      );
+      const fulfillmentRate =
+        totalRequests > 0
+          ? ((totalDeliveries / totalRequests) * 100).toFixed(1) + "%"
+          : "N/A";
+
+      statisticalSummary = [
+        `"--- STATISTICAL SUMMARY & AGGREGATE METRICS ---"`,
+        `"Metric Description","Calculated Aggregate"`,
+        `"Total Tracked Disaster Operations","${totalEvents}"`,
+        `"Cumulative Donations Recorded","${totalDonations}"`,
+        `"Cumulative Aid Demands Received","${totalRequests}"`,
+        `"Dispatched Deliveries (Fulfilled)","${totalDeliveries}"`,
+        `"Overall Operational Relief Fulfillment Rate","${fulfillmentRate}"`,
+        `""`,
+        `"--- DETAILED DISASTER OPERATIONAL DATA ---"`,
+      ].join("\n");
+    } else if (activeReport === "inventoryHealth") {
+      const totalItems = rows.length;
+      const totalStock = rows.reduce((s: number, r: any) => {
+        const val = Number(
+          String(r.currentStockFormatted || r.currentStock || "0").replace(/,/g, "")
+        ) || 0;
+        return s + val;
+      }, 0);
+      const totalDonated = rows.reduce(
+        (s: number, r: any) => s + Number(r.totalDonatedQty || 0),
+        0
+      );
+      const totalRequested = rows.reduce(
+        (s: number, r: any) => s + Number(r.totalRequestedQty || 0),
+        0
+      );
+      const criticalCount = rows.filter(
+        (r: any) => (r.stockHealth || "").toLowerCase() === "critical"
+      ).length;
+      const lowStockCount = rows.filter(
+        (r: any) => (r.stockHealth || "").toLowerCase() === "low stock"
+      ).length;
+
+      statisticalSummary = [
+        `"--- STATISTICAL SUMMARY & INVENTORY HEALTH METRICS ---"`,
+        `"Metric Description","Calculated Aggregate"`,
+        `"Total Tracked Relief SKU Commodities","${totalItems}"`,
+        `"Total Central Warehouse Stock Volume (Units)","${totalStock}"`,
+        `"Cumulative Inflow Donated (Units)","${totalDonated}"`,
+        `"Cumulative Outflow Requested (Units)","${totalRequested}"`,
+        `"Replenishment Urgency (Critical Alert SKUs)","${criticalCount}"`,
+        `"Low Stock Warning SKUs","${lowStockCount}"`,
+        `""`,
+        `"--- DETAILED WAREHOUSE STOCK STATUS & AUDIT ---"`,
+      ].join("\n");
+    } else if (activeReport === "donorImpact") {
+      const totalDonors = rows.length;
+      const totalDonations = rows.reduce(
+        (s: number, r: any) => s + Number(r.totalDonations || 0),
+        0
+      );
+      const totalUnits = rows.reduce(
+        (s: number, r: any) => s + Number(r.totalItemsDonated || 0),
+        0
+      );
+      const avgPerDonor =
+        totalDonors > 0 ? Math.round(totalUnits / totalDonors) : 0;
+
+      statisticalSummary = [
+        `"--- STATISTICAL SUMMARY & DONOR IMPACT METRICS ---"`,
+        `"Metric Description","Calculated Aggregate"`,
+        `"Total Registered Benefactor Entities","${totalDonors}"`,
+        `"Cumulative Donation Pledges Submitted","${totalDonations}"`,
+        `"Total Relief Units Donated","${totalUnits}"`,
+        `"Average Units Donated Per Benefactor","${avgPerDonor}"`,
+        `""`,
+        `"--- DETAILED DONOR IMPACT & CONTRIBUTION LEDGER ---"`,
+      ].join("\n");
+    }
+
     const headers = Object.keys(rows[0]);
     const csv = [
+      `"NATIONAL DISASTER RISK REDUCTION AND MANAGEMENT COUNCIL (NDRRMC)"`,
+      `"DRRMS CENTRAL OPERATIONS - OFFICIAL DECISION-SUPPORT REPORT"`,
+      `"Report Classifier: ${activeReport}"`,
+      `"Generated At: ${timestamp}"`,
+      `""`,
+      statisticalSummary,
       headers.join(","),
       ...rows.map((r: any) =>
         headers
@@ -648,7 +755,7 @@ export default function AdminPortalPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `DRRMS_Report_${activeReport}_${new Date()
+    a.download = `DRRMS_Official_Report_${activeReport}_${new Date()
       .toISOString()
       .slice(0, 10)}.csv`;
     a.click();
@@ -2288,19 +2395,77 @@ export default function AdminPortalPage() {
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            {/* Printable Official Header (Shows when printing) */}
+            <div className="hidden print:block mb-6 border-b-2 border-slate-900 pb-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <img
+                    src="/ndrrmc-logo.png"
+                    alt="NDRRMC Seal"
+                    className="h-16 w-16 object-contain"
+                  />
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                      Republic of the Philippines &bull; Office of Civil Defense
+                    </div>
+                    <h1 className="text-lg font-black text-slate-900 leading-tight">
+                      National Disaster Risk Reduction &amp; Management Council
+                    </h1>
+                    <p className="text-xs font-semibold text-blue-900">
+                      Disaster Relief &amp; Resource Management System (DRRMS) &bull; Central Decision-Support Operations
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right text-[11px] text-slate-600 space-y-0.5">
+                  <div>
+                    <span className="font-bold">Doc ID:</span> DRRMS-REP-
+                    {activeReport.toUpperCase()}
+                  </div>
+                  <div>
+                    <span className="font-bold">Date Generated:</span>{" "}
+                    {new Date().toLocaleDateString("en-PH", {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </div>
+                  <div className="text-[10px] uppercase font-bold text-emerald-700">
+                    Official Decision-Support Record
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div className="mb-4 border-b border-slate-200 pb-3">
-              <div className="text-xs font-bold text-[#002060] uppercase">
-                Official Decision-Support Analytical Output (ReportDAO)
+              <div className="text-xs font-bold text-[#002060] uppercase tracking-wider">
+                National Decision-Support Analytics &bull; Central DRRMS Ledger
               </div>
               <h2 className="text-base font-bold text-slate-900">
                 {activeReport === "operationalSummary" &&
-                  "Report 1: Disaster Relief Operational Summary (Multi-Table SQL JOIN & GROUP BY)"}
+                  "Report 1: Disaster Relief Operational & Logistics Summary"}
                 {activeReport === "inventoryHealth" &&
                   "Report 2: Warehouse Stock Status & Replenishment Alert Report"}
                 {activeReport === "donorImpact" &&
                   "Report 3: Donor Contribution & Impact Audit Ledger"}
               </h2>
             </div>
+
+            {/* Statistical Graphs and Visual Charts (Visible in UI and Rendered Crisply on Print) */}
+            {activeReport === "operationalSummary" && (
+              <OperationalSummaryCharts
+                rows={reports.operationalSummary || []}
+              />
+            )}
+            {activeReport === "inventoryHealth" && (
+              <InventoryHealthCharts
+                rows={reports.inventoryHealth || []}
+              />
+            )}
+            {activeReport === "donorImpact" && (
+              <DonorImpactCharts
+                rows={reports.donorImpact || []}
+              />
+            )}
 
             {activeReport === "operationalSummary" && (
               <div
@@ -2467,6 +2632,37 @@ export default function AdminPortalPage() {
                 </table>
               </div>
             )}
+
+            {/* Official Print Sign-Off Block (Shows when printing) */}
+            <div className="hidden print:grid grid-cols-3 gap-8 pt-8 mt-8 border-t-2 border-slate-300 text-xs text-center">
+              <div className="space-y-8">
+                <p className="font-semibold text-slate-600">Prepared By:</p>
+                <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+                  Central Operations Officer
+                  <span className="block text-[10px] font-normal text-slate-500">
+                    Disaster Relief Dispatch
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-8">
+                <p className="font-semibold text-slate-600">Verified By:</p>
+                <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+                  Logistics &amp; Inventory Controller
+                  <span className="block text-[10px] font-normal text-slate-500">
+                    Resource Management Division
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-8">
+                <p className="font-semibold text-slate-600">Approved By:</p>
+                <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+                  NDRRMC Operations Director
+                  <span className="block text-[10px] font-normal text-slate-500">
+                    Executive Oversight
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
