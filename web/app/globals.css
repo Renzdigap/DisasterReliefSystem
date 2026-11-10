@@ -58,6 +58,11 @@ dialog::backdrop {
   overscroll-behavior: contain;
 }
 
+.tracker-dialog::backdrop {
+  background-color: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(3px);
+}
+
 @media print {
   .no-print {
     display: none !important;

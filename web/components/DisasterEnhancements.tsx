@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import {
   Printer,
   X,
@@ -514,65 +514,119 @@ interface PublicAidTrackerModalProps {
   initialCode?: string;
 }
 
-const SAMPLE_TRACKING_RECORDS = [
+interface TrackingStage {
+  label: string;
+  detail: string;
+  time: string;
+}
+
+interface TrackingRecord {
+  code: string;
+  shortId: string;
+  campaign: string;
+  recipient: string;
+  destination: string;
+  items: string;
+  status: "Delivered" | "In Transit" | "Warehouse Allocated";
+  currentStage: number;
+  steps: TrackingStage[];
+}
+
+const SAMPLE_TRACKING_RECORDS: TrackingRecord[] = [
   {
     code: "DRRMS-WB-2024-00001",
     shortId: "#1",
-    type: "Waybill Dispatch",
     campaign: "Typhoon Carina Flood Response",
-    benefactor: "Robert Tan (Citizen Donor)",
     recipient: "Philippine Red Cross Manila",
     destination: "Port Area Evacuation Complex, Manila",
-    driver: "Charlie Driver • Relief Truck (NDL-4921)",
-    items: "500 Bottles Drinking Water 1L, 120 Sacks Rice 25kg",
+    items: "500 Bottles Drinking Water (1L), 120 Sacks Rice (25kg)",
     status: "Delivered",
     currentStage: 4,
-    auditHash: "SHA256-9F8A-44C1-B72E-NDRRMC",
-    timestamps: [
-      "Jul 27, 08:15 AM • Pledge Audited",
-      "Jul 27, 01:40 PM • Camp Aguinaldo Warehouse Allocated",
-      "Jul 28, 06:10 AM • Dispatched via Fleet Truck NDL-4921",
-      "Jul 28, 11:45 AM • Signed & Handed Over at Port Area Manila",
+    steps: [
+      {
+        label: "Pledge Verified",
+        detail: "Central DRRMS Ledger",
+        time: "Jul 27, 08:15 AM",
+      },
+      {
+        label: "Warehouse Allocated",
+        detail: "Camp Aguinaldo Logistics Base",
+        time: "Jul 27, 01:40 PM",
+      },
+      {
+        label: "Dispatched",
+        detail: "Charlie Driver • Relief Truck (NDL-4921)",
+        time: "Jul 28, 06:10 AM",
+      },
+      {
+        label: "Delivered & Received",
+        detail: "Port Area Evacuation Complex, Manila",
+        time: "Jul 28, 11:45 AM",
+      },
     ],
   },
   {
     code: "DRRMS-WB-2024-00008",
     shortId: "#8",
-    type: "Waybill Dispatch",
     campaign: "Tropical Storm Kristine Prep",
-    benefactor: "Metro Pacific Relief Foundation",
     recipient: "LGU Albay Emergency Command",
     destination: "Legazpi City Central Evacuation Dome, Albay",
-    driver: "Marco Reyes • Heavy Cargo Van (VNR-8820)",
-    items: "600 Bottles Drinking Water 1L, 200 Thermal Blankets",
+    items: "600 Bottles Drinking Water (1L), 200 Thermal Blankets",
     status: "In Transit",
     currentStage: 3,
-    auditHash: "SHA256-3E12-90D4-A19C-NDRRMC",
-    timestamps: [
-      "Oct 23, 09:30 AM • Pledge Audited",
-      "Oct 23, 03:15 PM • Regional Hub Stock Allocated",
-      "Oct 24, 05:00 AM • En Route via Maharlika Highway Convoy",
-      "Pending • Estimated Arrival 04:30 PM at Legazpi Dome",
+    steps: [
+      {
+        label: "Pledge Verified",
+        detail: "Central DRRMS Ledger",
+        time: "Oct 23, 09:30 AM",
+      },
+      {
+        label: "Warehouse Allocated",
+        detail: "Camp Aguinaldo Logistics Base",
+        time: "Oct 23, 03:15 PM",
+      },
+      {
+        label: "In Transit",
+        detail: "Marco Reyes • Heavy Cargo Van (VNR-8820)",
+        time: "Oct 24, 05:00 AM",
+      },
+      {
+        label: "Scheduled Delivery",
+        detail: "Legazpi City Central Evacuation Dome, Albay",
+        time: "Est. 04:30 PM",
+      },
     ],
   },
   {
     code: "DRRMS-DON-CERT-000003",
     shortId: "#3",
-    type: "Donation Pledge",
     campaign: "Central Luzon Monsoon Inundation",
-    benefactor: "Robert Tan (Citizen Donor)",
     recipient: "Pampanga Provincial Disaster Office",
     destination: "San Fernando Mega Evacuation Center, Pampanga",
-    driver: "Fleet Assignment Queue • Camp Aguinaldo Hub",
-    items: "250 Hygiene Kits, 100 Boxes Paracetamol 500mg",
+    items: "250 Hygiene Kits, 100 Boxes Paracetamol (500mg)",
     status: "Warehouse Allocated",
     currentStage: 2,
-    auditHash: "SHA256-7B41-66F9-E08A-NDRRMC",
-    timestamps: [
-      "Oct 25, 10:05 AM • Donor Pledge Verified",
-      "Oct 25, 02:20 PM • Quality Inspected & Stocked in Bay 4",
-      "Scheduled • Awaiting Convoy Loading",
-      "Pending • Final LGU Handover",
+    steps: [
+      {
+        label: "Pledge Verified",
+        detail: "Central DRRMS Ledger",
+        time: "Oct 25, 10:05 AM",
+      },
+      {
+        label: "Stocked in Warehouse",
+        detail: "Camp Aguinaldo Hub, Bay 4",
+        time: "Oct 25, 02:20 PM",
+      },
+      {
+        label: "Fleet Assignment",
+        detail: "Awaiting convoy loading",
+        time: "Scheduled",
+      },
+      {
+        label: "Final Handover",
+        detail: "San Fernando Mega Evacuation Center, Pampanga",
+        time: "Pending",
+      },
     ],
   },
 ];
@@ -582,220 +636,324 @@ export function PublicAidTrackerModal({
   initialCode = "DRRMS-WB-2024-00001",
 }: PublicAidTrackerModalProps) {
   const [query, setQuery] = useState(initialCode);
-  const [selectedRecord, setSelectedRecord] = useState(
-    SAMPLE_TRACKING_RECORDS[0]
+  const [selectedRecord, setSelectedRecord] = useState<TrackingRecord>(
+    () =>
+      SAMPLE_TRACKING_RECORDS.find((r) => r.code === initialCode) ||
+      SAMPLE_TRACKING_RECORDS[0]
   );
+  const [notFoundMsg, setNotFoundMsg] = useState("");
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const onCloseRef = useRef(onClose);
+  const titleId = useId();
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    if (!dialog.open) {
+      dialog.showModal();
+    }
+
+    const handleNativeClose = () => {
+      onCloseRef.current();
+    };
+    dialog.addEventListener("close", handleNativeClose);
+
+    // Light-dismiss fallback when <dialog closedby="any"> is unsupported
+    let pressedOutside = false;
+    const isOutsideDialog = (e: PointerEvent) => {
+      const rect = dialog.getBoundingClientRect();
+      return (
+        e.clientX < rect.left ||
+        e.clientX > rect.right ||
+        e.clientY < rect.top ||
+        e.clientY > rect.bottom
+      );
+    };
+    const handlePointerDown = (e: PointerEvent) => {
+      pressedOutside = isOutsideDialog(e);
+    };
+    const handlePointerUp = (e: PointerEvent) => {
+      if (pressedOutside && isOutsideDialog(e)) {
+        dialog.close();
+      }
+      pressedOutside = false;
+    };
+
+    const needsClosedByFallback = !("closedBy" in HTMLDialogElement.prototype);
+    if (needsClosedByFallback) {
+      dialog.addEventListener("pointerdown", handlePointerDown);
+      dialog.addEventListener("pointerup", handlePointerUp);
+    }
+
+    return () => {
+      dialog.removeEventListener("close", handleNativeClose);
+      if (needsClosedByFallback) {
+        dialog.removeEventListener("pointerdown", handlePointerDown);
+        dialog.removeEventListener("pointerup", handlePointerUp);
+      }
+      if (dialog.open) {
+        dialog.close();
+      }
+    };
+  }, []);
+
+  const requestClose = () => {
+    const dialog = dialogRef.current;
+    if (dialog && dialog.open) {
+      dialog.close();
+    } else {
+      onClose();
+    }
+  };
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = query.trim().toLowerCase();
-    const match =
-      SAMPLE_TRACKING_RECORDS.find(
-        (r) =>
-          r.code.toLowerCase().includes(q) ||
-          r.shortId.toLowerCase() === q ||
-          r.campaign.toLowerCase().includes(q) ||
-          r.recipient.toLowerCase().includes(q)
-      ) || SAMPLE_TRACKING_RECORDS[0];
-    setSelectedRecord(match);
+    if (!q) {
+      setNotFoundMsg("");
+      setSelectedRecord(SAMPLE_TRACKING_RECORDS[0]);
+      setQuery(SAMPLE_TRACKING_RECORDS[0].code);
+      return;
+    }
+
+    const match = SAMPLE_TRACKING_RECORDS.find(
+      (r) =>
+        r.code.toLowerCase().includes(q) ||
+        r.shortId.toLowerCase() === q ||
+        r.campaign.toLowerCase().includes(q) ||
+        r.recipient.toLowerCase().includes(q) ||
+        r.destination.toLowerCase().includes(q)
+    );
+
+    if (match) {
+      setNotFoundMsg("");
+      setSelectedRecord(match);
+    } else {
+      setNotFoundMsg(
+        `No shipment matched "${query.trim()}". Select one of the verified tracking IDs below.`
+      );
+    }
   };
 
-  const stages = [
-    {
-      step: 1,
-      title: "Pledge Audited & Logged",
-      subtitle: "Central DRRMS Ledger",
-      time: selectedRecord.timestamps[0],
-    },
-    {
-      step: 2,
-      title: "Warehouse Stock Allocated",
-      subtitle: "Camp Aguinaldo Logistics Base",
-      time: selectedRecord.timestamps[1],
-    },
-    {
-      step: 3,
-      title: "Dispatched via Certified Fleet",
-      subtitle: selectedRecord.driver,
-      time: selectedRecord.timestamps[2],
-    },
-    {
-      step: 4,
-      title: "Verified Evacuation Handover",
-      subtitle: selectedRecord.destination,
-      time: selectedRecord.timestamps[3],
-    },
-  ];
+  const statusBadgeClass =
+    selectedRecord.status === "Delivered"
+      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+      : selectedRecord.status === "In Transit"
+      ? "bg-amber-100 text-amber-800 border-amber-200"
+      : "bg-blue-100 text-blue-800 border-blue-200";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 p-4 backdrop-blur-xs overflow-y-auto no-print">
-      <div className="relative w-full max-w-2xl rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-6 text-slate-900">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-[#071936] via-[#0B2956] to-[#123E7C] px-6 py-5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-white p-1 flex items-center justify-center shrink-0">
-              <img
-                src="/ndrrmc-logo.png"
-                alt="NDRRMC"
-                className="h-full w-full object-contain"
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      {...({ closedby: "any" } as any)}
+      className="tracker-dialog m-auto w-[min(94vw,42rem)] max-h-[90dvh] overflow-y-auto rounded-3xl bg-white p-0 text-slate-900 shadow-2xl border border-slate-200 no-print"
+    >
+      {/* Clean Modal Header */}
+      <div className="bg-gradient-to-r from-[#071936] via-[#0B2956] to-[#123E7C] px-6 py-4 text-white flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-9 w-9 rounded-xl bg-white p-1 flex items-center justify-center shrink-0">
+            <img
+              src="/ndrrmc-logo.png"
+              alt="NDRRMC"
+              className="h-full w-full object-contain"
+            />
+          </div>
+          <h2
+            id={titleId}
+            className="text-base sm:text-lg font-bold tracking-tight leading-snug"
+          >
+            NDRRMC Shipment Tracker
+          </h2>
+        </div>
+        <button
+          type="button"
+          onClick={requestClose}
+          aria-label="Close tracker"
+          className="rounded-xl p-2 text-white/80 hover:bg-white/15 hover:text-white active:scale-95 transition shrink-0"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="p-6 space-y-5 leading-normal">
+        {/* Search & Quick Sample Selector */}
+        <div className="space-y-3">
+          <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search
+                className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
+              <input
+                type="search"
+                autoFocus
+                aria-label="Waybill or donation tracking ID"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  if (notFoundMsg) setNotFoundMsg("");
+                }}
+                placeholder="Enter Tracking ID (e.g. DRRMS-WB-2024-00001)"
+                className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2 text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-600 focus:outline-none"
               />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-widest px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                  Public Transparency Audit
-                </span>
-              </div>
-              <h2 className="text-base sm:text-lg font-extrabold tracking-tight mt-0.5">
-                NDRRMC Real-Time Relief Shipment Tracker
-              </h2>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl p-1.5 text-white/70 hover:bg-white/10 hover:text-white transition"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+            <button
+              type="submit"
+              className="min-h-[42px] rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] px-5 py-2 text-xs sm:text-sm font-bold text-white shadow-sm transition shrink-0"
+            >
+              Track Shipment
+            </button>
+          </form>
 
-        <div className="p-6 space-y-5">
-          {/* Search Input & Quick Sample Pills */}
-          <div className="space-y-2.5">
-            <form onSubmit={handleSearch} className="flex gap-2">
-              <div className="relative flex-1">
-                <Search className="h-4 w-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Enter Waybill ID (e.g. DRRMS-WB-2024-00001) or Donation ID..."
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                className="rounded-xl bg-blue-600 hover:bg-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition shrink-0"
-              >
-                Track Shipment
-              </button>
-            </form>
+          {notFoundMsg && (
+            <p role="status" className="text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              {notFoundMsg}
+            </p>
+          )}
 
-            <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-              <span className="text-slate-400 font-semibold">
-                Verified Shipments:
-              </span>
-              {SAMPLE_TRACKING_RECORDS.map((rec) => (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {SAMPLE_TRACKING_RECORDS.map((rec) => {
+              const isSelected = selectedRecord.code === rec.code;
+              const dotClass =
+                rec.status === "Delivered"
+                  ? "bg-emerald-500"
+                  : rec.status === "In Transit"
+                  ? "bg-amber-500"
+                  : "bg-blue-500";
+
+              return (
                 <button
                   key={rec.code}
                   type="button"
+                  aria-pressed={isSelected}
                   onClick={() => {
                     setQuery(rec.code);
                     setSelectedRecord(rec);
+                    setNotFoundMsg("");
                   }}
-                  className={`px-2.5 py-1 rounded-lg font-mono font-bold transition ${
-                    selectedRecord.code === rec.code
-                      ? "bg-blue-600 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  className={`rounded-xl border px-3 py-2 text-left transition active:scale-[0.98] ${
+                    isSelected
+                      ? "border-blue-600 bg-blue-50 text-slate-900 shadow-xs ring-1 ring-blue-600"
+                      : "border-slate-200 bg-slate-50/70 text-slate-700 hover:bg-slate-100 hover:border-slate-300"
                   }`}
                 >
-                  {rec.code} ({rec.status})
+                  <span className="block font-mono text-xs font-bold truncate">
+                    {rec.code}
+                  </span>
+                  <span className="mt-0.5 flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                    <span
+                      className={`h-2 w-2 rounded-full shrink-0 ${dotClass}`}
+                      aria-hidden="true"
+                    />
+                    <span>{rec.status}</span>
+                  </span>
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Shipment Summary Banner */}
-          <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/70 to-indigo-50/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-extrabold text-blue-700">
-                  {selectedRecord.code}
-                </span>
-                <span
-                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                    selectedRecord.currentStage === 4
-                      ? "bg-emerald-100 text-emerald-800"
-                      : selectedRecord.currentStage === 3
-                      ? "bg-amber-100 text-amber-800"
-                      : "bg-blue-100 text-blue-800"
-                  }`}
-                >
-                  {selectedRecord.status}
-                </span>
-              </div>
-              <h3 className="text-sm font-extrabold text-slate-900">
-                {selectedRecord.campaign} &rarr; {selectedRecord.recipient}
-              </h3>
-              <p className="text-xs text-slate-600">
-                <span className="font-semibold">Cargo Manifest:</span>{" "}
-                {selectedRecord.items}
-              </p>
-            </div>
-            <div className="text-left sm:text-right shrink-0 space-y-0.5">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">
-                Audit Verification Hash
-              </span>
-              <span className="font-mono text-[11px] font-bold text-emerald-700 bg-white px-2 py-1 rounded-lg border border-emerald-200 inline-block">
-                ✓ {selectedRecord.auditHash}
-              </span>
-            </div>
-          </div>
-
-          {/* 4-Stage Chain-of-Custody Stepper */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              End-to-End Chain of Custody Audit Trail
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-              {stages.map((s) => {
-                const isDone = s.step <= selectedRecord.currentStage;
-                const isCurrent = s.step === selectedRecord.currentStage;
-                return (
-                  <div
-                    key={s.step}
-                    className={`rounded-2xl border p-3.5 flex flex-col justify-between gap-2 transition ${
-                      isCurrent
-                        ? "border-blue-500 bg-blue-50/50 ring-2 ring-blue-500/20"
-                        : isDone
-                        ? "border-emerald-200 bg-emerald-50/30"
-                        : "border-slate-200 bg-slate-50/60 opacity-60"
-                    }`}
-                  >
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span
-                          className={`h-6 w-6 rounded-full text-xs font-extrabold flex items-center justify-center ${
-                            isDone
-                              ? "bg-emerald-600 text-white"
-                              : "bg-slate-200 text-slate-600"
-                          }`}
-                        >
-                          {isDone ? "✓" : s.step}
-                        </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                          Step 0{s.step}
-                        </span>
-                      </div>
-                      <div className="text-xs font-extrabold text-slate-900 leading-snug">
-                        {s.title}
-                      </div>
-                      <div className="text-[11px] font-medium text-slate-600">
-                        {s.subtitle}
-                      </div>
-                    </div>
-                    <div className="pt-2 border-t border-slate-200/70 text-[10px] font-semibold text-slate-500">
-                      {s.time}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              );
+            })}
           </div>
         </div>
+
+        {/* Clean Shipment Overview Card */}
+        <section
+          aria-label="Shipment summary"
+          className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="font-mono text-xs font-semibold text-blue-700">
+                {selectedRecord.code}
+              </p>
+              <h3 className="text-base font-bold text-slate-900 leading-snug">
+                {selectedRecord.campaign}
+              </h3>
+            </div>
+            <span
+              className={`px-3 py-1 rounded-full text-xs font-bold border ${statusBadgeClass}`}
+            >
+              {selectedRecord.status}
+            </span>
+          </div>
+
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 pt-3 border-t border-slate-200/80 text-xs">
+            <div>
+              <dt className="font-semibold text-slate-500">Recipient</dt>
+              <dd className="font-semibold text-slate-900 mt-0.5">
+                {selectedRecord.recipient}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-500">Destination</dt>
+              <dd className="font-semibold text-slate-900 mt-0.5">
+                {selectedRecord.destination}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="font-semibold text-slate-500">Relief Cargo</dt>
+              <dd className="font-medium text-slate-800 mt-0.5">
+                {selectedRecord.items}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        {/* Clean 4-Step Delivery Progress Timeline (Zero Redundant Text) */}
+        <section aria-label="Delivery progress" className="space-y-3">
+          <h4 className="text-sm font-bold text-slate-900">
+            Delivery Progress
+          </h4>
+          <ol className="space-y-2">
+            {selectedRecord.steps.map((step, index) => {
+              const stepNumber = index + 1;
+              const isDone = stepNumber <= selectedRecord.currentStage;
+              const isCurrent = stepNumber === selectedRecord.currentStage;
+
+              return (
+                <li
+                  key={step.label}
+                  className={`flex items-start justify-between gap-3 rounded-xl border px-3.5 py-2.5 transition ${
+                    isCurrent
+                      ? "border-blue-300 bg-blue-50/70"
+                      : isDone
+                      ? "border-emerald-200/80 bg-emerald-50/35"
+                      : "border-slate-200/80 bg-slate-50/50 opacity-70"
+                  }`}
+                >
+                  <div className="flex items-start gap-3 min-w-0">
+                    <span
+                      aria-hidden="true"
+                      className={`mt-0.5 h-6 w-6 rounded-full text-xs font-bold flex items-center justify-center shrink-0 ${
+                        isDone
+                          ? "bg-emerald-600 text-white"
+                          : "bg-slate-200 text-slate-600"
+                      }`}
+                    >
+                      {isDone ? "✓" : stepNumber}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                        {step.label}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {step.detail}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-medium text-slate-500 whitespace-nowrap shrink-0">
+                    {step.time}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </section>
       </div>
-    </div>
+    </dialog>
   );
 }
 
