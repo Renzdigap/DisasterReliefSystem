@@ -253,13 +253,22 @@ export default function LoginPage() {
 
         {/* Top Branding */}
         <div className="relative z-10 space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-2xl bg-white p-2 shadow-xl border border-white/20 flex items-center justify-center shrink-0">
-              <img
-                src="/ndrrmc-logo.png"
-                alt="NDRRMC Logo"
-                className="h-full w-full object-contain"
-              />
+          <div className="flex items-center gap-3.5">
+            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/15 shadow-xl shrink-0">
+              <div className="h-14 w-14 rounded-xl bg-white p-1.5 shadow-sm flex items-center justify-center">
+                <img
+                  src="/ndrrmc-logo.png"
+                  alt="NDRRMC Logo"
+                  className="h-full w-full object-contain"
+                />
+              </div>
+              <div className="h-14 w-14 rounded-xl bg-white p-1.5 shadow-sm flex items-center justify-center">
+                <img
+                  src="/drrms-logo.png"
+                  alt="DRRMS Project Logo"
+                  className="h-full w-full object-contain"
+                />
+              </div>
             </div>
             <div className="space-y-0.5">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-[11px] font-semibold text-blue-300">
@@ -319,22 +328,19 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Bottom Operations Status & Hotline Strip */}
-        <div className="relative z-10 pt-8 mt-6 border-t border-slate-800/80 space-y-2.5">
+        {/* Bottom Hotline Strip */}
+        <div className="relative z-10 pt-8 mt-6 border-t border-slate-800/80 space-y-2">
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="font-semibold text-emerald-400">Operations Center Online</span>
-            </div>
             <div className="flex items-center gap-2 text-slate-400 text-[11px]">
               <PhoneCall className="h-3.5 w-3.5 text-rose-400" />
-              <span>Emergency: <strong className="text-white">911</strong></span>
+              <span>National Emergency: <strong className="text-white">911</strong></span>
               <span className="text-slate-600">|</span>
-              <span>NDRRMC: <strong className="text-white">(02) 8911-5061</strong></span>
+              <span>NDRRMC Operations: <strong className="text-white">(02) 8911-5061</strong></span>
             </div>
+            <span className="text-[11px] text-slate-400">RA 10121 Mandated System</span>
           </div>
           <p className="text-[11px] text-slate-500">
-            Mandated under Republic Act 10121 (Philippine Disaster Risk Reduction and Management Act).
+            Philippine Disaster Risk Reduction and Management Unified Operations Portal.
           </p>
         </div>
       </div>
