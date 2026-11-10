@@ -17,6 +17,15 @@ body {
   outline-offset: 1px;
 }
 
+:where(button, a[href], select):focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.track-aid-btn:focus-visible {
+  outline-color: #ffffff;
+}
+
 .auth-input:user-invalid {
   border-color: #dc2626;
   background-color: #fef2f2;

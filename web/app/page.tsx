@@ -22,7 +22,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  Flame,
   Search,
 } from "lucide-react";
 import { apiFetch, saveSession, UserSession } from "@/lib/api";
@@ -243,7 +242,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#06101E]">
+    <main className="min-h-screen w-full flex flex-col lg:flex-row bg-[#06101E]">
       {/* LEFT PANEL: Official NDRRMC Hero & Operations Dashboard */}
       <div className="w-full lg:w-[48%] xl:w-[46%] shrink-0 relative overflow-hidden bg-gradient-to-br from-[#06101E] via-[#0C1A34] to-[#122850] text-white p-8 lg:p-12 xl:p-14 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-800/80 shadow-2xl">
         {/* Crisp Crisis Response Grid Pattern */}
@@ -289,55 +288,43 @@ export default function LoginPage() {
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
                 Republic of the Philippines
               </div>
-              <h2 className="text-base sm:text-lg font-bold tracking-tight text-white leading-tight">
+              <p className="text-base sm:text-lg font-bold tracking-tight text-white leading-tight">
                 Disaster Relief &amp; Resource Management
-              </h2>
+              </p>
               <p className="text-xs text-slate-300">
                 National Disaster Risk Reduction &amp; Management Council
               </p>
             </div>
           </div>
 
-          {/* Hero Headline & Purpose */}
-          <div className="space-y-3 pt-3 lg:pt-5">
+          {/* Hero Headline */}
+          <div className="pt-3 lg:pt-5">
             <h1 className="text-2xl sm:text-3xl xl:text-4xl font-extrabold tracking-tight text-white leading-tight">
               Centralized Humanitarian Relief Coordination
             </h1>
-            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-xl">
-              Connecting citizen donors, local government units (LGUs), and volunteer logistics fleets for rapid, verified aid distribution across calamity-affected communities.
-            </p>
           </div>
 
-          {/* Value Pillars (Rich, colored, non-wordy) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3">
-            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 hover:border-blue-400/40 p-4 backdrop-blur-md transition-all duration-300 shadow-lg group">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/30 group-hover:scale-105 transition-transform mb-2.5">
-                <PackageCheck className="h-4.5 w-4.5" />
+          {/* Value Pillars (Clean icon + title) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-blue-400/40 p-3.5 backdrop-blur-md transition-all duration-300 shadow-lg group flex items-center gap-3 sm:block">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
+                <PackageCheck className="h-4.5 w-4.5" aria-hidden="true" />
               </div>
-              <h3 className="text-xs font-bold text-white">Verified Aid Tracking</h3>
-              <p className="text-[11px] text-slate-300 leading-normal mt-1">
-                Audited transparency from donor pledges to confirmed delivery.
-              </p>
+              <h2 className="text-xs font-bold text-white">Verified Aid Tracking</h2>
             </div>
 
-            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 hover:border-emerald-400/40 p-4 backdrop-blur-md transition-all duration-300 shadow-lg group">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 group-hover:scale-105 transition-transform mb-2.5">
-                <Truck className="h-4.5 w-4.5" />
+            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-emerald-400/40 p-3.5 backdrop-blur-md transition-all duration-300 shadow-lg group flex items-center gap-3 sm:block">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
+                <Truck className="h-4.5 w-4.5" aria-hidden="true" />
               </div>
-              <h3 className="text-xs font-bold text-white">Volunteer Dispatch</h3>
-              <p className="text-[11px] text-slate-300 leading-normal mt-1">
-                Direct fleet assignments for trucks, relief vans, and boats.
-              </p>
+              <h2 className="text-xs font-bold text-white">Volunteer Dispatch</h2>
             </div>
 
-            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.12] border border-white/10 hover:border-amber-400/40 p-4 backdrop-blur-md transition-all duration-300 shadow-lg group">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-amber-500/30 group-hover:scale-105 transition-transform mb-2.5">
-                <Building2 className="h-4.5 w-4.5" />
+            <div className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-amber-400/40 p-3.5 backdrop-blur-md transition-all duration-300 shadow-lg group flex items-center gap-3 sm:block">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-amber-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
+                <Building2 className="h-4.5 w-4.5" aria-hidden="true" />
               </div>
-              <h3 className="text-xs font-bold text-white">LGU Requisitions</h3>
-              <p className="text-[11px] text-slate-300 leading-normal mt-1">
-                Local calamity relief requests matched with central stock.
-              </p>
+              <h2 className="text-xs font-bold text-white">LGU Requisitions</h2>
             </div>
           </div>
 
@@ -363,45 +350,37 @@ export default function LoginPage() {
             </div>
 
             {/* Public Transparency Aid Tracker Launch Bar */}
-            <button
-              type="button"
-              onClick={() => setShowTracker(true)}
-              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-blue-600/30 via-indigo-600/30 to-emerald-600/30 hover:from-blue-600/45 hover:to-emerald-600/45 border border-blue-400/40 p-3 flex items-center justify-between text-left backdrop-blur-md transition group shadow-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-xl bg-blue-500/30 border border-blue-300/40 flex items-center justify-center text-blue-200">
-                  <Search className="h-4 w-4" />
+            <div className="mt-3 w-full rounded-2xl bg-gradient-to-r from-blue-600/30 via-indigo-600/30 to-emerald-600/25 border border-blue-400/35 px-3.5 py-3 flex items-center justify-between gap-3 backdrop-blur-md shadow-lg">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-9 w-9 rounded-xl bg-blue-500/30 border border-blue-300/40 flex items-center justify-center text-blue-200 shrink-0">
+                  <Search className="h-4 w-4" aria-hidden="true" />
                 </div>
-                <div>
-                  <span className="text-xs font-extrabold text-white block">
-                    Public Relief Shipment &amp; Donation Tracker
-                  </span>
-                  <span className="text-[11px] text-blue-200/90 block">
-                    Verify Waybill ID or Donation Certificate Chain-of-Custody
-                  </span>
-                </div>
+                <span className="text-xs font-extrabold text-white leading-snug">
+                  Public Relief Shipment &amp; Donation Tracker
+                </span>
               </div>
-              <span className="text-xs font-bold text-emerald-300 group-hover:translate-x-1 transition-transform">
-                Track Aid &rarr;
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => setShowTracker(true)}
+                className="track-aid-btn shrink-0 min-h-[38px] rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.97] border border-emerald-300/70 px-4 py-2 text-xs font-bold text-slate-950 shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-400/30 transition-[background-color,box-shadow,transform] duration-150"
+              >
+                Track Aid
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Bottom Hotline Strip */}
-        <div className="relative z-10 pt-6 mt-6 border-t border-slate-800/80 space-y-2">
+        <div className="relative z-10 pt-5 mt-6 border-t border-slate-800/80">
           <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 text-slate-300 text-[11px]">
-              <PhoneCall className="h-3.5 w-3.5 text-rose-400" />
+              <PhoneCall className="h-3.5 w-3.5 text-rose-400" aria-hidden="true" />
               <span>National Emergency Hotline: <strong className="text-white">911</strong></span>
               <span className="text-slate-600">|</span>
               <span>NDRRMC Operations: <strong className="text-white">(02) 8911-5061</strong></span>
             </div>
             <span className="text-[11px] text-slate-400 font-medium">RA 10121 Mandated</span>
           </div>
-          <p className="text-[11px] text-slate-400">
-            Philippine Disaster Risk Reduction and Management Unified Operations Portal.
-          </p>
         </div>
       </div>
 
@@ -425,15 +404,10 @@ export default function LoginPage() {
 
         <div className="w-full max-w-[460px] relative z-10 space-y-5 my-auto">
           {/* Header */}
-          <div className="text-center lg:text-left space-y-1">
+          <div className="text-center lg:text-left">
             <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
               {mode === "login" ? "Sign In to Stakeholder Portal" : "Create Stakeholder Account"}
             </h2>
-            <p className="text-xs text-slate-500">
-              {mode === "login"
-                ? "Authenticate with your DRRMS credentials or select a quick role launcher below."
-                : "Register as a Citizen Donor, Partner LGU/NGO, or Volunteer Fleet Driver."}
-            </p>
           </div>
 
           {/* 3D Flip Card Container */}
@@ -466,7 +440,7 @@ export default function LoginPage() {
                       setErrorMsg("");
                       setSuccessMsg("");
                     }}
-                    className="rounded-xl py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all"
+                    className="rounded-xl py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 active:scale-[0.98] transition-all"
                   >
                     Create Account
                   </button>
@@ -478,7 +452,7 @@ export default function LoginPage() {
                     aria-live="assertive"
                     className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
                   >
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" aria-hidden="true" />
                     <span>{errorMsg}</span>
                   </div>
                 )}
@@ -489,7 +463,7 @@ export default function LoginPage() {
                     aria-live="polite"
                     className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
                   >
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
                     <span>{successMsg}</span>
                   </div>
                 )}
@@ -504,7 +478,7 @@ export default function LoginPage() {
                     </label>
                     <div className="relative">
                       <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <User className="h-4 w-4" />
+                        <User className="h-4 w-4" aria-hidden="true" />
                       </div>
                       <input
                         id="login-username"
@@ -536,7 +510,7 @@ export default function LoginPage() {
                     </label>
                     <div className="relative">
                       <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <Lock className="h-4 w-4" />
+                        <Lock className="h-4 w-4" aria-hidden="true" />
                       </div>
                       <input
                         id="login-password"
@@ -572,98 +546,73 @@ export default function LoginPage() {
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
+                    className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all flex items-center justify-center gap-2"
                   >
                     <span>{submitting ? "Signing in..." : "Sign In to Portal"}</span>
-                    <ArrowRight className="h-4 w-4" />
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </button>
                 </form>
 
-                {/* Vibrant Role Demo Switcher (Matches Portal Dashboards) */}
+                {/* Role Demo Switcher */}
                 <div className="pt-4 border-t border-slate-100">
-                  <div className="flex items-center justify-between mb-2.5">
-                    <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                      1-Click Role Switcher
-                    </p>
-                    <span className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full">
-                      Direct Role Access
-                    </span>
-                  </div>
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
+                    1-Click Role Switcher
+                  </p>
                   <div className="grid grid-cols-4 gap-2">
                     <button
                       type="button"
                       disabled={submitting}
                       onClick={() => handleQuickDemo("admin", "admin123")}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-blue-200/90 bg-gradient-to-b from-blue-50/80 to-blue-100/50 hover:from-blue-100 hover:to-blue-200/70 hover:border-blue-500 hover:shadow-md hover:shadow-blue-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
+                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-blue-200/90 bg-gradient-to-b from-blue-50/80 to-blue-100/50 hover:from-blue-100 hover:to-blue-200/70 hover:border-blue-500 active:scale-[0.97] hover:shadow-md hover:shadow-blue-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
                     >
                       <div className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                        <ShieldCheck className="h-4 w-4" />
+                        <ShieldCheck className="h-4 w-4" aria-hidden="true" />
                       </div>
-                      <div className="text-center leading-tight">
-                        <span className="block text-[11px] font-bold text-slate-800">
-                          Admin
-                        </span>
-                        <span className="block text-[9px] font-medium text-blue-600">
-                          Command
-                        </span>
-                      </div>
+                      <span className="block text-[11px] font-bold text-slate-800">
+                        Admin
+                      </span>
                     </button>
 
                     <button
                       type="button"
                       disabled={submitting}
                       onClick={() => handleQuickDemo("donor1", "pass123")}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-rose-200/90 bg-gradient-to-b from-rose-50/80 to-rose-100/50 hover:from-rose-100 hover:to-rose-200/70 hover:border-rose-500 hover:shadow-md hover:shadow-rose-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
+                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-rose-200/90 bg-gradient-to-b from-rose-50/80 to-rose-100/50 hover:from-rose-100 hover:to-rose-200/70 hover:border-rose-500 active:scale-[0.97] hover:shadow-md hover:shadow-rose-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
                     >
                       <div className="h-8 w-8 rounded-lg bg-rose-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                        <HeartHandshake className="h-4 w-4" />
+                        <HeartHandshake className="h-4 w-4" aria-hidden="true" />
                       </div>
-                      <div className="text-center leading-tight">
-                        <span className="block text-[11px] font-bold text-slate-800">
-                          Donor
-                        </span>
-                        <span className="block text-[9px] font-medium text-rose-600">
-                          Pledges
-                        </span>
-                      </div>
+                      <span className="block text-[11px] font-bold text-slate-800">
+                        Donor
+                      </span>
                     </button>
 
                     <button
                       type="button"
                       disabled={submitting}
                       onClick={() => handleQuickDemo("org1", "pass123")}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-amber-200/90 bg-gradient-to-b from-amber-50/80 to-amber-100/50 hover:from-amber-100 hover:to-amber-200/70 hover:border-amber-500 hover:shadow-md hover:shadow-amber-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
+                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-amber-200/90 bg-gradient-to-b from-amber-50/80 to-amber-100/50 hover:from-amber-100 hover:to-amber-200/70 hover:border-amber-500 active:scale-[0.97] hover:shadow-md hover:shadow-amber-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
                     >
                       <div className="h-8 w-8 rounded-lg bg-amber-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                        <Building2 className="h-4 w-4" />
+                        <Building2 className="h-4 w-4" aria-hidden="true" />
                       </div>
-                      <div className="text-center leading-tight">
-                        <span className="block text-[11px] font-bold text-slate-800">
-                          Org / LGU
-                        </span>
-                        <span className="block text-[9px] font-medium text-amber-600">
-                          Requests
-                        </span>
-                      </div>
+                      <span className="block text-[11px] font-bold text-slate-800">
+                        Org / LGU
+                      </span>
                     </button>
 
                     <button
                       type="button"
                       disabled={submitting}
                       onClick={() => handleQuickDemo("vol1", "pass123")}
-                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-emerald-200/90 bg-gradient-to-b from-emerald-50/80 to-emerald-100/50 hover:from-emerald-100 hover:to-emerald-200/70 hover:border-emerald-500 hover:shadow-md hover:shadow-emerald-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
+                      className="group flex flex-col items-center gap-1.5 rounded-xl border border-emerald-200/90 bg-gradient-to-b from-emerald-50/80 to-emerald-100/50 hover:from-emerald-100 hover:to-emerald-200/70 hover:border-emerald-500 active:scale-[0.97] hover:shadow-md hover:shadow-emerald-500/10 disabled:opacity-50 py-2.5 px-1 transition-all"
                     >
                       <div className="h-8 w-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                        <Truck className="h-4 w-4" />
+                        <Truck className="h-4 w-4" aria-hidden="true" />
                       </div>
-                      <div className="text-center leading-tight">
-                        <span className="block text-[11px] font-bold text-slate-800">
-                          Volunteer
-                        </span>
-                        <span className="block text-[9px] font-medium text-emerald-600">
-                          Logistics
-                        </span>
-                      </div>
+                      <span className="block text-[11px] font-bold text-slate-800">
+                        Volunteer
+                      </span>
                     </button>
                   </div>
                 </div>
@@ -686,7 +635,7 @@ export default function LoginPage() {
                       setErrorMsg("");
                       setSuccessMsg("");
                     }}
-                    className="rounded-xl py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all"
+                    className="rounded-xl py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 active:scale-[0.98] transition-all"
                   >
                     Sign In
                   </button>
@@ -704,7 +653,7 @@ export default function LoginPage() {
                     aria-live="assertive"
                     className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
                   >
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" aria-hidden="true" />
                     <span>{errorMsg}</span>
                   </div>
                 )}
@@ -715,7 +664,7 @@ export default function LoginPage() {
                     aria-live="polite"
                     className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
                   >
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
                     <span>{successMsg}</span>
                   </div>
                 )}
@@ -787,14 +736,14 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
                     >
                       <span>
                         {submitting
                           ? "Verifying..."
                           : "Verify Email & Create Account"}
                       </span>
-                      <ArrowRight className="h-4 w-4" />
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     </button>
 
                     <div className="flex items-center justify-between gap-2 pt-1 text-xs">
@@ -805,18 +754,18 @@ export default function LoginPage() {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="inline-flex items-center gap-1 font-semibold text-slate-600 hover:text-slate-900 transition"
+                        className="inline-flex items-center gap-1 font-semibold text-slate-600 hover:text-slate-900 active:scale-[0.98] transition"
                       >
-                        <ArrowLeft className="h-3.5 w-3.5" />
+                        <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>Edit Email / Details</span>
                       </button>
                       <button
                         type="button"
                         onClick={handleResendOtp}
                         disabled={resending || resendCooldown > 0}
-                        className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-700 disabled:text-slate-400 transition"
+                        className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-700 active:scale-[0.98] disabled:text-slate-400 transition"
                       >
-                        <RotateCcw className="h-3.5 w-3.5" />
+                        <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                         <span>
                           {resending
                             ? "Sending..."
@@ -864,7 +813,7 @@ export default function LoginPage() {
                       </span>
                       <div className="relative">
                         <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                          <Mail className="h-4 w-4" />
+                          <Mail className="h-4 w-4" aria-hidden="true" />
                         </div>
                         <input
                           id="reg-email"
@@ -909,7 +858,7 @@ export default function LoginPage() {
                         </span>
                         <div className="relative">
                           <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                            <User className="h-3.5 w-3.5" />
+                            <User className="h-3.5 w-3.5" aria-hidden="true" />
                           </div>
                           <input
                             id="reg-username"
@@ -956,7 +905,7 @@ export default function LoginPage() {
                         </span>
                         <div className="relative">
                           <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                            <Lock className="h-3.5 w-3.5" />
+                            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                           </div>
                           <input
                             id="reg-password"
@@ -1030,7 +979,7 @@ export default function LoginPage() {
                         </label>
                         <div className="relative">
                           <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                            <Phone className="h-3.5 w-3.5" />
+                            <Phone className="h-3.5 w-3.5" aria-hidden="true" />
                           </div>
                           <input
                             id="reg-contact"
@@ -1097,7 +1046,7 @@ export default function LoginPage() {
                           </label>
                           <div className="relative">
                             <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                              <MapPin className="h-3.5 w-3.5" />
+                              <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                             </div>
                             <input
                               id="reg-location"
@@ -1141,14 +1090,14 @@ export default function LoginPage() {
                     <button
                       type="submit"
                       disabled={submitting}
-                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
                     >
                       <span>
                         {submitting
                           ? "Sending Verification Code..."
                           : "Send Verification Code"}
                       </span>
-                      <ArrowRight className="h-4 w-4" />
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
                     </button>
 
                     <div className="text-center pt-2">
@@ -1159,9 +1108,9 @@ export default function LoginPage() {
                           setErrorMsg("");
                           setSuccessMsg("");
                         }}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-bold transition"
+                        className="text-xs text-blue-600 hover:text-blue-800 active:scale-[0.98] font-bold transition"
                       >
-                        Already have an account? Sign In &rarr;
+                        Already have an account? Sign In
                       </button>
                     </div>
                   </form>
@@ -1175,6 +1124,6 @@ export default function LoginPage() {
       {showTracker && (
         <PublicAidTrackerModal onClose={() => setShowTracker(false)} />
       )}
-    </div>
+    </main>
   );
 }
