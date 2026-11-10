@@ -31,7 +31,6 @@ import {
 } from "@/components/ReportCharts";
 import {
   getDisasterAlertInfo,
-  PhilippineCommandMap,
   EmergencyBroadcastModal,
 } from "@/components/DisasterEnhancements";
 import {
@@ -1002,14 +1001,7 @@ export default function AdminPortalPage() {
 
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
-        <div className="space-y-6">
-          <PhilippineCommandMap
-            events={events}
-            actionLabel="Manage Calamity Operations"
-            onSelectEventAction={() => setActiveTab("events")}
-          />
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-bold text-slate-900">
@@ -1106,7 +1098,6 @@ export default function AdminPortalPage() {
                 );
               })}
             </div>
-          </div>
           </div>
         </div>
       )}

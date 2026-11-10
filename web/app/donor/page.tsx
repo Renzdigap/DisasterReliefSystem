@@ -29,7 +29,6 @@ import { PortalShellSkeleton, StatusBadge } from "@/components/SkeletonUI";
 import {
   DonationCertificateModal,
   getDisasterAlertInfo,
-  PhilippineCommandMap,
 } from "@/components/DisasterEnhancements";
 import {
   apiFetch,
@@ -677,17 +676,7 @@ export default function DonorPortalPage() {
 
       {/* TAB 3: ACTIVE DISASTERS WITH PAGASA SEVERITY & RESOURCE DEMAND */}
       {activeTab === "needs" && (
-        <div className="space-y-5">
-          <PhilippineCommandMap
-            events={events}
-            actionLabel="Pledge Relief Goods to This Zone"
-            onSelectEventAction={(ev) => {
-              if (ev?.eventId) setSelectedEventId(ev.eventId);
-              setActiveTab("pledge");
-            }}
-          />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {events.map((ev: any) => {
             const alertInfo = getDisasterAlertInfo(ev.eventName);
             return (
@@ -764,7 +753,6 @@ export default function DonorPortalPage() {
               </div>
             );
           })}
-          </div>
         </div>
       )}
 
