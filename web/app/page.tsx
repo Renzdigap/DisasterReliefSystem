@@ -253,22 +253,13 @@ export default function LoginPage() {
 
         {/* Top Branding */}
         <div className="relative z-10 space-y-6">
-          <div className="flex items-center gap-3.5">
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/15 shadow-xl shrink-0">
-              <div className="h-14 w-14 rounded-xl bg-white p-1.5 shadow-sm flex items-center justify-center">
-                <img
-                  src="/ndrrmc-logo.png"
-                  alt="NDRRMC Logo"
-                  className="h-full w-full object-contain"
-                />
-              </div>
-              <div className="h-14 w-14 rounded-xl bg-white p-1.5 shadow-sm flex items-center justify-center">
-                <img
-                  src="/drrms-logo.png"
-                  alt="DRRMS Project Logo"
-                  className="h-full w-full object-contain"
-                />
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="h-16 w-16 rounded-2xl bg-white p-2 shadow-xl border border-white/20 flex items-center justify-center shrink-0">
+              <img
+                src="/ndrrmc-logo.png"
+                alt="NDRRMC Logo"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div className="space-y-0.5">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-[11px] font-semibold text-blue-300">
