@@ -303,22 +303,13 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
                   {/* Event Name Label on X-axis */}
                   <text
                     x={groupCenterX}
-                    y={baseY + 18}
+                    y={baseY + 20}
                     textAnchor="middle"
                     fontSize="10"
                     fill="#334155"
                     fontWeight="600"
                   >
                     {shortLabel}
-                  </text>
-                  <text
-                    x={groupCenterX}
-                    y={baseY + 30}
-                    textAnchor="middle"
-                    fontSize="9"
-                    fill="#94A3B8"
-                  >
-                    #{r.eventId}
                   </text>
                 </g>
               );
@@ -361,7 +352,7 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
     totalRequestedCount += requested;
 
     const health = (r.stockHealth || "").toLowerCase();
-    if (health === "critical") criticalCount++;
+    if (health.includes("critical")) criticalCount++;
     if (health === "low stock") lowCount++;
 
     if (!categoryMap[cat]) {
@@ -568,7 +559,7 @@ export function InventoryHealthCharts({ rows }: { rows: any[] }) {
                     <div
                       style={{ width: `${barPercent}%` }}
                       className={`h-full rounded-full ${
-                        (r.stockHealth || "").toLowerCase() === "critical"
+                        (r.stockHealth || "").toLowerCase().includes("critical")
                           ? "bg-rose-500"
                           : (r.stockHealth || "").toLowerCase() === "low stock"
                           ? "bg-amber-500"
@@ -721,7 +712,7 @@ export function DonorImpactCharts({ rows }: { rows: any[] }) {
                   ? "🥈"
                   : rank === 2
                   ? "🥉"
-                  : `#${rank + 1}`;
+                  : `${rank + 1}.`;
 
               return (
                 <div key={d.donorId} className="space-y-1">

@@ -229,13 +229,13 @@ export default function AdminPortalPage() {
       try {
         if (target.kind === "event") {
           await apiFetch(`/api/events?id=${target.id}`, { method: "DELETE" });
-          showToast(`Deleted disaster event #${target.id}.`);
+          showToast(`Deleted disaster event ${target.id}.`);
         } else if (target.kind === "request") {
           await apiFetch(`/api/requests?id=${target.id}`, { method: "DELETE" });
-          showToast(`Deleted relief request #${target.id}.`);
+          showToast(`Deleted relief request ${target.id}.`);
         } else if (target.kind === "donation") {
           await apiFetch(`/api/donations?id=${target.id}`, { method: "DELETE" });
-          showToast(`Deleted donation #${target.id}.`);
+          showToast(`Deleted donation ${target.id}.`);
         } else if (target.kind === "inventory") {
           await apiFetch(`/api/inventory?id=${target.id}`, {
             method: "DELETE",
@@ -245,7 +245,7 @@ export default function AdminPortalPage() {
           await apiFetch(`/api/deliveries?id=${target.id}`, {
             method: "DELETE",
           });
-          showToast(`Deleted delivery #${target.id}.`);
+          showToast(`Deleted delivery ${target.id}.`);
         }
         await refreshData(true);
       } catch (err: any) {
@@ -446,7 +446,7 @@ export default function AdminPortalPage() {
         method: "PUT",
         body: JSON.stringify({ eventId: ev.eventId, status: next }),
       });
-      showToast(`Event #${ev.eventId} transitioned to ${next}.`);
+      showToast(`Event ${ev.eventId} transitioned to ${next}.`);
       await refreshData(true);
     } catch (err: any) {
       showToast(err.message || "Failed to update event status.", "error");
@@ -463,7 +463,7 @@ export default function AdminPortalPage() {
         body: JSON.stringify({ requestId: reqId, status }),
       });
       showToast(
-        `Request #${reqId} marked ${status} (Warehouse inventory synchronized atomically).`
+        `Request ${reqId} marked ${status} (Warehouse inventory synchronized).`
       );
       await refreshData(true);
     } catch (err: any) {
@@ -481,7 +481,7 @@ export default function AdminPortalPage() {
         body: JSON.stringify({ donationId: donId, status }),
       });
       showToast(
-        `Donation #${donId} marked ${status} (Warehouse stock credited atomically).`
+        `Donation ${donId} marked ${status} (Warehouse stock updated).`
       );
       await refreshData(true);
     } catch (err: any) {
@@ -497,11 +497,11 @@ export default function AdminPortalPage() {
     const unit = newItemUnit.trim();
     const stock = Number(newItemStock);
     if (!itemName || !unit) {
-      showToast("Commodity name and unit of measure are required.", "error");
+      showToast("Item name and unit of measure are required.", "error");
       return;
     }
     if (!Number.isInteger(stock) || stock < 0) {
-      showToast("Opening stock must be a non-negative integer.", "error");
+      showToast("Initial stock must be a non-negative integer.", "error");
       return;
     }
     setBusyKey("create-inventory");
@@ -516,10 +516,10 @@ export default function AdminPortalPage() {
         }),
       });
       setNewItemName("");
-      showToast("Master ReliefGood & Initial Stock added.");
+      showToast("Relief item added to warehouse inventory.");
       await refreshData(true);
     } catch (err: any) {
-      showToast(err.message || "Failed to add commodity.", "error");
+      showToast(err.message || "Failed to add relief item.", "error");
     } finally {
       setBusyKey(null);
     }
@@ -598,7 +598,7 @@ export default function AdminPortalPage() {
       const dispatchedId = dispatchReqId;
       setDispatchReqId(0);
       setDispatchVolId(0);
-      showToast(`Delivery dispatched for Request #${dispatchedId}.`);
+      showToast(`Delivery dispatched for Request ${dispatchedId}.`);
       await refreshData(true);
     } catch (err: any) {
       showToast(err.message || "Failed to dispatch delivery.", "error");
@@ -614,7 +614,7 @@ export default function AdminPortalPage() {
         method: "PUT",
         body: JSON.stringify({ deliveryId: delId, deliveryStatus: status }),
       });
-      showToast(`Delivery #${delId} updated to ${status}.`);
+      showToast(`Delivery ${delId} updated to ${status}.`);
       await refreshData(true);
     } catch (err: any) {
       showToast(err.message || "Failed to update delivery status.", "error");
@@ -696,8 +696,8 @@ export default function AdminPortalPage() {
         (s: number, r: any) => s + Number(r.totalRequestedQty || 0),
         0
       );
-      const criticalCount = rows.filter(
-        (r: any) => (r.stockHealth || "").toLowerCase() === "critical"
+      const criticalCount = rows.filter((r: any) =>
+        (r.stockHealth || "").toLowerCase().includes("critical")
       ).length;
       const lowStockCount = rows.filter(
         (r: any) => (r.stockHealth || "").toLowerCase() === "low stock"
@@ -1013,23 +1013,31 @@ export default function AdminPortalPage() {
                       key={r.requestId}
                       className="py-3 flex items-center justify-between gap-3 text-xs"
                     >
-                      <div className="min-w-0">
-                        <div className="font-semibold text-slate-900 truncate">
-                          {r.orgName}{" "}
-                          <span className="font-normal text-slate-400">
-                            #{r.requestId}
+                      <div className="min-w-0 space-y-0.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-semibold text-slate-900 truncate">
+                            {r.orgName}
+                          </span>
+                          <span className="text-[11px] font-medium text-slate-400 tabular-nums shrink-0">
+                            ID {r.requestId}
                           </span>
                         </div>
-                        <div className="text-slate-600 mt-0.5 truncate">
-                          {r.eventName}
-                          {(r.items || []).length > 0 && (
+                        <div className="text-slate-600 truncate">
+                          {(r.items || []).length > 0 ? (
                             <>
-                              {" "}
-                              &bull;{" "}
-                              {(r.items || [])
-                                .map((i: any) => `${i.itemName} × ${i.quantity}`)
-                                .join(", ")}
+                              <span className="font-medium text-slate-700">
+                                {(r.items || [])
+                                  .map(
+                                    (i: any) =>
+                                      `${Number(i.quantity).toLocaleString()} ${i.itemName}`
+                                  )
+                                  .join(", ")}
+                              </span>
+                              {" · "}
+                              <span className="text-slate-500">{r.eventName}</span>
                             </>
+                          ) : (
+                            r.eventName
                           )}
                         </div>
                       </div>
@@ -1236,9 +1244,9 @@ export default function AdminPortalPage() {
                       <tr key={ev.eventId} className="hover:bg-slate-50/80">
                         <th
                           scope="row"
-                          className="px-4 py-3 font-bold text-slate-700 whitespace-nowrap"
+                          className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
                         >
-                          #{ev.eventId}
+                          {ev.eventId}
                         </th>
                         <td className="px-4 py-3 font-semibold text-slate-900">
                           {ev.eventName}
@@ -1266,12 +1274,12 @@ export default function AdminPortalPage() {
                             <button
                               type="button"
                               disabled={isBusy}
-                              aria-label={`Delete event #${ev.eventId}`}
+                              aria-label={`Delete event ${ev.eventId}`}
                               onClick={() =>
                                 openDeleteConfirm({
                                   kind: "event",
                                   id: ev.eventId,
-                                  label: `Disaster Event #${ev.eventId} (${ev.eventName})`,
+                                  label: `Disaster Event ${ev.eventId} (${ev.eventName})`,
                                 })
                               }
                               className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 active:scale-[0.98] disabled:opacity-50 p-1.5 transition"
@@ -1299,33 +1307,37 @@ export default function AdminPortalPage() {
 
       {/* TAB 3: RELIEF REQUESTS */}
       {activeTab === "requests" && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {["ALL", "Pending", "Approved", "Fulfilled"].map((st) => (
                 <button
                   key={st}
                   type="button"
+                  aria-pressed={statusFilter === st}
                   onClick={() => setStatusFilter(st)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                     statusFilter === st
-                      ? "bg-[#002060] text-white"
-                      : "bg-slate-100 text-slate-600"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {st}
+                  {st === "ALL" ? "All" : st}
                 </button>
               ))}
             </div>
             <div className="relative">
-              <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <Search
+                className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
               <input
                 type="search"
                 aria-label="Search relief requests by organization or disaster"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search organization or disaster..."
-                className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+                className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
               />
             </div>
           </div>
@@ -1336,62 +1348,77 @@ export default function AdminPortalPage() {
             aria-label="Relief requests table"
             className="overflow-x-auto"
           >
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <caption className="sr-only">Organization relief requests</caption>
+              <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                 <tr>
-                  <th scope="col" className="p-3">
-                    Req ID
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    ID
                   </th>
-                  <th scope="col" className="p-3">
-                    Requesting Organization
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Organization
                   </th>
-                  <th scope="col" className="p-3">
-                    Disaster Event
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Disaster
                   </th>
-                  <th scope="col" className="p-3">
-                    3NF Line Items (RequestItem)
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Requested Items
                   </th>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-4 py-3 font-semibold">
                     Date
                   </th>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-4 py-3 font-semibold">
                     Status
                   </th>
-                  <th scope="col" className="p-3 text-right">
-                    Steward Allocation
+                  <th scope="col" className="px-4 py-3 font-semibold text-right">
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredRequests.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-slate-400">
+                    <td colSpan={7} className="p-6 text-center text-xs text-slate-400">
                       No matching relief requests found.
                     </td>
                   </tr>
                 ) : (
                   slicePage(filteredRequests).map((r) => (
-                    <tr key={r.requestId} className="hover:bg-slate-50">
-                      <td className="p-3 font-bold">#{r.requestId}</td>
-                      <td className="p-3 font-semibold text-slate-900">
+                    <tr key={r.requestId} className="hover:bg-slate-50/80">
+                      <th
+                        scope="row"
+                        className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
+                      >
+                        {r.requestId}
+                      </th>
+                      <td className="px-4 py-3 font-semibold text-slate-900">
                         {r.orgName}
                       </td>
-                      <td className="p-3 text-slate-600">{r.eventName}</td>
-                      <td className="p-3 text-slate-700">
-                        {(r.items || []).map((it: any, idx: number) => (
-                          <span
-                            key={it.requestItemId || idx}
-                            className="inline-block rounded bg-slate-100 border border-slate-200 px-2 py-0.5 mr-1 mb-1 text-[11px]"
-                          >
-                            {it.itemName}: <b>{it.quantity}</b> {it.unitOfMeasure}
-                          </span>
-                        ))}
+                      <td className="px-4 py-3 text-slate-600">{r.eventName}</td>
+                      <td className="px-4 py-3 text-xs text-slate-700">
+                        {(r.items || []).length === 0 ? (
+                          <span className="text-slate-400">—</span>
+                        ) : (
+                          <ul className="space-y-1">
+                            {(r.items || []).map((it: any, idx: number) => (
+                              <li key={it.requestItemId || idx} className="leading-snug">
+                                <span className="font-semibold text-slate-900 tabular-nums">
+                                  {Number(it.quantity).toLocaleString()} {it.unitOfMeasure}
+                                </span>
+                                <span className="text-slate-400 mx-1.5">&middot;</span>
+                                <span className="text-slate-700">{it.itemName}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </td>
-                      <td className="p-3 text-slate-500">{r.requestDate}</td>
-                      <td className="p-3">
+                      <td className="px-4 py-3 text-slate-500 tabular-nums whitespace-nowrap">
+                        {r.requestDate}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <StatusBadge status={r.status} />
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5">
                           {r.status === "Pending" && (
                             <button
@@ -1403,11 +1430,11 @@ export default function AdminPortalPage() {
                                   "Approved"
                                 )
                               }
-                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-2.5 py-1 text-xs font-bold text-white"
+                              className="rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 px-3 py-1.5 text-xs font-semibold text-white transition"
                             >
                               {busyKey === `request-${r.requestId}`
                                 ? "Saving..."
-                                : "Approve & Deduct"}
+                                : "Approve"}
                             </button>
                           )}
                           {r.status === "Approved" && (
@@ -1420,7 +1447,7 @@ export default function AdminPortalPage() {
                                   "Fulfilled"
                                 )
                               }
-                              className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] disabled:opacity-50 px-2.5 py-1 text-xs font-bold text-white"
+                              className="rounded-lg border border-slate-300 bg-white hover:bg-slate-100 active:scale-[0.98] disabled:opacity-50 px-2.5 py-1 text-xs font-semibold text-slate-700 transition"
                             >
                               {busyKey === `request-${r.requestId}`
                                 ? "Saving..."
@@ -1430,17 +1457,17 @@ export default function AdminPortalPage() {
                           <button
                             type="button"
                             disabled={isBusy}
-                            aria-label={`Delete request #${r.requestId}`}
+                            aria-label={`Delete request ${r.requestId}`}
                             onClick={() =>
                               openDeleteConfirm({
                                 kind: "request",
                                 id: r.requestId,
-                                label: `Relief Request #${r.requestId} (${r.orgName})`,
+                                label: `Relief Request ${r.requestId} (${r.orgName})`,
                               })
                             }
-                            className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1.5"
+                            className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 active:scale-[0.98] disabled:opacity-50 p-1.5 transition"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           </button>
                         </div>
                       </td>
@@ -1462,33 +1489,37 @@ export default function AdminPortalPage() {
 
       {/* TAB 4: DONATIONS LEDGER */}
       {activeTab === "donations" && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {["ALL", "Pending", "Approved"].map((st) => (
                 <button
                   key={st}
                   type="button"
+                  aria-pressed={statusFilter === st}
                   onClick={() => setStatusFilter(st)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                     statusFilter === st
-                      ? "bg-[#002060] text-white"
-                      : "bg-slate-100 text-slate-600"
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
-                  {st}
+                  {st === "ALL" ? "All" : st}
                 </button>
               ))}
             </div>
             <div className="relative">
-              <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+              <Search
+                className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                aria-hidden="true"
+              />
               <input
                 type="search"
                 aria-label="Search donations by donor or event"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search donor or event..."
-                className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+                className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
               />
             </div>
           </div>
@@ -1499,63 +1530,77 @@ export default function AdminPortalPage() {
             aria-label="Donations ledger table"
             className="overflow-x-auto"
           >
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <caption className="sr-only">Donations ledger</caption>
+              <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                 <tr>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-4 py-3 font-semibold">
                     ID
                   </th>
-                  <th scope="col" className="p-3">
-                    Donor Name
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Donor
                   </th>
-                  <th scope="col" className="p-3">
-                    Target Disaster Event
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Disaster Event
                   </th>
-                  <th scope="col" className="p-3">
-                    Donated Items (DonationItem)
+                  <th scope="col" className="px-4 py-3 font-semibold">
+                    Donated Items
                   </th>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-4 py-3 font-semibold">
                     Date
                   </th>
-                  <th scope="col" className="p-3">
+                  <th scope="col" className="px-4 py-3 font-semibold">
                     Status
                   </th>
-                  <th scope="col" className="p-3 text-right">
-                    Steward Verification
+                  <th scope="col" className="px-4 py-3 font-semibold text-right">
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredDonations.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-slate-400">
+                    <td colSpan={7} className="p-6 text-center text-xs text-slate-400">
                       No matching donations found.
                     </td>
                   </tr>
                 ) : (
                   slicePage(filteredDonations).map((d) => (
-                    <tr key={d.donationId} className="hover:bg-slate-50">
-                      <td className="p-3 font-bold">#{d.donationId}</td>
-                      <td className="p-3 font-semibold text-slate-900">
+                    <tr key={d.donationId} className="hover:bg-slate-50/80">
+                      <th
+                        scope="row"
+                        className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
+                      >
+                        {d.donationId}
+                      </th>
+                      <td className="px-4 py-3 font-semibold text-slate-900">
                         {d.donorName}
                       </td>
-                      <td className="p-3 text-slate-600">{d.eventName}</td>
-                      <td className="p-3">
-                        {(d.items || []).map((it: any, idx: number) => (
-                          <span
-                            key={it.itemId || idx}
-                            className="inline-block rounded bg-emerald-50 border border-emerald-200 px-2 py-0.5 mr-1 mb-1 text-[11px] text-emerald-900"
-                          >
-                            {it.itemName}: <b>+{it.quantity}</b>{" "}
-                            {it.unitOfMeasure}
-                          </span>
-                        ))}
+                      <td className="px-4 py-3 text-slate-600">{d.eventName}</td>
+                      <td className="px-4 py-3 text-xs text-slate-700">
+                        {(d.items || []).length === 0 ? (
+                          <span className="text-slate-400">—</span>
+                        ) : (
+                          <ul className="space-y-1">
+                            {(d.items || []).map((it: any, idx: number) => (
+                              <li key={it.itemId || idx} className="leading-snug">
+                                <span className="font-semibold text-emerald-700 tabular-nums">
+                                  +{Number(it.quantity).toLocaleString()} {it.unitOfMeasure}
+                                </span>
+                                <span className="text-slate-400 mx-1.5">&middot;</span>
+                                <span className="text-slate-700">{it.itemName}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                       </td>
-                      <td className="p-3 text-slate-500">{d.donationDate}</td>
-                      <td className="p-3">
+                      <td className="px-4 py-3 text-slate-500 tabular-nums whitespace-nowrap">
+                        {d.donationDate}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <StatusBadge status={d.status} />
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5">
                           {d.status === "Pending" && (
                             <button
@@ -1567,27 +1612,27 @@ export default function AdminPortalPage() {
                                   "Approved"
                                 )
                               }
-                              className="rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-3 py-1 text-xs font-bold text-white"
+                              className="rounded-lg bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 px-3 py-1.5 text-xs font-semibold text-white transition"
                             >
                               {busyKey === `donation-${d.donationId}`
                                 ? "Saving..."
-                                : "Verify & Credit Stock"}
+                                : "Approve"}
                             </button>
                           )}
                           <button
                             type="button"
                             disabled={isBusy}
-                            aria-label={`Delete donation #${d.donationId}`}
+                            aria-label={`Delete donation ${d.donationId}`}
                             onClick={() =>
                               openDeleteConfirm({
                                 kind: "donation",
                                 id: d.donationId,
-                                label: `Donation #${d.donationId} by ${d.donorName}`,
+                                label: `Donation ${d.donationId} by ${d.donorName}`,
                               })
                             }
-                            className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1.5"
+                            className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 active:scale-[0.98] disabled:opacity-50 p-1.5 transition"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                           </button>
                         </div>
                       </td>
@@ -1607,53 +1652,59 @@ export default function AdminPortalPage() {
         </div>
       )}
 
-      {/* TAB 5: WAREHOUSE INVENTORY & MASTER CATALOG */}
+      {/* TAB 5: WAREHOUSE INVENTORY */}
       {activeTab === "inventory" && (
         <div className="space-y-5">
-          {/* Emergency Warehouse Auto-Replenishment & Shortage Trigger */}
+          {/* Low Stock Alert */}
           {(() => {
             const criticalOrLowItems = inventory.filter(
               (item) => item.currentStock <= 1000
             );
             if (criticalOrLowItems.length === 0) return null;
+            const remainingCount = Math.max(0, criticalOrLowItems.length - 3);
             return (
-              <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-rose-50/60 to-amber-50/40 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-extrabold uppercase">
-                      <AlertTriangle className="h-3 w-3" /> Replenishment Trigger
-                    </span>
-                    <span className="text-xs font-extrabold text-slate-900">
-                      {criticalOrLowItems.length} Commodities Below Optimal Safety Buffer
-                    </span>
+              <div className="rounded-2xl border border-amber-200/90 bg-amber-50/70 p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3 min-w-0">
+                  <div className="h-8 w-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertTriangle className="h-4 w-4" aria-hidden="true" />
                   </div>
-                  <p className="text-xs text-slate-600">
-                    Depletion forecast:{" "}
-                    <strong className="text-rose-700">
-                      ~3.2 Operational Days remaining
-                    </strong>{" "}
-                    for{" "}
-                    {criticalOrLowItems
-                      .slice(0, 3)
-                      .map((i) => `${i.itemName} (${i.currentStock} ${i.unitOfMeasure})`)
-                      .join(", ")}
-                    .
-                  </p>
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs sm:text-sm font-bold text-slate-900">
+                        Low Stock Alert
+                      </span>
+                      <span className="rounded-full bg-amber-100 border border-amber-200 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                        {criticalOrLowItems.length}{" "}
+                        {criticalOrLowItems.length === 1 ? "item" : "items"} need restocking
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600">
+                      Restock needed:{" "}
+                      {criticalOrLowItems
+                        .slice(0, 3)
+                        .map(
+                          (i) =>
+                            `${i.itemName} (${Number(i.currentStock).toLocaleString()} ${i.unitOfMeasure})`
+                        )
+                        .join(", ")}
+                      {remainingCount > 0 ? `, and ${remainingCount} more` : ""}.
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={() =>
                     showToast(
-                      `Urgent Calamity Replenishment Appeal published to Donor Portal for: ${criticalOrLowItems
+                      `Urgent donor appeal published for: ${criticalOrLowItems
                         .slice(0, 3)
                         .map((i) => i.itemName)
-                        .join(", ")}!`,
+                        .join(", ")}.`,
                       "success"
                     )
                   }
-                  className="rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 px-4 py-2 text-xs font-bold text-white shadow-sm transition shrink-0"
+                  className="rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] px-4 py-2 text-xs font-semibold text-white shadow-xs transition shrink-0"
                 >
-                  Publish Urgent Donor Appeal &rarr;
+                  Publish Urgent Donor Appeal
                 </button>
               </div>
             );
@@ -1661,14 +1712,14 @@ export default function AdminPortalPage() {
 
           <form
             onSubmit={handleAddInventoryItem}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm grid grid-cols-1 sm:grid-cols-6 gap-3 items-end"
+            className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs grid grid-cols-1 sm:grid-cols-6 gap-3 items-end"
           >
             <div className="sm:col-span-2">
               <label
                 htmlFor="new-good-name"
                 className="block text-xs font-semibold text-slate-700 mb-1"
               >
-                Master ReliefGood Name
+                Item Name
               </label>
               <input
                 id="new-good-name"
@@ -1678,7 +1729,7 @@ export default function AdminPortalPage() {
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 placeholder="e.g. Family Hygiene Kit"
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
             <div>
@@ -1693,13 +1744,15 @@ export default function AdminPortalPage() {
                 name="category"
                 value={newItemCategory}
                 onChange={(e) => setNewItemCategory(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600 focus:outline-none"
               >
                 <option value="Food">Food</option>
                 <option value="Water">Water</option>
                 <option value="Medicine">Medicine</option>
+                <option value="Hygiene">Hygiene</option>
                 <option value="Non-Food">Non-Food</option>
                 <option value="Shelter">Shelter</option>
+                <option value="Care">Care</option>
               </select>
             </div>
             <div>
@@ -1707,7 +1760,7 @@ export default function AdminPortalPage() {
                 htmlFor="new-good-unit"
                 className="block text-xs font-semibold text-slate-700 mb-1"
               >
-                Unit of Measure
+                Unit
               </label>
               <input
                 id="new-good-unit"
@@ -1717,7 +1770,7 @@ export default function AdminPortalPage() {
                 value={newItemUnit}
                 onChange={(e) => setNewItemUnit(e.target.value)}
                 placeholder="Packs"
-                className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
             <div>
@@ -1725,7 +1778,7 @@ export default function AdminPortalPage() {
                 htmlFor="new-good-stock"
                 className="block text-xs font-semibold text-slate-700 mb-1"
               >
-                Opening Stock
+                Initial Stock
               </label>
               <input
                 id="new-good-stock"
@@ -1736,19 +1789,20 @@ export default function AdminPortalPage() {
                 required
                 value={newItemStock}
                 onChange={(e) => setNewItemStock(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600 focus:outline-none"
               />
             </div>
             <button
               type="submit"
               disabled={isBusy}
-              className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] disabled:opacity-50 py-2 px-4 text-xs font-bold text-white"
+              className="inline-flex items-center justify-center gap-1.5 min-h-[40px] rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 py-2 px-4 text-xs font-bold text-white transition"
             >
-              {busyKey === "create-inventory" ? "Adding..." : "+ Add Commodity"}
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{busyKey === "create-inventory" ? "Adding..." : "Add Item"}</span>
             </button>
           </form>
 
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 {["ALL", "CRITICAL ALERT", "LOW STOCK", "SUFFICIENT"].map(
@@ -1756,27 +1810,37 @@ export default function AdminPortalPage() {
                     <button
                       key={st}
                       type="button"
+                      aria-pressed={statusFilter === st}
                       onClick={() => setStatusFilter(st)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                         statusFilter === st
-                          ? "bg-[#002060] text-white"
-                          : "bg-slate-100 text-slate-600"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
-                      {st}
+                      {st === "ALL"
+                        ? "All"
+                        : st === "CRITICAL ALERT"
+                        ? "Critical Alert"
+                        : st === "LOW STOCK"
+                        ? "Low Stock"
+                        : "Sufficient"}
                     </button>
                   )
                 )}
               </div>
               <div className="relative">
-                <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <Search
+                  className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  aria-hidden="true"
+                />
                 <input
                   type="search"
-                  aria-label="Search inventory commodities"
+                  aria-label="Search inventory items"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search commodity or category..."
-                  className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+                  placeholder="Search item or category..."
+                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
                 />
               </div>
             </div>
@@ -1787,26 +1851,27 @@ export default function AdminPortalPage() {
               aria-label="Warehouse inventory table"
               className="overflow-x-auto"
             >
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <caption className="sr-only">Warehouse inventory</caption>
+                <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                   <tr>
-                    <th scope="col" className="p-3">
-                      Good ID
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      ID
                     </th>
-                    <th scope="col" className="p-3">
-                      Commodity Name
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      Item Name
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Category
                     </th>
-                    <th scope="col" className="p-3">
-                      Operational Stock Balance
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      Current Stock
                     </th>
-                    <th scope="col" className="p-3">
-                      Health Status
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      Status
                     </th>
-                    <th scope="col" className="p-3 text-right">
-                      Manual Audit Adjustment
+                    <th scope="col" className="px-4 py-3 font-semibold text-right">
+                      Adjust Stock
                     </th>
                   </tr>
                 </thead>
@@ -1815,7 +1880,7 @@ export default function AdminPortalPage() {
                     <tr>
                       <td
                         colSpan={6}
-                        className="p-6 text-center text-slate-400"
+                        className="p-6 text-center text-xs text-slate-400"
                       >
                         No matching inventory items found.
                       </td>
@@ -1831,25 +1896,30 @@ export default function AdminPortalPage() {
                       const customVal =
                         stockEdits[inv.inventoryId] ?? String(inv.currentStock);
                       return (
-                        <tr key={inv.inventoryId} className="hover:bg-slate-50">
-                          <td className="p-3 font-bold">#{inv.goodId}</td>
-                          <td className="p-3 font-semibold text-slate-900">
+                        <tr key={inv.inventoryId} className="hover:bg-slate-50/80">
+                          <th
+                            scope="row"
+                            className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
+                          >
+                            {inv.goodId}
+                          </th>
+                          <td className="px-4 py-3 font-semibold text-slate-900">
                             {inv.itemName}
                           </td>
-                          <td className="p-3 text-slate-600">{inv.category}</td>
-                          <td className="p-3 font-bold text-slate-900">
-                            {inv.currentStock} {inv.unitOfMeasure}
+                          <td className="px-4 py-3 text-slate-600">{inv.category}</td>
+                          <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums whitespace-nowrap">
+                            {Number(inv.currentStock ?? 0).toLocaleString()} {inv.unitOfMeasure}
                           </td>
-                          <td className="p-3">
+                          <td className="px-4 py-3 whitespace-nowrap">
                             <StatusBadge status={healthLabel} />
                           </td>
-                          <td className="p-3 text-right">
-                            <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <div className="inline-flex items-center justify-end gap-1.5">
                               <button
                                 type="button"
                                 disabled={isBusy}
                                 onClick={() => handleAdjustStock(inv, 100)}
-                                className="rounded border border-slate-300 hover:bg-slate-100 disabled:opacity-50 px-2 py-1 text-[11px] font-bold"
+                                className="rounded-lg border border-slate-300 bg-white hover:bg-slate-100 active:scale-[0.98] disabled:opacity-50 px-2 py-1 text-xs font-semibold text-slate-700 tabular-nums transition"
                               >
                                 +100
                               </button>
@@ -1857,7 +1927,7 @@ export default function AdminPortalPage() {
                                 type="button"
                                 disabled={isBusy || inv.currentStock <= 0}
                                 onClick={() => handleAdjustStock(inv, -100)}
-                                className="rounded border border-slate-300 hover:bg-slate-100 disabled:opacity-50 px-2 py-1 text-[11px] font-bold"
+                                className="rounded-lg border border-slate-300 bg-white hover:bg-slate-100 active:scale-[0.98] disabled:opacity-50 px-2 py-1 text-xs font-semibold text-slate-700 tabular-nums transition"
                               >
                                 -100
                               </button>
@@ -1873,13 +1943,13 @@ export default function AdminPortalPage() {
                                     [inv.inventoryId]: e.target.value,
                                   }))
                                 }
-                                className="w-20 rounded border border-slate-300 px-2 py-1 text-[11px] font-semibold"
+                                className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold tabular-nums focus:border-blue-600 focus:outline-none"
                               />
                               <button
                                 type="button"
                                 disabled={isBusy}
                                 onClick={() => handleSetCustomStock(inv)}
-                                className="rounded bg-slate-800 hover:bg-slate-900 disabled:opacity-50 px-2 py-1 text-[11px] font-bold text-white"
+                                className="rounded-lg bg-slate-800 hover:bg-slate-900 active:scale-[0.98] disabled:opacity-50 px-2.5 py-1 text-xs font-semibold text-white transition"
                               >
                                 Set
                               </button>
@@ -1891,12 +1961,12 @@ export default function AdminPortalPage() {
                                   openDeleteConfirm({
                                     kind: "inventory",
                                     id: inv.inventoryId,
-                                    label: `${inv.itemName} (#${inv.goodId})`,
+                                    label: `${inv.itemName} (ID ${inv.goodId})`,
                                   })
                                 }
-                                className="rounded border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1"
+                                className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 active:scale-[0.98] disabled:opacity-50 p-1.5 transition"
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                               </button>
                             </div>
                           </td>
@@ -1923,14 +1993,14 @@ export default function AdminPortalPage() {
         <div className="space-y-5">
           <form
             onSubmit={handleCreateDelivery}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
+            className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-3 items-end"
           >
             <div>
               <label
                 htmlFor="dispatch-request-id"
                 className="block text-xs font-semibold text-slate-700 mb-1"
               >
-                Select Approved Relief Request
+                Approved Request
               </label>
               <select
                 id="dispatch-request-id"
@@ -1938,18 +2008,18 @@ export default function AdminPortalPage() {
                 required
                 value={dispatchReqId}
                 onChange={(e) => setDispatchReqId(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600 focus:outline-none"
               >
                 {approvedRequestsForDispatch.length === 0 ? (
                   <option value={0}>
-                    No Approved requests awaiting dispatch
+                    No approved requests awaiting dispatch
                   </option>
                 ) : (
                   <>
                     <option value={0}>-- Choose Approved Request --</option>
                     {approvedRequestsForDispatch.map((r) => (
                       <option key={r.requestId} value={r.requestId}>
-                        Req #{r.requestId} — {r.orgName} ({r.eventName})
+                        Request {r.requestId} — {r.orgName} ({r.eventName})
                       </option>
                     ))}
                   </>
@@ -1961,14 +2031,14 @@ export default function AdminPortalPage() {
                 htmlFor="dispatch-volunteer-id"
                 className="block text-xs font-semibold text-slate-700 mb-1"
               >
-                Assign Field Volunteer Driver
+                Assign Volunteer
               </label>
               <select
                 id="dispatch-volunteer-id"
                 name="volunteerId"
                 value={dispatchVolId}
                 onChange={(e) => setDispatchVolId(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs bg-white"
+                className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm bg-white focus:border-blue-600 focus:outline-none"
               >
                 <option value={0}>-- Unassigned / Select Volunteer --</option>
                 {volunteers.map((v) => (
@@ -1982,41 +2052,45 @@ export default function AdminPortalPage() {
             <button
               type="submit"
               disabled={isBusy || approvedRequestsForDispatch.length === 0}
-              className="rounded-lg bg-[#002060] hover:bg-[#1F4E79] disabled:opacity-50 py-2 px-4 text-xs font-bold text-white"
+              className="min-h-[40px] rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 py-2 px-4 text-xs font-bold text-white transition"
             >
               {busyKey === "create-delivery"
                 ? "Dispatching..."
-                : "Dispatch Fleet Delivery"}
+                : "Dispatch Delivery"}
             </button>
           </form>
 
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {["ALL", "Pending", "In Transit", "Delivered"].map((st) => (
                   <button
                     key={st}
                     type="button"
+                    aria-pressed={statusFilter === st}
                     onClick={() => setStatusFilter(st)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                    className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                       statusFilter === st
-                        ? "bg-[#002060] text-white"
-                        : "bg-slate-100 text-slate-600"
+                        ? "bg-blue-600 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
                   >
-                    {st}
+                    {st === "ALL" ? "All" : st}
                   </button>
                 ))}
               </div>
               <div className="relative">
-                <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                <Search
+                  className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                  aria-hidden="true"
+                />
                 <input
                   type="search"
                   aria-label="Search deliveries by recipient, volunteer, or location"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search organization, volunteer..."
-                  className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-64"
+                  className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-64 focus:border-blue-600 focus:outline-none"
                 />
               </div>
             </div>
@@ -2024,32 +2098,33 @@ export default function AdminPortalPage() {
             <div
               tabIndex={0}
               role="region"
-              aria-label="Fleet deliveries table"
+              aria-label="Deliveries table"
               className="overflow-x-auto"
             >
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <caption className="sr-only">Deliveries dispatch log</caption>
+                <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                   <tr>
-                    <th scope="col" className="p-3">
-                      Delivery ID
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      ID
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Request ID
                     </th>
-                    <th scope="col" className="p-3">
-                      Recipient Organization &amp; Destination
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      Recipient &amp; Destination
                     </th>
-                    <th scope="col" className="p-3">
-                      Assigned Volunteer
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      Volunteer
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Dispatch Date
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Status
                     </th>
-                    <th scope="col" className="p-3 text-right">
-                      Update Status
+                    <th scope="col" className="px-4 py-3 font-semibold text-right">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -2058,30 +2133,39 @@ export default function AdminPortalPage() {
                     <tr>
                       <td
                         colSpan={7}
-                        className="p-6 text-center text-slate-400"
+                        className="p-6 text-center text-xs text-slate-400"
                       >
                         No matching deliveries found.
                       </td>
                     </tr>
                   ) : (
                     slicePage(filteredDeliveries).map((d) => (
-                      <tr key={d.deliveryId} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold">#{d.deliveryId}</td>
-                        <td className="p-3 font-semibold">Req #{d.requestId}</td>
-                        <td className="p-3">
+                      <tr key={d.deliveryId} className="hover:bg-slate-50/80">
+                        <th
+                          scope="row"
+                          className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
+                        >
+                          {d.deliveryId}
+                        </th>
+                        <td className="px-4 py-3 font-medium text-slate-700 tabular-nums whitespace-nowrap">
+                          {d.requestId}
+                        </td>
+                        <td className="px-4 py-3">
                           <div className="font-semibold text-slate-900">
                             {d.orgName}
                           </div>
-                          <div className="text-[11px] text-slate-500">
+                          <div className="text-xs text-slate-500">
                             {d.location}
                           </div>
                         </td>
-                        <td className="p-3 text-slate-700">{d.volunteerName}</td>
-                        <td className="p-3 text-slate-500">{d.dispatchDate}</td>
-                        <td className="p-3">
+                        <td className="px-4 py-3 text-slate-700">{d.volunteerName}</td>
+                        <td className="px-4 py-3 text-slate-500 tabular-nums whitespace-nowrap">
+                          {d.dispatchDate}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <StatusBadge status={d.deliveryStatus} />
                         </td>
-                        <td className="p-3 text-right">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
                           <div className="inline-flex items-center gap-1.5">
                             {d.deliveryStatus === "Pending" && (
                               <button
@@ -2093,7 +2177,7 @@ export default function AdminPortalPage() {
                                     "In Transit"
                                   )
                                 }
-                                className="rounded-lg bg-amber-500 hover:bg-amber-600 disabled:opacity-50 px-2.5 py-1 text-xs font-bold text-white"
+                                className="rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-[0.98] disabled:opacity-50 px-2.5 py-1.5 text-xs font-semibold text-white transition"
                               >
                                 Start Transit
                               </button>
@@ -2108,7 +2192,7 @@ export default function AdminPortalPage() {
                                     "Delivered"
                                   )
                                 }
-                                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-2.5 py-1 text-xs font-bold text-white"
+                                className="rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] disabled:opacity-50 px-2.5 py-1.5 text-xs font-semibold text-white transition"
                               >
                                 {busyKey === `delivery-${d.deliveryId}`
                                   ? "Saving..."
@@ -2118,17 +2202,17 @@ export default function AdminPortalPage() {
                             <button
                               type="button"
                               disabled={isBusy}
-                              aria-label={`Delete delivery #${d.deliveryId}`}
+                              aria-label={`Delete delivery ${d.deliveryId}`}
                               onClick={() =>
                                 openDeleteConfirm({
                                   kind: "delivery",
                                   id: d.deliveryId,
-                                  label: `Delivery #${d.deliveryId} for Request #${d.requestId}`,
+                                  label: `Delivery ${d.deliveryId} for Request ${d.requestId}`,
                                 })
                               }
-                              className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 p-1.5"
+                              className="rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 active:scale-[0.98] disabled:opacity-50 p-1.5 transition"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                           </div>
                         </td>
@@ -2153,15 +2237,18 @@ export default function AdminPortalPage() {
       {activeTab === "stakeholders" && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
               <h2 className="text-sm font-bold text-slate-900 mb-2">
                 Partner Organizations &amp; LGUs ({organizations.length})
               </h2>
               <div className="divide-y divide-slate-100 max-h-72 overflow-y-auto">
                 {organizations.map((o) => (
                   <div key={o.orgId} className="py-2 text-xs">
-                    <div className="font-bold text-slate-800">
-                      #{o.orgId} • {o.orgName}
+                    <div className="font-semibold text-slate-900 flex items-center justify-between gap-2">
+                      <span>{o.orgName}</span>
+                      <span className="text-[11px] font-medium text-slate-400 tabular-nums shrink-0">
+                        ID {o.orgId}
+                      </span>
                     </div>
                     <div className="text-slate-500">{o.location}</div>
                   </div>
@@ -2169,7 +2256,7 @@ export default function AdminPortalPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
               <h2 className="text-sm font-bold text-slate-900 mb-2">
                 Registered Donors ({donors.length})
               </h2>
@@ -2177,12 +2264,17 @@ export default function AdminPortalPage() {
                 {donors.map((d) => (
                   <div
                     key={d.donorId}
-                    className="py-2 flex items-center justify-between text-xs"
+                    className="py-2 flex items-center justify-between gap-2 text-xs"
                   >
-                    <span className="font-bold text-slate-800">
-                      #{d.donorId} • {d.donorName}
-                    </span>
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">
+                    <div className="min-w-0">
+                      <span className="font-semibold text-slate-900">
+                        {d.donorName}
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-400 tabular-nums ml-1.5">
+                        ID {d.donorId}
+                      </span>
+                    </div>
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 shrink-0">
                       {d.donorType}
                     </span>
                   </div>
@@ -2190,7 +2282,7 @@ export default function AdminPortalPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs">
               <h2 className="text-sm font-bold text-slate-900 mb-2">
                 Field Volunteers ({volunteers.length})
               </h2>
@@ -2198,19 +2290,24 @@ export default function AdminPortalPage() {
                 {volunteers.map((v) => (
                   <div
                     key={v.volunteerId}
-                    className="py-2 flex items-center justify-between text-xs"
+                    className="py-2 flex items-center justify-between gap-2 text-xs"
                   >
-                    <div>
-                      <div className="font-bold text-slate-800">
-                        #{v.volunteerId} • {v.volunteerName}
+                    <div className="min-w-0">
+                      <div>
+                        <span className="font-semibold text-slate-900">
+                          {v.volunteerName}
+                        </span>
+                        <span className="text-[11px] font-medium text-slate-400 tabular-nums ml-1.5">
+                          ID {v.volunteerId}
+                        </span>
                       </div>
                       <div className="text-slate-500">{v.vehicleType}</div>
                     </div>
                     <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold border shrink-0 ${
                         v.isAvailable
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-slate-100 text-slate-500"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                          : "bg-slate-100 text-slate-600 border-slate-200"
                       }`}
                     >
                       {v.isAvailable ? "Available" : "On Assignment"}
@@ -2221,42 +2318,41 @@ export default function AdminPortalPage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
             <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <h2 className="text-sm font-bold text-slate-900">
-                  System User Accounts ({filteredUsers.length})
-                </h2>
-                <p className="text-[11px] text-slate-500">
-                  Master UserAccount directory across all roles
-                </p>
-              </div>
+              <h2 className="text-sm font-bold text-slate-900">
+                User Accounts ({filteredUsers.length})
+              </h2>
               <div className="flex flex-wrap items-center gap-2">
                 {["ALL", "Admin", "Donor", "Organization", "Volunteer"].map(
                   (role) => (
                     <button
                       key={role}
                       type="button"
+                      aria-pressed={statusFilter === role}
                       onClick={() => setStatusFilter(role)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-bold ${
+                      className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                         statusFilter === role
-                          ? "bg-[#002060] text-white"
-                          : "bg-slate-100 text-slate-600"
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
-                      {role}
+                      {role === "ALL" ? "All" : role}
                     </button>
                   )
                 )}
                 <div className="relative">
-                  <Search className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-2.5" />
+                  <Search
+                    className="h-3.5 w-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
+                    aria-hidden="true"
+                  />
                   <input
                     type="search"
                     aria-label="Search system user accounts"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search user, username..."
-                    className="rounded-lg border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-52"
+                    className="rounded-xl border border-slate-300 pl-8 pr-3 py-1.5 text-xs w-full sm:w-52 focus:border-blue-600 focus:outline-none"
                   />
                 </div>
               </div>
@@ -2268,25 +2364,26 @@ export default function AdminPortalPage() {
               aria-label="System user accounts table"
               className="overflow-x-auto"
             >
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
+              <table className="w-full text-left text-xs sm:text-sm">
+                <caption className="sr-only">System user accounts</caption>
+                <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                   <tr>
-                    <th scope="col" className="p-3">
-                      User ID
+                    <th scope="col" className="px-4 py-3 font-semibold">
+                      ID
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Full Name
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Username
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Role
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Email &amp; Contact
                     </th>
-                    <th scope="col" className="p-3">
+                    <th scope="col" className="px-4 py-3 font-semibold">
                       Status
                     </th>
                   </tr>
@@ -2296,34 +2393,39 @@ export default function AdminPortalPage() {
                     <tr>
                       <td
                         colSpan={6}
-                        className="p-6 text-center text-slate-400"
+                        className="p-6 text-center text-xs text-slate-400"
                       >
                         No matching user accounts found.
                       </td>
                     </tr>
                   ) : (
                     slicePage(filteredUsers).map((u) => (
-                      <tr key={u.userId} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold">#{u.userId}</td>
-                        <td className="p-3 font-semibold text-slate-900">
+                      <tr key={u.userId} className="hover:bg-slate-50/80">
+                        <th
+                          scope="row"
+                          className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
+                        >
+                          {u.userId}
+                        </th>
+                        <td className="px-4 py-3 font-semibold text-slate-900">
                           {u.fullName}
                         </td>
-                        <td className="p-3 font-mono text-slate-600">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">
                           {u.username}
                         </td>
-                        <td className="p-3">
-                          <span className="inline-block rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-[11px] font-semibold text-slate-700">
+                        <td className="px-4 py-3">
+                          <span className="inline-block rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-semibold text-slate-700">
                             {u.role}
                           </span>
                         </td>
-                        <td className="p-3 text-slate-500">
+                        <td className="px-4 py-3 text-slate-500">
                           {u.email ? (
                             <div className="space-y-0.5">
                               <div className="text-slate-700 font-medium">
                                 {u.email}
                               </div>
                               {u.contactInfo && (
-                                <div className="text-[11px] text-slate-400">
+                                <div className="text-xs text-slate-400">
                                   {u.contactInfo}
                                 </div>
                               )}
@@ -2332,9 +2434,9 @@ export default function AdminPortalPage() {
                             u.contactInfo || "—"
                           )}
                         </td>
-                        <td className="p-3">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span
-                            className={`inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold border ${
+                            className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold border ${
                               u.isVerified === false
                                 ? "bg-amber-50 text-amber-700 border-amber-200"
                                 : "bg-emerald-50 text-emerald-700 border-emerald-200"
@@ -2362,10 +2464,10 @@ export default function AdminPortalPage() {
 
       {/* TAB 8: NOTIFICATIONS */}
       {activeTab === "notifications" && (
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-900">
-              System Audit &amp; Notification Feed
+              Notifications
             </h2>
             <span className="text-xs font-medium text-slate-500">
               {unreadCount} unread
@@ -2388,8 +2490,8 @@ export default function AdminPortalPage() {
                     <p className="text-xs sm:text-sm font-medium text-slate-900">
                       {n.message}
                     </p>
-                    <p className="text-[11px] text-slate-400">
-                      User #{n.userId} •{" "}
+                    <p className="text-xs text-slate-400">
+                      User {n.userId} &middot;{" "}
                       {n.dateSent
                         ? new Date(n.dateSent).toLocaleString()
                         : "Just now"}
@@ -2404,7 +2506,7 @@ export default function AdminPortalPage() {
                       }
                       className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-50 px-3 py-1.5 text-xs font-medium text-slate-700 shrink-0"
                     >
-                      <Check className="h-3.5 w-3.5 text-emerald-600" />
+                      <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
                       Mark Read
                     </button>
                   )}
@@ -2421,66 +2523,69 @@ export default function AdminPortalPage() {
         </div>
       )}
 
-      {/* TAB 9: ANALYTICAL REPORTS (ReportDAO) */}
+      {/* TAB 9: REPORTS */}
       {activeTab === "reports" && (
         <div className="space-y-4">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 no-print">
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
+                aria-pressed={activeReport === "operationalSummary"}
                 onClick={() => setActiveReport("operationalSummary")}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                   activeReport === "operationalSummary"
-                    ? "bg-[#002060] text-white"
-                    : "bg-slate-100 text-slate-700"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
-                Report 1: Disaster Operational Summary
+                Summary
               </button>
               <button
                 type="button"
+                aria-pressed={activeReport === "inventoryHealth"}
                 onClick={() => setActiveReport("inventoryHealth")}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                   activeReport === "inventoryHealth"
-                    ? "bg-[#002060] text-white"
-                    : "bg-slate-100 text-slate-700"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
-                Report 2: Warehouse Stock &amp; Replenishment Alert
+                Stocks Report
               </button>
               <button
                 type="button"
+                aria-pressed={activeReport === "donorImpact"}
                 onClick={() => setActiveReport("donorImpact")}
-                className={`rounded-lg px-3 py-1.5 text-xs font-bold ${
+                className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition active:scale-[0.98] ${
                   activeReport === "donorImpact"
-                    ? "bg-[#002060] text-white"
-                    : "bg-slate-100 text-slate-700"
+                    ? "bg-blue-600 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
-                Report 3: Donor Contribution &amp; Impact Ledger
+                Donor Report
               </button>
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={exportReportCsv}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] px-3 py-1.5 text-xs font-semibold text-white transition"
               >
-                <Download className="h-3.5 w-3.5" />
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
                 Export CSV
               </button>
               <button
                 type="button"
                 onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-slate-800 hover:bg-slate-900 px-3 py-1.5 text-xs font-bold text-white"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-900 active:scale-[0.98] px-3 py-1.5 text-xs font-semibold text-white transition"
               >
-                <Printer className="h-3.5 w-3.5" />
+                <Printer className="h-3.5 w-3.5" aria-hidden="true" />
                 Print Report
               </button>
             </div>
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
             {/* Printable Official Header (Shows when printing) */}
             <div className="hidden print:block mb-6 border-b-2 border-slate-900 pb-4">
               <div className="flex items-center justify-between">
@@ -2523,16 +2628,10 @@ export default function AdminPortalPage() {
             </div>
 
             <div className="mb-4 border-b border-slate-200 pb-3">
-              <div className="text-xs font-bold text-[#002060] uppercase tracking-wider">
-                National Decision-Support Analytics &bull; Central DRRMS Ledger
-              </div>
               <h2 className="text-base font-bold text-slate-900">
-                {activeReport === "operationalSummary" &&
-                  "Report 1: Disaster Relief Operational & Logistics Summary"}
-                {activeReport === "inventoryHealth" &&
-                  "Report 2: Warehouse Stock Status & Replenishment Alert Report"}
-                {activeReport === "donorImpact" &&
-                  "Report 3: Donor Contribution & Impact Audit Ledger"}
+                {activeReport === "operationalSummary" && "Summary"}
+                {activeReport === "inventoryHealth" && "Stocks Report"}
+                {activeReport === "donorImpact" && "Donor Report"}
               </h2>
             </div>
 
@@ -2557,50 +2656,60 @@ export default function AdminPortalPage() {
               <div
                 tabIndex={0}
                 role="region"
-                aria-label="Disaster operational summary report table"
+                aria-label="Disaster summary report table"
                 className="overflow-x-auto"
               >
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <caption className="sr-only">Disaster operations summary</caption>
+                  <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                     <tr>
-                      <th scope="col" className="p-2.5">
-                        Event ID
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        ID
                       </th>
-                      <th scope="col" className="p-2.5">
+                      <th scope="col" className="px-4 py-3 font-semibold">
                         Disaster Event
                       </th>
-                      <th scope="col" className="p-2.5">
+                      <th scope="col" className="px-4 py-3 font-semibold">
                         Location
                       </th>
-                      <th scope="col" className="p-2.5">
+                      <th scope="col" className="px-4 py-3 font-semibold">
                         Status
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Total Donations
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Donations
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Total Aid Requests
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Requests
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Dispatched Deliveries
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Deliveries
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {(reports.operationalSummary || []).map((r: any) => (
-                      <tr key={r.eventId}>
-                        <td className="p-2.5 font-bold">#{r.eventId}</td>
-                        <td className="p-2.5 font-semibold">{r.eventName}</td>
-                        <td className="p-2.5">{r.location}</td>
-                        <td className="p-2.5">{r.status}</td>
-                        <td className="p-2.5 font-bold text-emerald-700">
-                          {r.totalDonations}
+                      <tr key={r.eventId} className="hover:bg-slate-50/80">
+                        <th
+                          scope="row"
+                          className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
+                        >
+                          {r.eventId}
+                        </th>
+                        <td className="px-4 py-3 font-semibold text-slate-900">
+                          {r.eventName}
                         </td>
-                        <td className="p-2.5 font-bold text-amber-700">
-                          {r.totalRequests}
+                        <td className="px-4 py-3 text-slate-600">{r.location}</td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <StatusBadge status={r.status} />
                         </td>
-                        <td className="p-2.5 font-bold text-blue-700">
-                          {r.totalDeliveries}
+                        <td className="px-4 py-3 font-semibold text-emerald-700 tabular-nums">
+                          {Number(r.totalDonations || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-amber-700 tabular-nums">
+                          {Number(r.totalRequests || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-blue-700 tabular-nums">
+                          {Number(r.totalDeliveries || 0).toLocaleString()}
                         </td>
                       </tr>
                     ))}
@@ -2613,51 +2722,59 @@ export default function AdminPortalPage() {
               <div
                 tabIndex={0}
                 role="region"
-                aria-label="Warehouse stock health report table"
+                aria-label="Stocks report table"
                 className="overflow-x-auto"
               >
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <caption className="sr-only">Warehouse stocks report</caption>
+                  <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                     <tr>
-                      <th scope="col" className="p-2.5">
-                        Good ID
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        ID
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Relief Item
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Item Name
                       </th>
-                      <th scope="col" className="p-2.5">
+                      <th scope="col" className="px-4 py-3 font-semibold">
                         Category
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Current Warehouse Stock
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Current Stock
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Cumulative Donated
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Donated
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Cumulative Requested
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Requested
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Stock Health Alert
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Status
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {(reports.inventoryHealth || []).map((r: any) => (
-                      <tr key={r.goodId}>
-                        <td className="p-2.5 font-bold">#{r.goodId}</td>
-                        <td className="p-2.5 font-semibold">{r.itemName}</td>
-                        <td className="p-2.5">{r.category}</td>
-                        <td className="p-2.5 font-bold">
+                      <tr key={r.goodId} className="hover:bg-slate-50/80">
+                        <th
+                          scope="row"
+                          className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
+                        >
+                          {r.goodId}
+                        </th>
+                        <td className="px-4 py-3 font-semibold text-slate-900">
+                          {r.itemName}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{r.category}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums whitespace-nowrap">
                           {r.currentStockFormatted}
                         </td>
-                        <td className="p-2.5 text-emerald-700 font-semibold">
-                          +{r.totalDonatedQty}
+                        <td className="px-4 py-3 text-emerald-700 font-semibold tabular-nums">
+                          +{Number(r.totalDonatedQty || 0).toLocaleString()}
                         </td>
-                        <td className="p-2.5 text-amber-700 font-semibold">
-                          -{r.totalRequestedQty}
+                        <td className="px-4 py-3 text-amber-700 font-semibold tabular-nums">
+                          -{Number(r.totalRequestedQty || 0).toLocaleString()}
                         </td>
-                        <td className="p-2.5">
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <StatusBadge status={r.stockHealth} />
                         </td>
                       </tr>
@@ -2671,46 +2788,58 @@ export default function AdminPortalPage() {
               <div
                 tabIndex={0}
                 role="region"
-                aria-label="Donor impact ledger report table"
+                aria-label="Donor report table"
                 className="overflow-x-auto"
               >
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 border-b border-slate-200">
+                <table className="w-full text-left text-xs sm:text-sm">
+                  <caption className="sr-only">Donor contribution report</caption>
+                  <thead className="bg-slate-50 text-slate-600 text-xs border-b border-slate-200">
                     <tr>
-                      <th scope="col" className="p-2.5">
-                        Donor ID
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        ID
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Donor Name
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Donor
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Classification
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Type
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Contact Info
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Contact
                       </th>
-                      <th scope="col" className="p-2.5">
-                        Donations Count
+                      <th scope="col" className="px-4 py-3 font-semibold">
+                        Donations
                       </th>
-                      <th scope="col" className="p-2.5">
+                      <th scope="col" className="px-4 py-3 font-semibold">
                         Events Supported
                       </th>
-                      <th scope="col" className="p-2.5">
+                      <th scope="col" className="px-4 py-3 font-semibold">
                         Total Items Donated
                       </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {(reports.donorImpact || []).map((r: any) => (
-                      <tr key={r.donorId}>
-                        <td className="p-2.5 font-bold">#{r.donorId}</td>
-                        <td className="p-2.5 font-semibold">{r.donorName}</td>
-                        <td className="p-2.5">{r.donorType}</td>
-                        <td className="p-2.5">{r.contactInfo}</td>
-                        <td className="p-2.5 font-bold">{r.totalDonations}</td>
-                        <td className="p-2.5">{r.eventsSupported}</td>
-                        <td className="p-2.5 font-bold text-emerald-700">
-                          {r.totalItemsDonated} units
+                      <tr key={r.donorId} className="hover:bg-slate-50/80">
+                        <th
+                          scope="row"
+                          className="px-4 py-3 font-semibold text-slate-700 tabular-nums whitespace-nowrap"
+                        >
+                          {r.donorId}
+                        </th>
+                        <td className="px-4 py-3 font-semibold text-slate-900">
+                          {r.donorName}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{r.donorType}</td>
+                        <td className="px-4 py-3 text-slate-600">{r.contactInfo}</td>
+                        <td className="px-4 py-3 font-semibold text-slate-900 tabular-nums">
+                          {Number(r.totalDonations || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700 tabular-nums">
+                          {Number(r.eventsSupported || 0).toLocaleString()}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-emerald-700 tabular-nums whitespace-nowrap">
+                          {Number(r.totalItemsDonated || 0).toLocaleString()} units
                         </td>
                       </tr>
                     ))}

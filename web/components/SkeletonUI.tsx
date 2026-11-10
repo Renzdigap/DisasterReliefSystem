@@ -5,8 +5,6 @@ import React from "react";
 export function StatusBadge({ status }: { status?: string }) {
   const s = status || "Unknown";
   let color = "bg-slate-100 text-slate-700 border-slate-200/90";
-  let dotColor = "bg-slate-400";
-  let shouldPulse = false;
 
   if (
     s === "Active" ||
@@ -15,8 +13,6 @@ export function StatusBadge({ status }: { status?: string }) {
     s === "Cancelled"
   ) {
     color = "bg-rose-50 text-rose-700 border-rose-200/90";
-    dotColor = "bg-rose-500";
-    shouldPulse = s === "Active" || s === "CRITICAL ALERT";
   } else if (
     s === "Approved" ||
     s === "Delivered" ||
@@ -25,7 +21,6 @@ export function StatusBadge({ status }: { status?: string }) {
     s === "Fulfilled"
   ) {
     color = "bg-emerald-50 text-emerald-700 border-emerald-200/90";
-    dotColor = "bg-emerald-500";
   } else if (
     s === "Pending" ||
     s === "In Transit" ||
@@ -33,22 +28,14 @@ export function StatusBadge({ status }: { status?: string }) {
     s === "On Assignment"
   ) {
     color = "bg-amber-50 text-amber-800 border-amber-200/90";
-    dotColor = "bg-amber-500";
-    shouldPulse = s === "In Transit";
   } else if (s === "Resolved") {
     color = "bg-slate-100 text-slate-600 border-slate-200/90";
-    dotColor = "bg-slate-400";
   }
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-bold tracking-tight shadow-2xs ${color}`}
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-bold tracking-tight shadow-2xs ${color}`}
     >
-      <span
-        className={`h-1.5 w-1.5 rounded-full ${dotColor} ${
-          shouldPulse ? "animate-ping" : ""
-        }`}
-      />
       <span>{s}</span>
     </span>
   );
@@ -56,8 +43,7 @@ export function StatusBadge({ status }: { status?: string }) {
 
 export function StatusBadgeSkeleton() {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1">
-      <span className="h-2 w-2 rounded-full bg-slate-300 animate-pulse" />
+    <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1">
       <span className="h-2.5 w-14 rounded bg-slate-200 animate-pulse" />
     </span>
   );
