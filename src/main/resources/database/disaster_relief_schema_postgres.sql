@@ -1,9 +1,10 @@
--- ==========================================
--- PostgreSQL Schema for Supabase - FULL V2
--- 13 Tables matching 12 Modules
--- ==========================================
+-- ==============================================================================
+-- NATIONAL DISASTER RELIEF & RESOURCE MANAGEMENT SYSTEM (DRRMS)
+-- LOCALIZED JURISDICTION: CITY OF BATAC, ILOCOS NORTE (CDRRMO SETTING)
+-- PostgreSQL Schema for Supabase - FULL 3NF V3 (All 43 Barangays of Batac City)
+-- ==============================================================================
 
--- Drop existing tables to allow clean re-run
+-- Drop existing tables in reverse dependency order to allow clean re-execution
 DROP TABLE IF EXISTS PendingVerification CASCADE;
 DROP TABLE IF EXISTS Notification CASCADE;
 DROP TABLE IF EXISTS Delivery CASCADE;
@@ -19,194 +20,219 @@ DROP TABLE IF EXISTS Organization CASCADE;
 DROP TABLE IF EXISTS Donor CASCADE;
 DROP TABLE IF EXISTS UserAccount CASCADE;
 
--- 1. AUTHENTICATION (UserAccount)
+-- ==============================================================================
+-- 1. AUTHENTICATION & ACCESS CONTROL (UserAccount)
+-- ==============================================================================
 CREATE TABLE UserAccount (
     user_id SERIAL PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL CHECK (role IN ('Admin', 'Donor', 'Volunteer', 'Manager', 'Organization')),
-    full_name VARCHAR(100) NOT NULL,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('Admin', 'Donor', 'Organization', 'Volunteer', 'Manager')),
+    full_name VARCHAR(100),
     contact_info VARCHAR(100),
-    email VARCHAR(255),
-    is_verified BOOLEAN NOT NULL DEFAULT true
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX idx_useraccount_email_unique
-    ON UserAccount (LOWER(email))
-    WHERE email IS NOT NULL;
-
--- 2. DONORS (Donor)
+-- ==============================================================================
+-- 2. STAKEHOLDER PROFILE SUBTYPES (1:1 with UserAccount)
+-- ==============================================================================
 CREATE TABLE Donor (
     donor_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
-    donor_type VARCHAR(20) DEFAULT 'Individual' CHECK (donor_type IN ('Individual', 'Corporate')),
-    FOREIGN KEY (user_id) REFERENCES UserAccount(user_id) ON DELETE CASCADE
+    user_id INT NOT NULL REFERENCES UserAccount(user_id) ON DELETE CASCADE,
+    donor_type VARCHAR(20) NOT NULL CHECK (donor_type IN ('Individual', 'Corporate', 'NGO', 'Government'))
 );
 
--- 3. ORGANIZATIONS (Organization)
 CREATE TABLE Organization (
     org_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
+    user_id INT NOT NULL REFERENCES UserAccount(user_id) ON DELETE CASCADE,
     org_name VARCHAR(100) NOT NULL,
-    location VARCHAR(100),
-    FOREIGN KEY (user_id) REFERENCES UserAccount(user_id) ON DELETE CASCADE
+    location VARCHAR(150) NOT NULL
 );
 
--- 4. VOLUNTEERS (Volunteer)
 CREATE TABLE Volunteer (
     volunteer_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
+    user_id INT NOT NULL REFERENCES UserAccount(user_id) ON DELETE CASCADE,
     vehicle_type VARCHAR(50),
-    is_available BOOLEAN DEFAULT true,
-    FOREIGN KEY (user_id) REFERENCES UserAccount(user_id) ON DELETE CASCADE
+    is_available BOOLEAN DEFAULT true
 );
 
--- 5. DISASTER EVENTS
+-- ==============================================================================
+-- 3. MASTER CATALOGS (DisasterEvent, ReliefGood, Inventory)
+-- ==============================================================================
 CREATE TABLE DisasterEvent (
-    event_id SERIAL PRIMARY KEY,
+    disaster_id SERIAL PRIMARY KEY,
     event_name VARCHAR(100) NOT NULL,
-    location VARCHAR(100) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Resolved')),
-    start_date DATE NOT NULL
+    location VARCHAR(150) NOT NULL,
+    status VARCHAR(20) NOT NULL CHECK (status IN ('Active', 'Resolved', 'Monitoring')),
+    start_date DATE NOT NULL,
+    end_date DATE
 );
 
--- 6. RELIEF GOODS (Master list of items)
 CREATE TABLE ReliefGood (
     good_id SERIAL PRIMARY KEY,
     item_name VARCHAR(100) NOT NULL,
-    category VARCHAR(50) NOT NULL,
-    unit_of_measure VARCHAR(20) NOT NULL
+    category VARCHAR(50) NOT NULL CHECK (category IN ('Food', 'Water', 'Medicine', 'Non-Food', 'Hygiene', 'Care', 'Shelter', 'Other')),
+    unit_of_measure VARCHAR(30) NOT NULL
 );
 
--- 7. INVENTORY (Central warehouse stock tracking)
 CREATE TABLE Inventory (
     inventory_id SERIAL PRIMARY KEY,
-    good_id INT NOT NULL UNIQUE,
-    current_stock INT DEFAULT 0,
-    FOREIGN KEY (good_id) REFERENCES ReliefGood(good_id) ON DELETE CASCADE
+    good_id INT NOT NULL REFERENCES ReliefGood(good_id) ON DELETE CASCADE,
+    current_stock INT NOT NULL DEFAULT 0 CHECK (current_stock >= 0),
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 8. DONATIONS
+-- ==============================================================================
+-- 4. SPLIT TRANSACTION: DONATIONS (Donation & DonationItem)
+-- ==============================================================================
 CREATE TABLE Donation (
     donation_id SERIAL PRIMARY KEY,
-    donor_id INT NOT NULL,
-    event_id INT, -- Can be null if donating to general fund
+    donor_id INT NOT NULL REFERENCES Donor(donor_id) ON DELETE CASCADE,
+    event_id INT REFERENCES DisasterEvent(disaster_id) ON DELETE SET NULL,
     donation_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved')),
-    FOREIGN KEY (donor_id) REFERENCES Donor(donor_id) ON DELETE CASCADE,
-    FOREIGN KEY (event_id) REFERENCES DisasterEvent(event_id) ON DELETE SET NULL
+    status VARCHAR(20) NOT NULL CHECK (status IN ('Pending', 'Approved', 'Distributed', 'Cancelled'))
 );
 
--- 9. DONATION ITEMS
 CREATE TABLE DonationItem (
-    item_id SERIAL PRIMARY KEY,
-    donation_id INT NOT NULL,
-    good_id INT NOT NULL,
-    quantity INT NOT NULL,
-    FOREIGN KEY (donation_id) REFERENCES Donation(donation_id) ON DELETE CASCADE,
-    FOREIGN KEY (good_id) REFERENCES ReliefGood(good_id) ON DELETE CASCADE
+    donation_item_id SERIAL PRIMARY KEY,
+    donation_id INT NOT NULL REFERENCES Donation(donation_id) ON DELETE CASCADE,
+    good_id INT NOT NULL REFERENCES ReliefGood(good_id) ON DELETE CASCADE,
+    quantity INT NOT NULL CHECK (quantity > 0)
 );
 
--- 10. REQUESTS
+-- ==============================================================================
+-- 5. SPLIT TRANSACTION: RELIEF REQUESTS (ReliefRequest & RequestItem)
+-- ==============================================================================
 CREATE TABLE ReliefRequest (
     request_id SERIAL PRIMARY KEY,
-    org_id INT NOT NULL,
-    event_id INT NOT NULL,
+    org_id INT NOT NULL REFERENCES Organization(org_id) ON DELETE CASCADE,
+    event_id INT NOT NULL REFERENCES DisasterEvent(disaster_id) ON DELETE CASCADE,
     request_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Fulfilled')),
-    FOREIGN KEY (org_id) REFERENCES Organization(org_id) ON DELETE CASCADE,
-    FOREIGN KEY (event_id) REFERENCES DisasterEvent(event_id) ON DELETE CASCADE
+    status VARCHAR(20) NOT NULL CHECK (status IN ('Pending', 'Approved', 'Fulfilled', 'Rejected'))
 );
 
--- 11. REQUEST ITEMS
 CREATE TABLE RequestItem (
     request_item_id SERIAL PRIMARY KEY,
-    request_id INT NOT NULL,
-    good_id INT NOT NULL,
-    quantity INT NOT NULL,
-    FOREIGN KEY (request_id) REFERENCES ReliefRequest(request_id) ON DELETE CASCADE,
-    FOREIGN KEY (good_id) REFERENCES ReliefGood(good_id) ON DELETE CASCADE
+    request_id INT NOT NULL REFERENCES ReliefRequest(request_id) ON DELETE CASCADE,
+    good_id INT NOT NULL REFERENCES ReliefGood(good_id) ON DELETE CASCADE,
+    quantity INT NOT NULL CHECK (quantity > 0)
 );
 
--- 12. DELIVERIES
+-- ==============================================================================
+-- 6. LOGISTICS DISPATCH & NOTIFICATIONS (Delivery & Notification)
+-- ==============================================================================
 CREATE TABLE Delivery (
     delivery_id SERIAL PRIMARY KEY,
-    request_id INT NOT NULL,
-    volunteer_id INT, -- Assigned later
-    dispatch_date DATE,
-    delivery_status VARCHAR(20) DEFAULT 'Pending' CHECK (delivery_status IN ('Pending', 'In Transit', 'Delivered')),
-    FOREIGN KEY (request_id) REFERENCES ReliefRequest(request_id) ON DELETE CASCADE,
-    FOREIGN KEY (volunteer_id) REFERENCES Volunteer(volunteer_id) ON DELETE SET NULL
+    request_id INT NOT NULL REFERENCES ReliefRequest(request_id) ON DELETE CASCADE,
+    volunteer_id INT NOT NULL REFERENCES Volunteer(volunteer_id) ON DELETE CASCADE,
+    dispatch_date DATE NOT NULL,
+    delivery_status VARCHAR(20) NOT NULL CHECK (delivery_status IN ('Scheduled', 'In Transit', 'Delivered', 'Cancelled'))
 );
 
--- 13. NOTIFICATIONS
 CREATE TABLE Notification (
     notification_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL,
+    user_id INT NOT NULL REFERENCES UserAccount(user_id) ON DELETE CASCADE,
     message TEXT NOT NULL,
     is_read BOOLEAN DEFAULT false,
-    date_sent TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES UserAccount(user_id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- 14. PENDING EMAIL VERIFICATIONS (6-digit OTP staging)
+-- ==============================================================================
+-- 7. EMAIL REGISTRATION VERIFICATION (Next.js Web Portal OTP)
+-- ==============================================================================
 CREATE TABLE PendingVerification (
-    verification_id SERIAL PRIMARY KEY,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    username VARCHAR(50) NOT NULL,
-    code_hash VARCHAR(128) NOT NULL,
-    payload_json TEXT NOT NULL,
-    attempts INT NOT NULL DEFAULT 0,
-    expires_at TIMESTAMPTZ NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    otp VARCHAR(6) NOT NULL,
+    registration_data JSONB NOT NULL,
+    expires_at TIMESTAMP NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- ==========================================
--- SAMPLE DATA (>= 10 records per major table)
--- ==========================================
-
--- 1. Users (32 Accounts)
+-- ==============================================================================
+-- SAMPLE SEED DATA - LOCALIZED TO CITY OF BATAC, ILOCOS NORTE
 -- Passwords:
 -- 'admin' -> 'admin123' (Hash: JAvlGPq9JyTdtvBO6x2llnRI1+gxwIyPqCKAn3THIKk=)
 -- All others -> 'pass123' (Hash: m4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=)
-INSERT INTO UserAccount (username, password_hash, role, full_name, contact_info) VALUES
-('admin', 'JAvlGPq9JyTdtvBO6x2llnRI1+gxwIyPqCKAn3THIKk=', 'Admin', 'System Administrator', '0917-000-0001'),
--- Donors (user_id 2 to 11)
-('donor1', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Robert Tan', '0917-111-2222'),
-('donor2', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Ayala Foundation', '0917-222-3333'),
-('donor3', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Maria Santos', '0918-333-4444'),
-('donor4', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'SM Cares Corp', '0919-444-5555'),
-('donor5', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Juan Dela Cruz', '0920-555-6666'),
-('donor6', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'GMA Kapuso Foundation', '0921-666-7777'),
-('donor7', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Elena Rostova', '0922-777-8888'),
-('donor8', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'San Miguel Foundation', '0923-888-9999'),
-('donor9', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Carlos Mendoza', '0924-999-0000'),
-('donor10', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'PLDT-Smart Gabay Kalikasan', '0925-101-1122'),
--- Organizations (user_id 12 to 21)
-('org1', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Philippine Red Cross Manila', '0918-100-0001'),
-('org2', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'LGU Marikina CDRRMO', '0918-100-0002'),
-('org3', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'DSWD Field Office Region IV-A', '0918-100-0003'),
-('org4', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Caritas Manila Relief', '0918-100-0004'),
-('org5', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'LGU Tuguegarao Emergency Ops', '0918-100-0005'),
-('org6', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Cebu Provincial Disaster Council', '0918-100-0006'),
-('org7', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Angat Buhay NGO', '0918-100-0007'),
-('org8', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'LGU Albay Emergency Command', '0918-100-0008'),
-('org9', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Habitat for Humanity PH', '0918-100-0009'),
-('org10', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'LGU Davao City Disaster Unit', '0918-100-0010'),
--- Volunteers (user_id 22 to 31)
-('vol1', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Charlie Driver', '0919-200-0001'),
-('vol2', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Dave Logistics', '0919-200-0002'),
-('vol3', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Grace Ramos', '0919-200-0003'),
-('vol4', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Fernando Poe Jr', '0919-200-0004'),
-('vol5', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Hannah Lim', '0919-200-0005'),
-('vol6', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Ian Bautista', '0919-200-0006'),
-('vol7', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Karen Joy Cortez', '0919-200-0007'),
-('vol8', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Leo Gonzales', '0919-200-0008'),
-('vol9', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Mia Villanueva', '0919-200-0009'),
-('vol10', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Noel Alcantara', '0919-200-0010');
+-- ==============================================================================
 
--- 2. Donors (10 Records)
+-- 1. System Administrator (user_id 1)
+INSERT INTO UserAccount (username, password_hash, role, full_name, contact_info) VALUES
+('admin', 'JAvlGPq9JyTdtvBO6x2llnRI1+gxwIyPqCKAn3THIKk=', 'Admin', 'Batac City CDRRMO Administrator', '0917-000-0001');
+
+-- 2. Donors (user_id 2 to 11)
+INSERT INTO UserAccount (username, password_hash, role, full_name, contact_info) VALUES
+('donor1', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Robert Tan', '0917-111-2222'),
+('donor2', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'MMSU Alumni Association Batac', '0917-222-3333'),
+('donor3', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Maria Santos (Quiling Sur)', '0918-333-4444'),
+('donor4', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Batac City Chamber of Commerce', '0919-444-5555'),
+('donor5', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Juan Dela Cruz (Poblacion)', '0920-555-6666'),
+('donor6', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'INEC Cares - Batac Substation', '0921-666-7777'),
+('donor7', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Batac Civic & Rotary Club', '0922-777-8888'),
+('donor8', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'San Miguel Logistics Ilocos', '0923-888-9999'),
+('donor9', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Carlos Mendoza', '0924-999-0000'),
+('donor10', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Donor', 'Batac Agricultural Multipurpose Coop', '0925-101-1122');
+
+-- 3. Organizations: ALL 43 BARANGAYS OF BATAC CITY (user_id 12 to 54)
+INSERT INTO UserAccount (username, password_hash, role, full_name, contact_info) VALUES
+('org1', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 1-N Ricarte (Nalasin) Council', '0918-100-0001'),
+('org2', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 1-S Valdez (Caoayan) Relief Desk', '0918-100-0002'),
+('org3', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 2 Ablan (Labucao) Council', '0918-100-0003'),
+('org4', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 3 Cangrunaan Council', '0918-100-0004'),
+('org5', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 4 Nalupta (Suabit) Emergency Team', '0918-100-0005'),
+('org6', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 5 Callaguip Relief Ops', '0918-100-0006'),
+('org7', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 6 San Julian Council', '0918-100-0007'),
+('org8', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 7 Caunayan Disaster Committee', '0918-100-0008'),
+('org9', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 8 Acosta (Iloilo) Council', '0918-100-0009'),
+('org10', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 9 Aglipay Relief Operations', '0918-100-0010'),
+('org11', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 10-S Barani Council', '0918-100-0011'),
+('org12', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 10-N Lacub Relief Desk', '0918-100-0012'),
+('org13', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 11 Ben-Agan Council', '0918-100-0013'),
+('org14', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 12 Palpalicong Council', '0918-100-0014'),
+('org15', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 13 Baay Disaster Committee', '0918-100-0015'),
+('org16', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 14 Bungon Relief Desk', '0918-100-0016'),
+('org17', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 15 Baligat Council', '0918-100-0017'),
+('org18', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 16-N Quiling Norte Council', '0918-100-0018'),
+('org19', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 16-S Quiling Sur Council (MMSU)', '0918-100-0019'),
+('org20', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 17 Tabug Council', '0918-100-0020'),
+('org21', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 18 Magnuang Emergency Ops', '0918-100-0021'),
+('org22', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 19 Pimentel (Cubol) Council', '0918-100-0022'),
+('org23', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 20-N Colo Disaster Unit', '0918-100-0023'),
+('org24', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 20-S Mabaleng Council', '0918-100-0024'),
+('org25', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 21 Quiom Relief Desk', '0918-100-0025'),
+('org26', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 22 Maipalig Council', '0918-100-0026'),
+('org27', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 23 Biningan Disaster Committee', '0918-100-0027'),
+('org28', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 24 Sumader Council', '0918-100-0028'),
+('org29', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 25-N Camguidan Relief Desk', '0918-100-0029'),
+('org30', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 25-S Payao Council', '0918-100-0030'),
+('org31', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 26 Parangopong Council', '0918-100-0031'),
+('org32', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 27-E Capacuan Emergency Unit', '0918-100-0032'),
+('org33', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 27-W Naguirangan Council', '0918-100-0033'),
+('org34', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 28 San Mateo Council', '0918-100-0034'),
+('org35', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 29 San Pedro Disaster Committee', '0918-100-0035'),
+('org36', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 30-E Baoa East Council', '0918-100-0036'),
+('org37', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 30-W Baoa West Council', '0918-100-0037'),
+('org38', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 31 Camandingan Council', '0918-100-0038'),
+('org39', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 32 Palongpong Emergency Desk', '0918-100-0039'),
+('org40', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 33-N Nagbacalan Council', '0918-100-0040'),
+('org41', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 33-S Rayuray Council', '0918-100-0041'),
+('org42', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 34 Dariwdiw Disaster Team', '0918-100-0042'),
+('org43', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Organization', 'Brgy. 35 Bil-loca Council', '0918-100-0043');
+
+-- 4. Volunteers: Local Batac Responders (user_id 55 to 64)
+INSERT INTO UserAccount (username, password_hash, role, full_name, contact_info) VALUES
+('vol1', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Charlie Driver (Batac Unit)', '0919-200-0001'),
+('vol2', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Dave Logistics (Central Depot)', '0919-200-0002'),
+('vol3', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Grace Ramos (Poblacion Team)', '0919-200-0003'),
+('vol4', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Fernando Poe Jr (Rapid Assessment)', '0919-200-0004'),
+('vol5', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Hannah Lim (MMSU Volunteer Corps)', '0919-200-0005'),
+('vol6', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Ian Bautista (Riverside Responder)', '0919-200-0006'),
+('vol7', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Karen Joy Cortez (Batac Youth Desk)', '0919-200-0007'),
+('vol8', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Leo Gonzales (Quiling Sur Unit)', '0919-200-0008'),
+('vol9', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Mia Villanueva (City Health Aux)', '0919-200-0009'),
+('vol10', 'm4dppKdClZotApjDb7cGI/LfrNqENiN98I2N/Vs3N0w=', 'Volunteer', 'Noel Alcantara (Batac CDRRMO Logistics)', '0919-200-0010');
+
+-- 2. Donors (10 Records, user_id 2 to 11 -> donor_id 1 to 10)
 INSERT INTO Donor (user_id, donor_type) VALUES
 (2, 'Individual'),
 (3, 'Corporate'),
@@ -219,46 +245,79 @@ INSERT INTO Donor (user_id, donor_type) VALUES
 (10, 'Individual'),
 (11, 'Corporate');
 
--- 3. Organizations (10 Records)
+-- 3. Organizations: ALL 43 BARANGAYS (user_id 12 to 54 -> org_id 1 to 43)
 INSERT INTO Organization (user_id, org_name, location) VALUES
-(12, 'Philippine Red Cross Manila', 'Port Area, Manila'),
-(13, 'LGU Marikina CDRRMO', 'Marikina City'),
-(14, 'DSWD Field Office Region IV-A', 'Calamba, Laguna'),
-(15, 'Caritas Manila Relief', 'Pandacan, Manila'),
-(16, 'LGU Tuguegarao Emergency Ops', 'Tuguegarao, Cagayan'),
-(17, 'Cebu Provincial Disaster Council', 'Cebu City'),
-(18, 'Angat Buhay NGO', 'Quezon City'),
-(19, 'LGU Albay Emergency Command', 'Legazpi City, Albay'),
-(20, 'Habitat for Humanity PH', 'Mandaluyong City'),
-(21, 'LGU Davao City Disaster Unit', 'Davao City');
+(12, 'Brgy. 1-N Ricarte (Nalasin) Council', 'City of Batac, Ilocos Norte'),
+(13, 'Brgy. 1-S Valdez (Caoayan) Relief Desk', 'City of Batac, Ilocos Norte'),
+(14, 'Brgy. 2 Ablan (Labucao) Council', 'City of Batac, Ilocos Norte'),
+(15, 'Brgy. 3 Cangrunaan Council', 'City of Batac, Ilocos Norte'),
+(16, 'Brgy. 4 Nalupta (Suabit) Emergency Team', 'City of Batac, Ilocos Norte'),
+(17, 'Brgy. 5 Callaguip Relief Ops', 'City of Batac, Ilocos Norte'),
+(18, 'Brgy. 6 San Julian Council', 'City of Batac, Ilocos Norte'),
+(19, 'Brgy. 7 Caunayan Disaster Committee', 'City of Batac, Ilocos Norte'),
+(20, 'Brgy. 8 Acosta (Iloilo) Council', 'City of Batac, Ilocos Norte'),
+(21, 'Brgy. 9 Aglipay Relief Operations', 'City of Batac, Ilocos Norte'),
+(22, 'Brgy. 10-S Barani Council', 'City of Batac, Ilocos Norte'),
+(23, 'Brgy. 10-N Lacub Relief Desk', 'City of Batac, Ilocos Norte'),
+(24, 'Brgy. 11 Ben-Agan Council', 'City of Batac, Ilocos Norte'),
+(25, 'Brgy. 12 Palpalicong Council', 'City of Batac, Ilocos Norte'),
+(26, 'Brgy. 13 Baay Disaster Committee', 'City of Batac, Ilocos Norte'),
+(27, 'Brgy. 14 Bungon Relief Desk', 'City of Batac, Ilocos Norte'),
+(28, 'Brgy. 15 Baligat Council', 'City of Batac, Ilocos Norte'),
+(29, 'Brgy. 16-N Quiling Norte Council', 'City of Batac, Ilocos Norte'),
+(30, 'Brgy. 16-S Quiling Sur Council (MMSU)', 'City of Batac, Ilocos Norte'),
+(31, 'Brgy. 17 Tabug Council', 'City of Batac, Ilocos Norte'),
+(32, 'Brgy. 18 Magnuang Emergency Ops', 'City of Batac, Ilocos Norte'),
+(33, 'Brgy. 19 Pimentel (Cubol) Council', 'City of Batac, Ilocos Norte'),
+(34, 'Brgy. 20-N Colo Disaster Unit', 'City of Batac, Ilocos Norte'),
+(35, 'Brgy. 20-S Mabaleng Council', 'City of Batac, Ilocos Norte'),
+(36, 'Brgy. 21 Quiom Relief Desk', 'City of Batac, Ilocos Norte'),
+(37, 'Brgy. 22 Maipalig Council', 'City of Batac, Ilocos Norte'),
+(38, 'Brgy. 23 Biningan Disaster Committee', 'City of Batac, Ilocos Norte'),
+(39, 'Brgy. 24 Sumader Council', 'City of Batac, Ilocos Norte'),
+(40, 'Brgy. 25-N Camguidan Relief Desk', 'City of Batac, Ilocos Norte'),
+(41, 'Brgy. 25-S Payao Council', 'City of Batac, Ilocos Norte'),
+(42, 'Brgy. 26 Parangopong Council', 'City of Batac, Ilocos Norte'),
+(43, 'Brgy. 27-E Capacuan Emergency Unit', 'City of Batac, Ilocos Norte'),
+(44, 'Brgy. 27-W Naguirangan Council', 'City of Batac, Ilocos Norte'),
+(45, 'Brgy. 28 San Mateo Council', 'City of Batac, Ilocos Norte'),
+(46, 'Brgy. 29 San Pedro Disaster Committee', 'City of Batac, Ilocos Norte'),
+(47, 'Brgy. 30-E Baoa East Council', 'City of Batac, Ilocos Norte'),
+(48, 'Brgy. 30-W Baoa West Council', 'City of Batac, Ilocos Norte'),
+(49, 'Brgy. 31 Camandingan Council', 'City of Batac, Ilocos Norte'),
+(50, 'Brgy. 32 Palongpong Emergency Desk', 'City of Batac, Ilocos Norte'),
+(51, 'Brgy. 33-N Nagbacalan Council', 'City of Batac, Ilocos Norte'),
+(52, 'Brgy. 33-S Rayuray Council', 'City of Batac, Ilocos Norte'),
+(53, 'Brgy. 34 Dariwdiw Disaster Team', 'City of Batac, Ilocos Norte'),
+(54, 'Brgy. 35 Bil-loca Council', 'City of Batac, Ilocos Norte');
 
--- 4. Volunteers (10 Records)
+-- 4. Volunteers (10 Records, user_id 55 to 64 -> volunteer_id 1 to 10)
 INSERT INTO Volunteer (user_id, vehicle_type, is_available) VALUES
-(22, 'Truck', true),
-(23, 'Van', true),
-(24, 'Pickup / 4x4', true),
-(25, 'Motorcycle', false),
-(26, 'Van', true),
-(27, 'Truck', false),
-(28, 'Boat / Watercraft', true),
-(29, 'Pickup / 4x4', true),
-(30, 'Motorcycle', true),
-(31, 'Van', false);
+(55, 'Pickup Truck', true),
+(56, 'Cargo Van', true),
+(57, 'Multicab', true),
+(58, 'Motorcycle', true),
+(59, 'Light Truck', true),
+(60, 'Van', true),
+(61, 'Multicab', true),
+(62, 'Pickup Truck', true),
+(63, 'Van', true),
+(64, 'Light Truck', true);
 
--- 5. Disaster Events (10 Records)
+-- 5. Disaster Events (10 Calamity Incidents Localized to Batac City / Ilocos Norte)
 INSERT INTO DisasterEvent (event_name, location, status, start_date) VALUES
-('Typhoon Carina Flood', 'Metro Manila & Rizal', 'Active', '2024-07-24'),
-('Mt. Kanlaon Volcanic Unrest', 'Canlaon, Negros Oriental', 'Active', '2024-06-03'),
-('Super Typhoon Mawar Relief', 'Batanes & Cagayan', 'Resolved', '2023-05-31'),
-('Mindanao 6.8 Magnitude Earthquake', 'Sarangani, Davao Occidental', 'Resolved', '2023-11-17'),
-('Taal Volcano Sulfur Gas Crisis', 'Batangas', 'Active', '2024-08-15'),
-('Typhoon Egay Coastal Surge', 'Ilocos Norte & Aparri', 'Resolved', '2023-07-26'),
-('Northern Samar Flash Floods', 'Catarman, Northern Samar', 'Resolved', '2023-11-20'),
-('Davao De Oro Landslide Disaster', 'Maco, Davao de Oro', 'Resolved', '2024-02-06'),
-('Tropical Storm Kristine Prep', 'Bicol Region & Eastern Samar', 'Active', '2024-10-21'),
-('Central Luzon Monsoon Inundation', 'Pampanga & Bulacan', 'Active', '2024-08-02');
+('Typhoon Carina - Quiaoit River Flash Flood', 'Riverside Barangays, Batac City', 'Active', '2024-07-24'),
+('Typhoon Egay - City-Wide Agricultural Recovery', 'City of Batac, Ilocos Norte', 'Resolved', '2023-07-26'),
+('Typhoon Marce - Low-Lying Riverside Response', 'City of Batac, Ilocos Norte', 'Active', '2024-11-06'),
+('Typhoon Julian - Northern Calamity Assistance', 'Batac City & Ilocos Norte', 'Resolved', '2024-09-30'),
+('Localized Flash Flood Incident - Quiling & Bil-loca', 'Quiling & Bil-loca, Batac City', 'Resolved', '2024-08-15'),
+('Severe Tropical Storm Kristine Preparedness', 'City of Batac, Ilocos Norte', 'Active', '2024-10-21'),
+('Super Typhoon Pepito Pre-Emptive Operations', 'Batac City Evacuation Center', 'Active', '2024-11-10'),
+('Monsoon Inundation - Riverside & Agricultural Sectors', 'City of Batac, Ilocos Norte', 'Resolved', '2023-08-10'),
+('Typhoon Goring Flash Flood Assistance', 'Eastern Barangays, Batac City', 'Resolved', '2023-08-28'),
+('Tropical Storm Enteng Drainage Inundation', 'Poblacion Barangays, Batac City', 'Resolved', '2024-09-02');
 
--- 6. Relief Goods (10 Records)
+-- 6. Relief Goods (10 Standard Humanitarian Commodities)
 INSERT INTO ReliefGood (item_name, category, unit_of_measure) VALUES
 ('Bottled Drinking Water 1L', 'Water', 'Bottles'),
 ('Rice 25kg Sack', 'Food', 'Sacks'),
@@ -268,10 +327,10 @@ INSERT INTO ReliefGood (item_name, category, unit_of_measure) VALUES
 ('Hygiene Kit (Soap/Toothbrush)', 'Hygiene', 'Kits'),
 ('Instant Noodles (Pack of 55)', 'Food', 'Boxes'),
 ('First Aid Trauma Kit', 'Medicine', 'Kits'),
-('Heavy-Duty Family Tent', 'Non-Food', 'Units'),
+('Heavy-Duty Family Tent', 'Shelter', 'Units'),
 ('Baby Formula & Diaper Pack', 'Care', 'Kits');
 
--- 7. Inventory (10 Records matching Goods 1-10)
+-- 7. Inventory (Stock Balances at Batac City Central Relief Depot)
 INSERT INTO Inventory (good_id, current_stock) VALUES
 (1, 12500),
 (2, 850),
@@ -284,22 +343,22 @@ INSERT INTO Inventory (good_id, current_stock) VALUES
 (9, 150),
 (10, 310);
 
--- 8. Donations (12 Records)
+-- 8. Donations (12 Records from Local Donors)
 INSERT INTO Donation (donor_id, event_id, donation_date, status) VALUES
 (1, 1, '2024-07-25', 'Approved'),
 (2, 1, '2024-07-26', 'Approved'),
-(3, 2, '2024-06-05', 'Approved'),
+(3, 2, '2023-07-27', 'Approved'),
 (4, 1, '2024-07-28', 'Approved'),
 (5, 5, '2024-08-16', 'Approved'),
 (6, 1, '2024-07-29', 'Approved'),
-(7, 9, '2024-10-22', 'Pending'),
-(8, 10, '2024-08-04', 'Approved'),
-(9, 2, '2024-06-10', 'Approved'),
-(10, 9, '2024-10-23', 'Pending'),
+(7, 6, '2024-10-22', 'Pending'),
+(8, 3, '2024-11-07', 'Approved'),
+(9, 2, '2023-07-28', 'Approved'),
+(10, 6, '2024-10-23', 'Pending'),
 (1, NULL, '2024-08-10', 'Approved'),
-(2, 10, '2024-08-12', 'Approved');
+(2, 7, '2024-11-11', 'Approved');
 
--- 9. Donation Items (15 Records)
+-- 9. Donation Items (15 Split-Transaction Line Items)
 INSERT INTO DonationItem (donation_id, good_id, quantity) VALUES
 (1, 1, 500),
 (1, 2, 50),
@@ -317,22 +376,25 @@ INSERT INTO DonationItem (donation_id, good_id, quantity) VALUES
 (10, 6, 300),
 (11, 9, 20);
 
--- 10. Relief Requests (12 Records)
+-- 10. Relief Requests (15 Sample Requests from Batac Barangays)
 INSERT INTO ReliefRequest (org_id, event_id, request_date, status) VALUES
-(1, 1, '2024-07-26', 'Approved'),
-(2, 1, '2024-07-27', 'Approved'),
-(3, 1, '2024-07-28', 'Approved'),
-(4, 2, '2024-06-06', 'Approved'),
-(5, 1, '2024-07-30', 'Pending'),
-(6, 10, '2024-08-05', 'Approved'),
-(7, 5, '2024-08-18', 'Approved'),
-(8, 9, '2024-10-23', 'Pending'),
-(9, 1, '2024-08-01', 'Approved'),
-(10, 10, '2024-08-06', 'Approved'),
-(1, 9, '2024-10-24', 'Pending'),
-(2, 5, '2024-08-20', 'Approved');
+(1, 1, '2024-07-26', 'Approved'),   -- Brgy. 1-N Ricarte
+(2, 1, '2024-07-27', 'Approved'),   -- Brgy. 1-S Valdez
+(3, 1, '2024-07-28', 'Approved'),   -- Brgy. 2 Ablan
+(4, 1, '2024-07-29', 'Approved'),   -- Brgy. 3 Cangrunaan
+(5, 1, '2024-07-30', 'Pending'),    -- Brgy. 4 Nalupta
+(6, 3, '2024-11-07', 'Approved'),   -- Brgy. 5 Callaguip
+(19, 3, '2024-11-08', 'Approved'),  -- Brgy. 16-S Quiling Sur (MMSU)
+(18, 3, '2024-11-08', 'Pending'),   -- Brgy. 16-N Quiling Norte
+(36, 5, '2024-08-16', 'Approved'),  -- Brgy. 30-E Baoa East
+(37, 5, '2024-08-16', 'Approved'),  -- Brgy. 30-W Baoa West
+(43, 5, '2024-08-17', 'Pending'),   -- Brgy. 35 Bil-loca
+(11, 1, '2024-07-31', 'Approved'),  -- Brgy. 10-S Barani
+(13, 1, '2024-08-01', 'Approved'),  -- Brgy. 11 Ben-Agan
+(14, 7, '2024-11-11', 'Approved'),  -- Brgy. 12 Palpalicong
+(15, 7, '2024-11-12', 'Pending');   -- Brgy. 13 Baay
 
--- 11. Request Items (15 Records)
+-- 11. Request Items (18 Split-Transaction Line Items)
 INSERT INTO RequestItem (request_id, good_id, quantity) VALUES
 (1, 1, 400),
 (1, 2, 30),
@@ -342,37 +404,44 @@ INSERT INTO RequestItem (request_id, good_id, quantity) VALUES
 (4, 5, 50),
 (5, 1, 500),
 (6, 2, 40),
-(7, 8, 30),
-(8, 1, 600),
-(9, 7, 120),
-(10, 2, 50),
-(10, 3, 400),
-(11, 6, 250),
-(12, 4, 100);
+(7, 1, 300),
+(7, 3, 250),
+(8, 2, 20),
+(9, 1, 450),
+(10, 2, 35),
+(11, 6, 100),
+(12, 7, 120),
+(13, 2, 50),
+(13, 3, 400),
+(14, 4, 100);
 
--- 12. Deliveries (10 Records)
+-- 12. Deliveries (10 Dispatch Records to Batac Barangays)
 INSERT INTO Delivery (request_id, volunteer_id, dispatch_date, delivery_status) VALUES
-(1, 1, '2024-07-28', 'Delivered'),
-(2, 2, '2024-07-29', 'Delivered'),
-(3, 3, '2024-07-30', 'Delivered'),
-(4, 4, '2024-06-08', 'Delivered'),
-(6, 5, '2024-08-07', 'In Transit'),
-(7, 6, '2024-08-21', 'Delivered'),
-(9, 7, '2024-08-03', 'Delivered'),
-(10, 8, '2024-08-09', 'In Transit'),
-(12, 9, '2024-08-23', 'In Transit'),
-(1, 10, '2024-07-29', 'Delivered');
+(1, 1, '2024-07-28', 'Delivered'),   -- To Brgy. 1-N Ricarte via Charlie Driver
+(2, 2, '2024-07-29', 'Delivered'),   -- To Brgy. 1-S Valdez via Dave Logistics
+(3, 3, '2024-07-30', 'Delivered'),   -- To Brgy. 2 Ablan via Grace Ramos
+(4, 4, '2024-07-31', 'Delivered'),   -- To Brgy. 3 Cangrunaan via Fernando Poe Jr
+(6, 5, '2024-11-08', 'In Transit'),  -- To Brgy. 5 Callaguip via Hannah Lim
+(7, 8, '2024-11-09', 'Delivered'),   -- To Brgy. 16-S Quiling Sur via Leo Gonzales
+(9, 6, '2024-08-18', 'Delivered'),   -- To Brgy. 30-E Baoa East via Ian Bautista
+(10, 7, '2024-08-19', 'In Transit'), -- To Brgy. 30-W Baoa West via Karen Joy Cortez
+(12, 9, '2024-08-02', 'Delivered'),  -- To Brgy. 10-S Barani via Mia Villanueva
+(13, 10, '2024-08-03', 'Delivered'); -- To Brgy. 11 Ben-Agan via Noel Alcantara
 
--- 13. Notifications (10 Records)
+-- 13. Notifications (15 Audit & Operational Alerts)
 INSERT INTO Notification (user_id, message, is_read) VALUES
-(12, 'Your relief request #1 has been approved and dispatched.', true),
-(13, 'Your relief request #2 is scheduled for fleet transit.', true),
-(22, 'Assigned to delivery route #1 for Marikina evacuation center.', true),
-(23, 'Assigned to delivery route #2 for DSWD Field Command.', true),
-(2, 'Thank you! Your donation #1 has been approved and allocated.', true),
-(3, 'Corporate relief aid acknowledged by NDRDMS logistics.', true),
-(14, 'Emergency request #3 goods have arrived on site.', false),
-(24, 'Dispatch route #3 update: road clearance verified.', false),
-(15, 'Urgent: Water purification kits allocation pending review.', false),
-(1, 'System Notice: Database backup and replication sync complete.', false);
-
+(12, 'Your relief request #1 for Brgy. 1-N Ricarte has been approved and dispatched from Central Depot.', true),
+(13, 'Your relief request #2 for Brgy. 1-S Valdez is scheduled for fleet transit.', true),
+(30, 'Emergency request #7 for Brgy. 16-S Quiling Sur has been delivered successfully.', true),
+(55, 'Assigned to delivery route #1 for Brgy. Ricarte evacuation staging area.', true),
+(56, 'Assigned to delivery route #2 for Brgy. Valdez relief station.', true),
+(62, 'Assigned to delivery route #7 for Quiling Sur emergency response.', true),
+(2, 'Thank you! Your donation #1 has been acknowledged and allocated to Quiaoit River flood relief.', true),
+(3, 'Corporate relief aid from MMSU Alumni acknowledged by Batac CDRRMO logistics.', true),
+(14, 'Emergency request #3 goods have arrived on site at Brgy. 2 Ablan.', false),
+(47, 'Dispatch route #9 update: Baoa East road access verified cleared.', false),
+(15, 'Urgent: Water purification kits allocation for Brgy. Cangrunaan pending review.', false),
+(1, 'System Notice: Daily automated backup for Batac CDRRMO database complete.', false),
+(48, 'Your relief request #10 for Brgy. Baoa West is now In Transit.', false),
+(24, 'Your relief request #13 for Brgy. Ben-Agan has been fulfilled.', true),
+(25, 'Pre-emptive evacuation supplies allocated for Brgy. Palpalicong.', false);
