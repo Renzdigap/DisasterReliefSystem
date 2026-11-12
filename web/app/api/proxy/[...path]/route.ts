@@ -489,7 +489,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
         location:
           typeof location === "string" && location.trim()
             ? location.trim()
-            : "Metro Manila",
+            : "City of Batac, Ilocos Norte",
         vehicleType:
           typeof vehicleType === "string" && vehicleType.trim()
             ? vehicleType.trim()
@@ -804,7 +804,7 @@ async function handleRequest(req: NextRequest, subpath: string) {
         } else if (p.role === "Organization") {
           const oIns = await client.query(
             "INSERT INTO Organization (user_id, org_name, location) VALUES ($1, $2, $3) RETURNING *",
-            [userId, p.orgName || p.fullName, p.location || "Metro Manila"]
+            [userId, p.orgName || p.fullName, p.location || "City of Batac, Ilocos Norte"]
           );
           resp.orgId = oIns.rows[0].org_id;
           resp.orgName = oIns.rows[0].org_name;

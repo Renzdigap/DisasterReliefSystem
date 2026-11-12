@@ -963,7 +963,7 @@ export default function OrganizationPortalPage() {
     session?.user?.fullName ||
     "Organization";
   const orgLocation =
-    data?.organization?.location || session?.location || "Metro Manila";
+    data?.organization?.location || session?.location || "City of Batac, Ilocos Norte";
 
   const navItems: SidebarNavItem[] = [
     {

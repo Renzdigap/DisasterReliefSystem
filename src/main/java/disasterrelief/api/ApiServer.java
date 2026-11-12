@@ -222,7 +222,7 @@ public class ApiServer {
                             try (PreparedStatement insOrg = conn.prepareStatement("INSERT INTO Organization (user_id, org_name, location) VALUES (?, ?, ?)")) {
                                 insOrg.setInt(1, userId);
                                 insOrg.setString(2, !isBlank(orgName) ? orgName.trim() : trimmedName);
-                                insOrg.setString(3, !isBlank(location) ? location.trim() : "Metro Manila");
+                                insOrg.setString(3, !isBlank(location) ? location.trim() : "City of Batac, Ilocos Norte");
                                 insOrg.executeUpdate();
                             }
                         } else if ("Volunteer".equals(role)) {

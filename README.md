@@ -1,12 +1,13 @@
-# National Disaster Relief & Resource Distribution Management System (NDRDMS)
+# Disaster Relief & Resource Management System (DRRMS) — City of Batac
 
 > **IT 161 – Information Management: Class Project 1**  
-> Full-Stack Operational Information System with Next.js TypeScript, Java JDBC REST API, and Supabase Cloud PostgreSQL 15
+> Operational Information System & Institutional Information Management Framework for the **City Disaster Risk Reduction and Management Office (CDRRMO) of the City of Batac, Ilocos Norte**  
+> Built with Next.js TypeScript, Java JDBC REST API & Desktop Client, and Supabase Cloud PostgreSQL 15 (3NF)
 
 ---
 
 ## 📌 Project Overview
-The **National Disaster Relief & Resource Distribution Management System (NDRDMS / DRRMS)** is a full-stack humanitarian relief coordination platform. It enables emergency operations administrators, citizens/donors, partner organizations/LGUs, and field volunteers to register disaster events, submit multi-item split-transaction pledges and relief requests, manage central warehouse inventory atomically, track fleet deliveries, and generate operational analytics reports.
+The **Disaster Relief & Resource Management System (DRRMS)** is a localized humanitarian relief coordination platform designed for the **City of Batac, Ilocos Norte**. It enables CDRRMO emergency administrators, citizen donors, the **43 official Barangays of Batac**, and field logistics volunteers to register localized disaster events (such as Quiaoit River flash floods), submit multi-item relief requisitions, manage central warehouse inventory at the Batac City Evacuation & Logistics Center, track fleet deliveries, and generate operational decision reports.
 
 Behind both the **Next.js TypeScript web portal (`web/`)** and the **Java Swing desktop client (`disasterrelief.gui`)** is a normalized **Third Normal Form (3NF) PostgreSQL 15 database** hosted on **Supabase**, powered by a **Java JDBC HTTP REST API (`disasterrelief.api.ApiServer`)**.
 

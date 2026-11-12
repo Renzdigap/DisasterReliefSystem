@@ -11,7 +11,7 @@ import java.awt.*;
 public class MainFrame extends JFrame {
 
     public MainFrame() {
-        setTitle("National Disaster Relief & Resource Management System (NDRDMS)");
+        setTitle("Disaster Relief & Resource Management System (DRRMS) — City of Batac");
         setSize(1366, 820);
         setMinimumSize(new Dimension(1080, 680));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);

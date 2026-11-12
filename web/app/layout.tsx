@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NDRDMS / DRRMS — National Disaster Relief & Resource Management System",
+  title: "DRRMS — Disaster Relief & Resource Management System (City of Batac, Ilocos Norte)",
   description:
-    "Institutional Information Management Framework & Multi-Portal System powered by Java JDBC & Supabase PostgreSQL 15 (3NF).",
+    "Institutional Information Management Framework & Multi-Portal System for City of Batac CDRRMO powered by Java JDBC & Supabase PostgreSQL 15 (3NF).",
 };
 
 export default function RootLayout({

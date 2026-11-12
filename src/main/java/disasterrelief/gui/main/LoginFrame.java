@@ -33,7 +33,7 @@ public class LoginFrame extends JFrame {
         JPanel headerBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 24, 14));
         headerBar.setBackground(UITheme.BG_CARD);
         headerBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UITheme.BORDER_SUBTLE));
-        JLabel lblHeaderBrand = new JLabel("NATIONAL DISASTER RELIEF & LOGISTICS MANAGEMENT SYSTEM");
+        JLabel lblHeaderBrand = new JLabel("DISASTER RELIEF & LOGISTICS MANAGEMENT SYSTEM — CITY OF BATAC");
         lblHeaderBrand.setFont(UITheme.FONT_BODY_BOLD);
         lblHeaderBrand.setForeground(UITheme.COLOR_PRIMARY);
         headerBar.add(lblHeaderBrand);
