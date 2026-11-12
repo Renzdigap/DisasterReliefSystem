@@ -67,7 +67,10 @@ export default function LoginPage() {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [showRegPass, setShowRegPass] = useState(false);
-  const [regFullName, setRegFullName] = useState("");
+  const [regFirstName, setRegFirstName] = useState("");
+  const [regMiddleName, setRegMiddleName] = useState("");
+  const [regLastName, setRegLastName] = useState("");
+  const [noMiddleName, setNoMiddleName] = useState(false);
   const [regContactInfo, setRegContactInfo] = useState("");
   const [regRole, setRegRole] = useState<"Donor" | "Organization" | "Volunteer">("Donor");
   const [regDonorType, setRegDonorType] = useState<"Individual" | "Corporate">("Individual");
@@ -141,6 +144,9 @@ export default function LoginPage() {
     setSuccessMsg("");
     const trimmedUser = regUsername.trim();
     const trimmedEmail = regEmail.trim().toLowerCase();
+    const trimmedFirst = regFirstName.trim();
+    const trimmedLast = regLastName.trim();
+    const trimmedMiddle = noMiddleName ? "N/A" : regMiddleName.trim();
 
     if (trimmedUser.length < 3 || /[\s@]/.test(trimmedUser)) {
       setErrorMsg("Username must be 3-50 characters with no spaces or '@'.");
@@ -154,6 +160,22 @@ export default function LoginPage() {
       setErrorMsg("Password must be at least 6 characters long.");
       return;
     }
+    if (!trimmedFirst) {
+      setErrorMsg("Please enter your First Name.");
+      return;
+    }
+    if (!trimmedLast) {
+      setErrorMsg("Please enter your Last Name.");
+      return;
+    }
+    if (!noMiddleName && !trimmedMiddle) {
+      setErrorMsg("Please enter your Middle Name or check 'No Middle Name'.");
+      return;
+    }
+
+    const computedFullName = (trimmedMiddle && trimmedMiddle !== "N/A")
+      ? `${trimmedFirst} ${trimmedMiddle} ${trimmedLast}`
+      : `${trimmedFirst} ${trimmedLast}`;
 
     setSubmitting(true);
     try {
@@ -167,11 +189,15 @@ export default function LoginPage() {
           username: trimmedUser,
           email: trimmedEmail,
           password: regPassword,
-          fullName: regFullName.trim(),
+          firstName: trimmedFirst,
+          middleName: trimmedMiddle,
+          lastName: trimmedLast,
+          noMiddleName,
+          fullName: computedFullName,
           contactInfo: regContactInfo.trim(),
           role: regRole,
           donorType: regDonorType,
-          orgName: (regOrgName || regFullName).trim(),
+          orgName: (regOrgName || computedFullName).trim(),
           location: regLocation.trim() || "City of Batac, Ilocos Norte",
           vehicleType: regVehicleType,
         }),
@@ -631,21 +657,82 @@ export default function LoginPage() {
                   </div>
                 </div>
 
+                {/* Name Fields: First Name & Last Name */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <div>
-                    <label htmlFor="reg-fullname" className="block text-[11px] font-semibold text-slate-700 mb-1">Full Name / Contact Person</label>
+                    <label htmlFor="reg-firstname" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      First Name <span className="text-red-500">*</span>
+                    </label>
                     <input
-                      id="reg-fullname"
+                      id="reg-firstname"
                       type="text"
                       required
-                      value={regFullName}
-                      onChange={(e) => setRegFullName(e.target.value)}
-                      placeholder="Full Name"
+                      value={regFirstName}
+                      onChange={(e) => setRegFirstName(e.target.value)}
+                      placeholder="e.g. Juan"
                       className="auth-input w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8]"
                     />
                   </div>
                   <div>
-                    <label htmlFor="reg-contact" className="block text-[11px] font-semibold text-slate-700 mb-1">Contact Number</label>
+                    <label htmlFor="reg-lastname" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Last Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="reg-lastname"
+                      type="text"
+                      required
+                      value={regLastName}
+                      onChange={(e) => setRegLastName(e.target.value)}
+                      placeholder="e.g. Dela Cruz"
+                      className="auth-input w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8]"
+                    />
+                  </div>
+                </div>
+
+                {/* Middle Name (with automatic N/A checkbox) & Contact Number */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label htmlFor="reg-middlename" className="text-[11px] font-semibold text-slate-700">
+                        Middle Name
+                      </label>
+                      <label className="inline-flex items-center gap-1 cursor-pointer text-[10px] text-slate-600 hover:text-slate-900 select-none">
+                        <input
+                          type="checkbox"
+                          id="reg-no-middlename"
+                          checked={noMiddleName}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setNoMiddleName(checked);
+                            if (checked) {
+                              setRegMiddleName("N/A");
+                            } else if (regMiddleName === "N/A") {
+                              setRegMiddleName("");
+                            }
+                          }}
+                          className="h-3 w-3 rounded border-slate-300 text-[#0038A8] focus:ring-[#0038A8]"
+                        />
+                        <span className="font-medium text-slate-600">No Middle Name</span>
+                      </label>
+                    </div>
+                    <input
+                      id="reg-middlename"
+                      type="text"
+                      disabled={noMiddleName}
+                      value={noMiddleName ? "N/A" : regMiddleName}
+                      onChange={(e) => setRegMiddleName(e.target.value)}
+                      placeholder={noMiddleName ? "N/A" : "e.g. Santos"}
+                      className={`auth-input w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8] ${
+                        noMiddleName
+                          ? "bg-slate-100 text-slate-500 cursor-not-allowed font-medium italic"
+                          : "bg-white"
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="reg-contact" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Contact Number <span className="text-red-500">*</span>
+                    </label>
                     <input
                       id="reg-contact"
                       type="text"

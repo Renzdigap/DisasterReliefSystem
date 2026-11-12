@@ -344,6 +344,10 @@ async function handleRequest(req: NextRequest, subpath: string) {
         email: rawEmail,
         password,
         fullName,
+        firstName,
+        middleName,
+        lastName,
+        noMiddleName,
         contactInfo,
         role: rawRole,
         donorType,
@@ -352,13 +356,25 @@ async function handleRequest(req: NextRequest, subpath: string) {
         vehicleType,
       } = body;
 
+      let resolvedFullName = typeof fullName === "string" ? fullName.trim() : "";
+      if (!resolvedFullName && typeof firstName === "string" && typeof lastName === "string") {
+        const mid =
+          typeof middleName === "string" &&
+          middleName.trim() &&
+          middleName.trim().toUpperCase() !== "N/A"
+            ? ` ${middleName.trim()} `
+            : " ";
+        resolvedFullName = `${firstName.trim()}${mid}${lastName.trim()}`
+          .replace(/\s+/g, " ")
+          .trim();
+      }
+
       if (
         typeof username !== "string" ||
         !username.trim() ||
         typeof password !== "string" ||
         !password ||
-        typeof fullName !== "string" ||
-        !fullName.trim() ||
+        !resolvedFullName ||
         !rawRole
       ) {
         return NextResponse.json(
@@ -478,14 +494,22 @@ async function handleRequest(req: NextRequest, subpath: string) {
       const pendingPayload = {
         username: trimmedUsername,
         passwordHash: hashPasswordSha256Base64(password),
-        fullName: fullName.trim(),
+        fullName: resolvedFullName,
+        firstName: typeof firstName === "string" ? firstName.trim() : "",
+        middleName:
+          typeof middleName === "string"
+            ? middleName.trim()
+            : noMiddleName
+            ? "N/A"
+            : "",
+        lastName: typeof lastName === "string" ? lastName.trim() : "",
         contactInfo: typeof contactInfo === "string" ? contactInfo.trim() : "",
         role,
         donorType: safeDonorType,
         orgName:
           typeof orgName === "string" && orgName.trim()
             ? orgName.trim()
-            : fullName.trim(),
+            : resolvedFullName,
         location:
           typeof location === "string" && location.trim()
             ? location.trim()
