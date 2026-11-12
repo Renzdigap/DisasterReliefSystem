@@ -969,10 +969,10 @@ export default function AdminPortalPage() {
         <button
           type="button"
           onClick={() => setShowBroadcastModal(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-700 hover:to-amber-700 active:scale-[0.98] px-3 py-1.5 text-xs font-bold text-white shadow-sm transition"
-          title="Broadcast Emergency Fleet Dispatch Alert"
+          className="inline-flex items-center gap-1.5 rounded-md bg-[#CE1126] hover:bg-red-700 active:scale-[0.98] px-3 py-1.5 text-xs font-bold text-white shadow-xs border border-red-800 transition"
+          title="Broadcast Emergency Fleet Dispatch Alert (Batac CDRRMO)"
         >
-          <Radio className="h-3.5 w-3.5 animate-pulse" aria-hidden="true" />
+          <Radio className="h-3.5 w-3.5 animate-pulse text-amber-300" aria-hidden="true" />
           <span className="hidden sm:inline">Broadcast Fleet Alert</span>
         </button>
       }
@@ -981,7 +981,7 @@ export default function AdminPortalPage() {
         <div
           role={toast.type === "error" ? "alert" : "status"}
           aria-live="polite"
-          className={`toast-enter rounded-xl border px-4 py-3 text-xs sm:text-sm font-medium flex items-center justify-between gap-3 no-print ${
+          className={`toast-enter rounded-md border px-4 py-3 text-xs sm:text-sm font-medium flex items-center justify-between gap-3 no-print ${
             toast.type === "success"
               ? "border-emerald-200 bg-emerald-50 text-emerald-900"
               : "border-rose-200 bg-rose-50 text-rose-900"
@@ -998,7 +998,7 @@ export default function AdminPortalPage() {
           <button
             type="button"
             onClick={() => setToast(null)}
-            className="text-xs underline shrink-0"
+            className="text-xs underline shrink-0 font-bold"
           >
             Close
           </button>
@@ -1008,10 +1008,10 @@ export default function AdminPortalPage() {
       {/* TAB 1: OVERVIEW */}
       {activeTab === "overview" && (
         <div className="space-y-6 tab-panel-enter">
-          {/* Executive KPI Summary (Interactive Quick Navigation, Zero Subtexts) */}
+          {/* Executive KPI Summary (Command & Control Stat Cards) */}
           <div
             ref={kpiGridRef}
-            className="stagger-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 no-print"
+            className="stagger-grid grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 no-print"
           >
             <button
               type="button"
@@ -1020,18 +1020,21 @@ export default function AdminPortalPage() {
                 setStatusFilter("Active");
                 setSearchQuery("");
               }}
-              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-rose-300 hover:shadow-sm p-4 shadow-xs"
+              className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#CE1126] group"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-slate-600">
-                  Active Disasters
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Active Incidents
                 </span>
-                <div className="h-7 w-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                  <AlertTriangle className="h-3.5 w-3.5" aria-hidden="true" />
-                </div>
+                <span className="rounded bg-rose-50 text-[#CE1126] border border-rose-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                  CRITICAL
+                </span>
               </div>
-              <div className="text-2xl font-black text-rose-600 mt-2 tracking-tight tabular-nums">
+              <div className="text-2xl font-black text-slate-900 mt-1.5 tracking-tight tabular-nums group-hover:text-[#CE1126] transition-colors">
                 <AnimatedNumber value={Number(metrics.activeDisasters ?? 0)} />
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+                Batac Basin &amp; Quiaoit
               </div>
             </button>
 
@@ -1042,18 +1045,21 @@ export default function AdminPortalPage() {
                 setStatusFilter("Pending");
                 setSearchQuery("");
               }}
-              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm p-4 shadow-xs"
+              className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#D97706] group"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-slate-600">
-                  Pending Requests
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Requisitions
                 </span>
-                <div className="h-7 w-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                  <Building2 className="h-3.5 w-3.5" aria-hidden="true" />
-                </div>
+                <span className="rounded bg-amber-50 text-[#D97706] border border-amber-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                  PENDING
+                </span>
               </div>
-              <div className="text-2xl font-black text-amber-600 mt-2 tracking-tight tabular-nums">
+              <div className="text-2xl font-black text-slate-900 mt-1.5 tracking-tight tabular-nums group-hover:text-[#D97706] transition-colors">
                 <AnimatedNumber value={Number(metrics.pendingRequests ?? 0)} />
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+                43 Batac Barangays
               </div>
             </button>
 
@@ -1064,18 +1070,21 @@ export default function AdminPortalPage() {
                 setStatusFilter("ALL");
                 setSearchQuery("");
               }}
-              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm p-4 shadow-xs"
+              className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#0038A8] group"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-slate-600">
-                  Donations
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Donation Intake
                 </span>
-                <div className="h-7 w-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                  <HeartHandshake className="h-3.5 w-3.5" aria-hidden="true" />
-                </div>
+                <span className="rounded bg-blue-50 text-[#0038A8] border border-blue-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                  VERIFIED
+                </span>
               </div>
-              <div className="text-2xl font-black text-blue-600 mt-2 tracking-tight tabular-nums">
+              <div className="text-2xl font-black text-slate-900 mt-1.5 tracking-tight tabular-nums group-hover:text-[#0038A8] transition-colors">
                 <AnimatedNumber value={Number(metrics.totalDonations ?? 0)} />
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+                Donor Pledges (In-Kind/Cash)
               </div>
             </button>
 
@@ -1086,18 +1095,21 @@ export default function AdminPortalPage() {
                 setStatusFilter("ALL");
                 setSearchQuery("");
               }}
-              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 hover:shadow-sm p-4 shadow-xs"
+              className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-indigo-600 group"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-slate-600">
-                  Relief Items
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Relief Goods
                 </span>
-                <div className="h-7 w-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                  <Package className="h-3.5 w-3.5" aria-hidden="true" />
-                </div>
+                <span className="rounded bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                  CATALOG
+                </span>
               </div>
-              <div className="text-2xl font-black text-indigo-600 mt-2 tracking-tight tabular-nums">
+              <div className="text-2xl font-black text-slate-900 mt-1.5 tracking-tight tabular-nums group-hover:text-indigo-600 transition-colors">
                 <AnimatedNumber value={Number(metrics.reliefGoodsCount ?? 0)} />
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+                Batac Central Warehouse
               </div>
             </button>
 
@@ -1108,18 +1120,21 @@ export default function AdminPortalPage() {
                 setStatusFilter("Volunteer");
                 setSearchQuery("");
               }}
-              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-sky-300 hover:shadow-sm p-4 shadow-xs"
+              className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-emerald-600 group"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-slate-600">
-                  Volunteers
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Volunteer Corps
                 </span>
-                <div className="h-7 w-7 rounded-lg bg-sky-50 text-sky-600 flex items-center justify-center shrink-0">
-                  <Users className="h-3.5 w-3.5" aria-hidden="true" />
-                </div>
+                <span className="rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                  DISPATCH
+                </span>
               </div>
-              <div className="text-2xl font-black text-sky-600 mt-2 tracking-tight tabular-nums">
+              <div className="text-2xl font-black text-slate-900 mt-1.5 tracking-tight tabular-nums group-hover:text-emerald-600 transition-colors">
                 <AnimatedNumber value={Number(metrics.registeredVolunteers ?? 0)} />
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+                Active Field Personnel
               </div>
             </button>
 
@@ -1130,42 +1145,50 @@ export default function AdminPortalPage() {
                 setStatusFilter("Delivered");
                 setSearchQuery("");
               }}
-              className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm p-4 shadow-xs"
+              className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-sky-600 group"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-slate-600">
-                  Deliveries Done
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Dispatches Done
                 </span>
-                <div className="h-7 w-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                  <Truck className="h-3.5 w-3.5" aria-hidden="true" />
-                </div>
+                <span className="rounded bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                  COMPLETED
+                </span>
               </div>
-              <div className="text-2xl font-black text-emerald-600 mt-2 tracking-tight tabular-nums">
+              <div className="text-2xl font-black text-slate-900 mt-1.5 tracking-tight tabular-nums group-hover:text-sky-600 transition-colors">
                 <AnimatedNumber value={Number(metrics.completedDeliveries ?? 0)} />
+              </div>
+              <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+                Barangay Drop-offs
               </div>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-slate-900">
-                  Pending Requests
-                </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Barangay Relief Requisitions
+                  </h2>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Pending requisitions from the 43 Barangays of Batac awaiting stock allocation
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
                     setActiveTab("requests");
                     window.scrollTo({ top: 0 });
                   }}
-                  className="text-xs font-semibold text-blue-600 hover:underline"
+                  className="text-xs font-bold text-[#0038A8] hover:underline"
                 >
                   View all
                 </button>
               </div>
               {pendingRequestsList.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400">
-                  All relief requests have been reviewed.
+                  All relief requests have been reviewed and allocated.
                 </div>
               ) : (
                 <div className="divide-y divide-slate-100">
@@ -1179,14 +1202,14 @@ export default function AdminPortalPage() {
                           <span className="font-semibold text-slate-900 truncate">
                             {r.orgName}
                           </span>
-                          <span className="text-[11px] font-medium text-slate-400 tabular-nums shrink-0">
-                            ID {r.requestId}
+                          <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded shrink-0">
+                            REQ #{r.requestId}
                           </span>
                         </div>
-                        <div className="text-slate-600 truncate">
+                        <div className="text-slate-600 truncate text-[11px]">
                           {(r.items || []).length > 0 ? (
                             <>
-                              <span className="font-medium text-slate-700">
+                              <span className="font-medium text-slate-800">
                                 {(r.items || [])
                                   .map(
                                     (i: any) =>
@@ -1208,11 +1231,11 @@ export default function AdminPortalPage() {
                         onClick={() =>
                           handleUpdateRequestStatus(r.requestId, "Approved")
                         }
-                        className="rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-[0.98] disabled:opacity-50 px-3.5 py-1.5 text-xs font-semibold text-white transition shrink-0"
+                        className="rounded-md bg-[#0038A8] hover:bg-blue-800 active:scale-[0.98] disabled:opacity-50 px-3 py-1.5 text-xs font-bold text-white transition shrink-0 shadow-xs border border-blue-900"
                       >
                         {busyKey === `request-${r.requestId}`
                           ? "Saving..."
-                          : "Approve"}
+                          : "Approve Requisition"}
                       </button>
                     </div>
                   ))}
@@ -1220,18 +1243,23 @@ export default function AdminPortalPage() {
               )}
             </section>
 
-            <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-slate-900">
-                  Warehouse Stock
-                </h2>
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs">
+              <div className="flex items-center justify-between mb-3 border-b border-slate-100 pb-2">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Batac Central Warehouse Stock
+                  </h2>
+                  <p className="text-[11px] text-slate-500 font-medium">
+                    Relief goods inventory balance &amp; emergency buffer tracking
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
                     setActiveTab("inventory");
                     window.scrollTo({ top: 0 });
                   }}
-                  className="text-xs font-semibold text-blue-600 hover:underline"
+                  className="text-xs font-bold text-[#0038A8] hover:underline"
                 >
                   Manage inventory
                 </button>
@@ -1246,18 +1274,18 @@ export default function AdminPortalPage() {
                           <span className="font-semibold text-slate-900">
                             {inv.itemName}
                           </span>
-                          <span className="text-slate-400 ml-2">
+                          <span className="text-[10px] font-mono text-slate-500 ml-2 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded uppercase">
                             {inv.category}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="font-semibold text-slate-900 tabular-nums">
+                          <span className="font-bold text-slate-900 tabular-nums">
                             {Number(inv.currentStock ?? 0).toLocaleString()}{" "}
                             {inv.unitOfMeasure}
                           </span>
                           {low && (
-                            <span className="rounded-full bg-rose-50 text-rose-700 border border-rose-200 px-2 py-0.5 text-xs font-semibold">
-                              Low
+                            <span className="rounded bg-rose-50 text-[#CE1126] border border-rose-200 px-1.5 py-0.5 text-[10px] font-mono font-bold">
+                              LOW
                             </span>
                           )}
                         </div>
@@ -1311,7 +1339,7 @@ export default function AdminPortalPage() {
                 required
                 value={newEventLocation}
                 onChange={(e) => setNewEventLocation(e.target.value)}
-                placeholder="e.g. Ilocos Norte / Cagayan Valley"
+                placeholder="e.g. Brgy. San Lorenzo / Quiaoit River Basin, Batac City"
                 className="w-full min-h-[40px] rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm focus:border-blue-600"
               />
             </div>

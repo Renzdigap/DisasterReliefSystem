@@ -898,7 +898,7 @@ export default function DonorPortalPage() {
         {/* Interactive KPI Strip */}
         <div
           ref={kpiGridRef}
-          className="stagger-grid grid grid-cols-2 lg:grid-cols-4 gap-4"
+          className="stagger-grid grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
         >
           <button
             type="button"
@@ -906,19 +906,22 @@ export default function DonorPortalPage() {
               setStatusFilter("ALL");
               setActiveTab("history");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#0038A8] group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Total Donations
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Total Pledges
               </span>
-              <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <HeartHandshake className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-blue-50 text-[#0038A8] border border-blue-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                CIVIC AID
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-slate-900 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#0038A8] transition-colors">
               <AnimatedNumber value={donations.length} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Recorded in Batac System
+            </div>
           </button>
 
           <button
@@ -927,19 +930,22 @@ export default function DonorPortalPage() {
               setStatusFilter("Pending");
               setActiveTab("history");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#D97706] group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Pending Review
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Pending Verification
               </span>
-              <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Clock className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-amber-50 text-[#D97706] border border-amber-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                AUDIT
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-amber-600 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#D97706] transition-colors">
               <AnimatedNumber value={pendingDonationsCount} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Awaiting CDRRMO Verification
+            </div>
           </button>
 
           <button
@@ -948,19 +954,22 @@ export default function DonorPortalPage() {
               setStatusFilter("Approved");
               setActiveTab("history");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-emerald-600 group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Items Donated
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Relief Units Donated
               </span>
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <Boxes className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                CREDITED
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-emerald-600 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-emerald-600 transition-colors">
               <AnimatedNumber value={totalItemsDonated} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Dispatched to Evacuation Centers
+            </div>
           </button>
 
           <button
@@ -969,19 +978,22 @@ export default function DonorPortalPage() {
               setDisasterFilter("Active");
               setActiveTab("needs");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-rose-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#CE1126] group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Active Disasters
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Monitored Calamities
               </span>
-              <div className="h-8 w-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-                <MapPin className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-rose-50 text-[#CE1126] border border-rose-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                ACTIVE
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-rose-600 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#CE1126] transition-colors">
               <AnimatedNumber value={activeEvents.length} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Quiaoit River &amp; Batac Zones
+            </div>
           </button>
         </div>
 

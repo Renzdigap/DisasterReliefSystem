@@ -1044,10 +1044,10 @@ export default function OrganizationPortalPage() {
           </div>
         )}
 
-        {/* Clickable KPI Cards (Clean, No Subtexts) */}
+        {/* Command & Control KPI Cards */}
         <div
           ref={kpiGridRef}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-grid"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger-grid"
         >
           <button
             type="button"
@@ -1055,19 +1055,22 @@ export default function OrganizationPortalPage() {
               setStatusFilter("ALL");
               setActiveTab("history");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#0038A8] group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Total Requests
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Total Requisitions
               </span>
-              <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <ClipboardList className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-blue-50 text-[#0038A8] border border-blue-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                BARANGAY
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-slate-900 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#0038A8] transition-colors">
               <AnimatedNumber value={requests.length} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Submitted to Batac CDRRMO
+            </div>
           </button>
 
           <button
@@ -1076,19 +1079,22 @@ export default function OrganizationPortalPage() {
               setStatusFilter("Pending");
               setActiveTab("history");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#D97706] group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                 Pending Review
               </span>
-              <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Clock className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-amber-50 text-[#D97706] border border-amber-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                EVALUATION
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-amber-600 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#D97706] transition-colors">
               <AnimatedNumber value={pendingRequestsCount} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Awaiting Central Depot Approval
+            </div>
           </button>
 
           <button
@@ -1097,19 +1103,22 @@ export default function OrganizationPortalPage() {
               setStatusFilter("Approved");
               setActiveTab("history");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-emerald-600 group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Approved
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Approved Requisitions
               </span>
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                ALLOCATED
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-emerald-600 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-emerald-600 transition-colors">
               <AnimatedNumber value={approvedCount} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Ready for Fleet Dispatch
+            </div>
           </button>
 
           <button
@@ -1118,19 +1127,22 @@ export default function OrganizationPortalPage() {
               setDelStatusFilter("ALL");
               setActiveTab("deliveries");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-sky-600 group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Deliveries
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Deliveries &bull; Inbound
               </span>
-              <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <Truck className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                LOGISTICS
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-indigo-600 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-sky-600 transition-colors">
               <AnimatedNumber value={deliveries.length} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Incoming from Batac Depot
+            </div>
           </button>
         </div>
 

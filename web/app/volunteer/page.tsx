@@ -674,10 +674,10 @@ export default function VolunteerPortalPage() {
           </div>
         )}
 
-        {/* Clickable KPI Cards (Clean, No Subtexts or Dots) */}
+        {/* Command & Control KPI Cards */}
         <div
           ref={kpiGridRef}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger-grid"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 stagger-grid"
         >
           <button
             type="button"
@@ -685,19 +685,22 @@ export default function VolunteerPortalPage() {
               setStatusFilter("ALL");
               setActiveTab("deliveries");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-blue-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#0038A8] group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Total Assigned
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Assigned Missions
               </span>
-              <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-                <Truck className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-blue-50 text-[#0038A8] border border-blue-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                FLEET
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-slate-900 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#0038A8] transition-colors">
               <AnimatedNumber value={deliveries.length} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Batac Logistics Waybills
+            </div>
           </button>
 
           <button
@@ -712,19 +715,22 @@ export default function VolunteerPortalPage() {
               );
               setActiveTab("deliveries");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-amber-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-[#D97706] group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Active Dispatch
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Active In-Transit
               </span>
-              <div className="h-8 w-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Navigation className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-amber-50 text-[#D97706] border border-amber-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                EN ROUTE
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-amber-600 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-[#D97706] transition-colors">
               <AnimatedNumber value={activeDispatchCount} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Cargo in Transport to Barangays
+            </div>
           </button>
 
           <button
@@ -733,41 +739,51 @@ export default function VolunteerPortalPage() {
               setStatusFilter("Delivered");
               setActiveTab("deliveries");
             }}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-emerald-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-emerald-600 group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Completed
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Completed Drop-offs
               </span>
-              <div className="h-8 w-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className="rounded bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 text-[9px] font-mono font-bold">
+                DELIVERED
+              </span>
             </div>
-            <p className="mt-2 text-2xl font-black text-emerald-600 tracking-tight tabular-nums">
+            <p className="mt-1.5 text-2xl font-black text-slate-900 tracking-tight tabular-nums group-hover:text-emerald-600 transition-colors">
               <AnimatedNumber value={deliveredCount} />
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              Signed by LGU Receiving Officers
+            </div>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab("profile")}
-            className="interactive-lift text-left rounded-2xl border border-slate-200/80 bg-white hover:border-indigo-300 hover:shadow-sm p-4 shadow-xs"
+            className="text-left rounded-lg border border-slate-200 bg-white hover:border-slate-400 p-3.5 shadow-xs transition-colors border-t-4 border-t-indigo-600 group"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-slate-600">
-                Duty Status
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                Duty Readiness
               </span>
-              <div className="h-8 w-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-              </div>
+              <span className={`rounded border px-1.5 py-0.5 text-[9px] font-mono font-bold ${
+                isAvailable
+                  ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                  : "bg-amber-50 text-amber-900 border-amber-200"
+              }`}>
+                {isAvailable ? "STANDBY" : "DEPLOYED"}
+              </span>
             </div>
             <p
-              className={`mt-2 text-xl sm:text-2xl font-black tracking-tight transition-colors duration-200 ${
-                isAvailable ? "text-emerald-600" : "text-amber-600"
+              className={`mt-1.5 text-xl sm:text-2xl font-black tracking-tight tabular-nums transition-colors duration-200 ${
+                isAvailable ? "text-emerald-700" : "text-amber-700"
               }`}
             >
               {isAvailable ? "Available" : "On Assignment"}
             </p>
+            <div className="text-[10px] text-slate-500 font-medium mt-1 truncate">
+              {isAvailable ? "Ready for Instant Call-up" : "Currently on Road Dispatch"}
+            </div>
           </button>
         </div>
 

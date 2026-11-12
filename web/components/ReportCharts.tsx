@@ -80,67 +80,67 @@ export function OperationalSummaryCharts({ rows }: { rows: any[] }) {
         ref={kpiRef}
         className="grid grid-cols-2 lg:grid-cols-5 gap-3 stagger-grid"
       >
-        <div className="interactive-lift rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+        <div className="rounded-lg border border-slate-200 bg-white border-t-4 border-t-[#CE1126] p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase tracking-wider">
             <span>Calamities</span>
-            <AlertTriangle className="h-4 w-4 text-blue-600" aria-hidden="true" />
+            <AlertTriangle className="h-4 w-4 text-[#CE1126]" aria-hidden="true" />
           </div>
           <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
             <AnimatedNumber value={totalEvents} />
           </div>
-          <div className="mt-1 text-[11px] font-medium text-blue-700">
-            Tracked Disaster Zones
+          <div className="mt-1 text-[10px] font-medium text-slate-500">
+            Batac Monitored Calamities
           </div>
         </div>
 
-        <div className="interactive-lift rounded-xl border border-blue-100 bg-gradient-to-br from-white to-blue-50/60 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+        <div className="rounded-lg border border-slate-200 bg-white border-t-4 border-t-[#0038A8] p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase tracking-wider">
             <span>Donations</span>
-            <HeartHandshake className="h-4 w-4 text-blue-600" aria-hidden="true" />
+            <HeartHandshake className="h-4 w-4 text-[#0038A8]" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-blue-700 tabular-nums">
+          <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
             <AnimatedNumber value={totalDonations} />
           </div>
-          <div className="mt-1 text-[11px] font-medium text-blue-600">
+          <div className="mt-1 text-[10px] font-medium text-slate-500">
             Total Pledges Logged
           </div>
         </div>
 
-        <div className="interactive-lift rounded-xl border border-amber-100 bg-gradient-to-br from-white to-amber-50/60 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+        <div className="rounded-lg border border-slate-200 bg-white border-t-4 border-t-[#D97706] p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase tracking-wider">
             <span>Requisitions</span>
-            <TrendingUp className="h-4 w-4 text-amber-600" aria-hidden="true" />
+            <TrendingUp className="h-4 w-4 text-[#D97706]" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-amber-700 tabular-nums">
+          <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
             <AnimatedNumber value={totalRequests} />
           </div>
-          <div className="mt-1 text-[11px] font-medium text-amber-600">
-            LGU Relief Demands
+          <div className="mt-1 text-[10px] font-medium text-slate-500">
+            43 Barangays Demand
           </div>
         </div>
 
-        <div className="interactive-lift rounded-xl border border-emerald-100 bg-gradient-to-br from-white to-emerald-50/60 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+        <div className="rounded-lg border border-slate-200 bg-white border-t-4 border-t-emerald-600 p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase tracking-wider">
             <span>Dispatched</span>
             <Truck className="h-4 w-4 text-emerald-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-emerald-700 tabular-nums">
+          <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
             <AnimatedNumber value={totalDeliveries} />
           </div>
-          <div className="mt-1 text-[11px] font-medium text-emerald-600">
-            Fulfilled Missions
+          <div className="mt-1 text-[10px] font-medium text-slate-500">
+            Completed Convoy Missions
           </div>
         </div>
 
-        <div className="interactive-lift col-span-2 lg:col-span-1 rounded-xl border border-indigo-100 bg-gradient-to-br from-white to-indigo-50/60 p-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-slate-500 text-[11px] font-bold uppercase tracking-wider">
+        <div className="col-span-2 lg:col-span-1 rounded-lg border border-slate-200 bg-white border-t-4 border-t-indigo-600 p-3.5 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-[10px] font-bold uppercase tracking-wider">
             <span>Fulfillment</span>
             <CheckCircle2 className="h-4 w-4 text-indigo-600" aria-hidden="true" />
           </div>
-          <div className="mt-1.5 text-2xl font-black text-indigo-700 tabular-nums">
+          <div className="mt-1.5 text-2xl font-black text-slate-900 tabular-nums">
             <AnimatedNumber value={fulfillmentRate} suffix="%" />
           </div>
-          <div className="mt-1 text-[11px] font-medium text-indigo-600">
+          <div className="mt-1 text-[10px] font-medium text-slate-500">
             Demand-to-Delivery Ratio
           </div>
         </div>

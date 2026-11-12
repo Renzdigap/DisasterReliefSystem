@@ -75,17 +75,30 @@ export function getDisasterAlertInfo(eventName: string = "") {
       progressPct: 65,
     };
   }
-  if (lower.includes("mayon") || lower.includes("volcan") || lower.includes("albay")) {
+  if (lower.includes("quiaoit") || lower.includes("batac") || lower.includes("flood") || lower.includes("river")) {
     return {
-      severity: "Volcanic Alert Level 2",
-      warningType: "Ashfall & Lahar Flow Hazard",
-      badgeColor: "bg-amber-50 text-amber-700 border-amber-200",
-      dotColor: "bg-amber-500",
-      familiesAffected: "8,500 Families",
+      severity: "Red Flash Flood Warning",
+      warningType: "Quiaoit River Overflow & Inundation Hazard",
+      badgeColor: "bg-rose-50 text-rose-800 border-rose-300",
+      dotColor: "bg-[#CE1126]",
+      familiesAffected: "3,450 Families",
       evacCenters: 14,
-      priorityDemand: "N95 Dust Masks, Bottled Water, Canned Goods",
-      urgency: "ACTIVE RELIEF",
-      progressPct: 58,
+      priorityDemand: "Drinking Water, Ready-to-Eat Food, Thermal Blankets",
+      urgency: "CRITICAL RESPONSE",
+      progressPct: 88,
+    };
+  }
+  if (lower.includes("marce") || lower.includes("pepito") || lower.includes("supertyphoon")) {
+    return {
+      severity: "Signal No. 3 Warning",
+      warningType: "Severe Tropical Cyclone Impact",
+      badgeColor: "bg-rose-50 text-rose-800 border-rose-300",
+      dotColor: "bg-[#CE1126]",
+      familiesAffected: "4,200 Families",
+      evacCenters: 18,
+      priorityDemand: "Hygiene Kits, Family Food Packs, Bottled Water",
+      urgency: "CRITICAL RESPONSE",
+      progressPct: 82,
     };
   }
   return {
@@ -247,30 +260,38 @@ export function DonationCertificateModal({
       {/* Printable Official Receipt Body */}
       <div className="p-6 sm:p-8 space-y-5 bg-white">
         {/* Letterhead */}
-        <div className="text-center space-y-2 border-b-2 border-[#002060] pb-4">
-          <div className="flex items-center justify-center">
-            <div className="h-12 w-12 rounded-2xl bg-white p-1 border border-slate-200 shadow-xs flex items-center justify-center">
-              <img
-                src="/ndrrmc-logo.png"
-                alt="NDRRMC Seal"
-                className="h-full w-full object-contain"
-              />
-            </div>
+        <div className="text-center space-y-2 border-b-2 border-[#0038A8] pb-4">
+          <div className="flex items-center justify-center -space-x-1.5">
+            <img
+              src="/logo_mmsu.png"
+              alt="MMSU Seal"
+              className="h-10 w-10 object-contain rounded-full bg-white p-0.5 border border-slate-200"
+            />
+            <img
+              src="/logo_ccis.png"
+              alt="CCIS Logo"
+              className="h-10 w-10 object-contain rounded-full bg-white p-0.5 border border-slate-200"
+            />
+            <img
+              src="/ndrrmc-logo.png"
+              alt="Batac CDRRMO"
+              className="h-10 w-10 object-contain rounded-full bg-white p-0.5 border border-slate-200"
+            />
           </div>
           <div>
-            <div className="text-[11px] font-semibold text-slate-500">
-              Republic of the Philippines &bull; Office of Civil Defense
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              Republika ng Pilipinas &bull; Lungsod ng Batac, Ilocos Norte
             </div>
             <h2
               id={titleId}
-              className="text-base sm:text-lg font-extrabold text-[#002060] tracking-tight"
+              className="text-base sm:text-lg font-extrabold text-[#0038A8] tracking-tight"
             >
-              National Disaster Risk Reduction &amp; Management Council
+              City Disaster Risk Reduction &amp; Management Office
             </h2>
-            <p className="text-xs font-semibold text-blue-700">
+            <p className="text-xs font-semibold text-slate-700">
               {isApproved
-                ? "Official Donation Acknowledgment Certificate"
-                : "Donation Pledge Receipt (Pending Review)"}
+                ? "Official Humanitarian Aid Acknowledgment Certificate"
+                : "Donation Pledge Receipt (Pending CDRRMO Review)"}
             </p>
           </div>
         </div>
@@ -404,7 +425,7 @@ export function DonationCertificateModal({
 
           <div className="text-right space-y-1">
             <div className="text-xs font-semibold text-slate-900">
-              NDRRMC Logistics Desk
+              Batac CDRRMO Logistics Desk
             </div>
             <div className="border-t border-slate-200 pt-1 text-[11px] font-medium text-slate-500">
               Central Warehouse Operations
@@ -581,27 +602,37 @@ export function DeliveryWaybillModal({
       {/* Printable Waybill Manifest Body */}
       <div className="p-6 sm:p-8 space-y-6 bg-white">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-[#002060] pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b-2 border-[#0038A8] pb-4">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-white p-1 border border-slate-200 shadow-xs flex items-center justify-center shrink-0">
+            <div className="flex items-center -space-x-1.5 shrink-0">
+              <img
+                src="/logo_mmsu.png"
+                alt="MMSU Seal"
+                className="h-10 w-10 object-contain rounded-full bg-white p-0.5 border border-slate-200"
+              />
+              <img
+                src="/logo_ccis.png"
+                alt="CCIS Logo"
+                className="h-10 w-10 object-contain rounded-full bg-white p-0.5 border border-slate-200"
+              />
               <img
                 src="/ndrrmc-logo.png"
-                alt="NDRRMC Seal"
-                className="h-full w-full object-contain"
+                alt="Batac CDRRMO"
+                className="h-10 w-10 object-contain rounded-full bg-white p-0.5 border border-slate-200"
               />
             </div>
             <div>
-              <div className="text-[11px] font-semibold text-slate-500">
-                Republic of the Philippines &bull; DRRMS Logistics
+              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                Republika ng Pilipinas &bull; Lungsod ng Batac, Ilocos Norte
               </div>
               <h2
                 id={titleId}
-                className="text-base sm:text-lg font-extrabold text-[#002060] tracking-tight"
+                className="text-base sm:text-lg font-extrabold text-[#0038A8] tracking-tight"
               >
-                Emergency Relief Cargo Waybill
+                CDRRMO Emergency Relief Cargo Waybill
               </h2>
-              <p className="text-xs text-blue-700 font-semibold">
-                Dispatch &amp; Custody Transfer Manifest
+              <p className="text-xs text-slate-600 font-semibold">
+                Barangay Relief Dispatch &amp; Custody Transfer Manifest
               </p>
             </div>
           </div>
@@ -845,7 +876,7 @@ const SAMPLE_TRACKING_RECORDS: TrackingRecord[] = [
       },
       {
         label: "Dispatched",
-        detail: "Charlie Driver (Batac Unit) • Pickup Truck",
+        detail: "Charlie Driver (Batac Unit) • Relief Truck (NDL-4921)",
         time: "Jul 28, 06:10 AM",
       },
       {
