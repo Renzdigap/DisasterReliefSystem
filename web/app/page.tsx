@@ -1,108 +1,96 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ShieldCheck,
-  HeartHandshake,
   Building2,
-  Truck,
   AlertCircle,
   CheckCircle2,
   Eye,
   EyeOff,
-  MailCheck,
-  RotateCcw,
-  PhoneCall,
-  PackageCheck,
   User,
   Lock,
-  Mail,
-  Phone,
-  MapPin,
   Search,
+  PhoneCall,
+  Clock,
+  Warehouse,
+  Info,
 } from "lucide-react";
 import { apiFetch, saveSession, UserSession } from "@/lib/api";
 import { PublicAidTrackerModal } from "@/components/DisasterEnhancements";
-import { AnimatedNumber, useSiblingStagger } from "@/components/InteractiveMotion";
 
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [showTracker, setShowTracker] = useState(false);
 
-  const pillarsRef = useRef<HTMLDivElement>(null);
-  const metricsRef = useRef<HTMLDivElement>(null);
-  const switcherRef = useRef<HTMLDivElement>(null);
-  const frontFaceRef = useRef<HTMLDivElement>(null);
-  const backFaceRef = useRef<HTMLDivElement>(null);
-
-  useSiblingStagger(pillarsRef);
-  useSiblingStagger(metricsRef);
-  useSiblingStagger(switcherRef, mode);
+  // Real-time Philippine Standard Time display
+  const [pstTime, setPstTime] = useState<string>("");
 
   useEffect(() => {
-    if (frontFaceRef.current) {
-      frontFaceRef.current.inert = mode !== "login";
-    }
-    if (backFaceRef.current) {
-      backFaceRef.current.inert = mode !== "register";
-    }
-  }, [mode]);
+    const updateTime = () => {
+      const now = new Date();
+      const options: Intl.DateTimeFormatOptions = {
+        timeZone: "Asia/Manila",
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      };
+      setPstTime(new Intl.DateTimeFormat("en-PH", options).format(now));
+    };
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
+  // Login Form States
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showLoginPass, setShowLoginPass] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
 
-  const [regStep, setRegStep] = useState<"form" | "verify">("form");
+  // Registration States
+  const [regStep, setRegStep] = useState<"form" | "otp">("form");
   const [regUsername, setRegUsername] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [showRegPass, setShowRegPass] = useState(false);
   const [regFullName, setRegFullName] = useState("");
   const [regContactInfo, setRegContactInfo] = useState("");
-  const [regRole, setRegRole] = useState<
-    "Donor" | "Organization" | "Volunteer"
-  >("Donor");
-  const [regDonorType, setRegDonorType] = useState("Individual");
+  const [regRole, setRegRole] = useState<"Donor" | "Organization" | "Volunteer">("Donor");
+  const [regDonorType, setRegDonorType] = useState<"Individual" | "Corporate">("Individual");
   const [regOrgName, setRegOrgName] = useState("");
-  const [regLocation, setRegLocation] = useState("");
+  const [regLocation, setRegLocation] = useState("City of Batac, Ilocos Norte");
   const [regVehicleType, setRegVehicleType] = useState("Van");
 
+  // OTP Verification States
   const [pendingEmail, setPendingEmail] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resending, setResending] = useState(false);
 
+  // Feedback & Network States
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
+  // Resend cooldown timer
   useEffect(() => {
     if (resendCooldown <= 0) return;
-    const timer = setTimeout(() => {
-      setResendCooldown((prev) => Math.max(0, prev - 1));
+    const t = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
-    return () => clearTimeout(timer);
+    return () => clearInterval(t);
   }, [resendCooldown]);
 
-  const syncAriaValidity = (el: HTMLInputElement) => {
-    try {
-      el.setAttribute(
-        "aria-invalid",
-        el.matches(":user-invalid") ? "true" : "false"
-      );
-    } catch {
-      el.setAttribute("aria-invalid", el.checkValidity() ? "false" : "true");
-    }
-  };
-
-  const handleFieldBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    syncAriaValidity(e.currentTarget);
-  };
-
   const routeByRole = (session: UserSession) => {
-    const role = (session.user.role || "").toLowerCase();
+    const role = (session?.user?.role || "").toLowerCase();
     if (role === "admin" || role === "manager") router.push("/admin");
     else if (role === "donor") router.push("/donor");
     else if (role === "organization") router.push("/organization");
@@ -115,7 +103,7 @@ export default function LoginPage() {
     setErrorMsg("");
     setSuccessMsg("");
     if (!username.trim() || !password) {
-      setErrorMsg("Username or email and password are required.");
+      setErrorMsg("Please enter both your username/email and password.");
       return;
     }
     setSubmitting(true);
@@ -124,33 +112,21 @@ export default function LoginPage() {
         method: "POST",
         body: JSON.stringify({ username: username.trim(), password }),
       });
+      setSuccessMsg("Authentication verified. Entering portal...");
       saveSession(session);
       routeByRole(session);
     } catch (err: any) {
-      setErrorMsg(err.message || "Invalid username or password.");
+      setErrorMsg(err.message || "Invalid credentials. Please verify your login details.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleQuickDemo = async (demoUser: string, demoPass: string) => {
-    setUsername(demoUser);
-    setPassword(demoPass);
+  const fillQuickAccount = (u: string, p: string) => {
+    setUsername(u);
+    setPassword(p);
     setErrorMsg("");
     setSuccessMsg("");
-    setSubmitting(true);
-    try {
-      const session = await apiFetch<UserSession>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ username: demoUser, password: demoPass }),
-      });
-      saveSession(session);
-      routeByRole(session);
-    } catch (err: any) {
-      setErrorMsg(err.message || "Quick sign-in failed.");
-    } finally {
-      setSubmitting(false);
-    }
   };
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -190,20 +166,24 @@ export default function LoginPage() {
           role: regRole,
           donorType: regDonorType,
           orgName: (regOrgName || regFullName).trim(),
-          location: regLocation.trim(),
+          location: regLocation.trim() || "City of Batac, Ilocos Norte",
           vehicleType: regVehicleType,
         }),
       });
-      setPendingEmail(res.email || trimmedEmail);
-      setOtpCode("");
-      setRegStep("verify");
-      setResendCooldown(45);
-      setSuccessMsg(
-        res.message ||
-          `Verification code sent to ${res.email || trimmedEmail}.`
-      );
+
+      if (res?.pendingVerification) {
+        setPendingEmail(res.email || trimmedEmail);
+        setRegStep("otp");
+        setResendCooldown(60);
+        setSuccessMsg(res.message || "A 6-digit verification code has been dispatched to your email.");
+      } else {
+        setSuccessMsg("Registration successful! You may now sign in.");
+        setMode("login");
+        setUsername(trimmedUser);
+        setPassword("");
+      }
     } catch (err: any) {
-      setErrorMsg(err.message || "Registration failed.");
+      setErrorMsg(err.message || "Registration failed. Please check your information.");
     } finally {
       setSubmitting(false);
     }
@@ -228,956 +208,629 @@ export default function LoginPage() {
           code: cleanOtp,
         }),
       });
-      setSuccessMsg("Email verified! Signing you in...");
+      setSuccessMsg("Email verified! Entering your stakeholder dashboard...");
       saveSession(session);
       routeByRole(session);
     } catch (err: any) {
-      setErrorMsg(err.message || "Verification failed.");
+      setErrorMsg(err.message || "Verification code is invalid or has expired.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleResendOtp = async () => {
-    if (!pendingEmail || resending || resendCooldown > 0) return;
+    if (resendCooldown > 0 || resending) return;
     setErrorMsg("");
     setSuccessMsg("");
     setResending(true);
     try {
-      const res = await apiFetch<{ message?: string }>("/api/auth/resend-otp", {
+      await apiFetch("/api/auth/resend-otp", {
         method: "POST",
         body: JSON.stringify({ email: pendingEmail }),
       });
-      setResendCooldown(45);
-      setSuccessMsg(
-        res.message || `A new 6-digit verification code was sent to ${pendingEmail}.`
-      );
+      setSuccessMsg("A fresh 6-digit verification code has been transmitted.");
+      setResendCooldown(60);
     } catch (err: any) {
-      setErrorMsg(err.message || "Failed to resend verification code.");
+      setErrorMsg(err.message || "Failed to resend code. Please wait a moment.");
     } finally {
       setResending(false);
     }
   };
 
   return (
-    <main className="min-h-screen w-full flex flex-col lg:flex-row bg-[#06101E]">
-      {/* LEFT PANEL: Official NDRRMC Hero & Operations Dashboard */}
-      <div className="w-full lg:w-[48%] xl:w-[46%] shrink-0 relative overflow-hidden bg-gradient-to-br from-[#06101E] via-[#0C1A34] to-[#122850] text-white p-8 lg:p-12 xl:p-14 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-800/80 shadow-2xl">
-        {/* Crisp Crisis Response Grid Pattern */}
-        <svg
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.05] stroke-white"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <pattern id="drrm-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" strokeWidth="1" />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#drrm-grid)" />
-        </svg>
-
-        {/* Ambient atmospheric glow lights */}
-        <div className="pointer-events-none absolute -top-24 -left-24 h-[420px] w-[420px] rounded-full bg-blue-600/25 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 -right-24 h-[380px] w-[380px] rounded-full bg-amber-500/15 blur-3xl" />
-        <div className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-cyan-400/10 blur-3xl" />
-
-        {/* Faint watermark of NDRRMC Seal in the background */}
-        <div className="pointer-events-none absolute right-[-70px] bottom-[-70px] opacity-[0.06] select-none">
-          <img
-            src="/ndrrmc-logo.png"
-            alt=""
-            className="w-[500px] h-[500px] object-contain filter invert"
-          />
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col font-sans selection:bg-[#0038A8] selection:text-white">
+      {/* =========================================================================
+          1. REPUBLIC OF THE PHILIPPINES OFFICIAL GOVERNMENT TOP BAR (GWHS)
+          ========================================================================= */}
+      <header className="bg-[#0F172A] border-b-2 border-[#D97706] text-white text-[11px] sm:text-xs py-1.5 px-4 sm:px-8 shadow-sm">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 font-medium tracking-wide">
+            <img src="/logo_bp.png" alt="Bagong Pilipinas" className="h-4 sm:h-5 object-contain" />
+            <span className="text-slate-300">REPUBLIKA NG PILIPINAS</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-amber-400 font-semibold">LUNGSOD NG BATAC, ILOCOS NORTE</span>
+          </div>
+          <div className="flex items-center gap-4 text-slate-300 font-mono text-[11px]">
+            <span className="hidden md:inline-flex items-center gap-1.5">
+              <Clock className="h-3 w-3 text-amber-400" />
+              <span>PST: {pstTime || "Philippine Standard Time"}</span>
+            </span>
+            <span className="hidden lg:inline text-slate-600">|</span>
+            <span className="inline-flex items-center gap-1.5 text-slate-200">
+              <PhoneCall className="h-3 w-3 text-rose-400" />
+              <span>CDRRMO Emergency Desk: <strong>(077) 792-3049</strong></span>
+            </span>
+          </div>
         </div>
+      </header>
 
-        {/* Top Branding */}
-        <div className="relative z-10 space-y-6">
+      {/* =========================================================================
+          2. INSTITUTIONAL BRANDING HEADER (MMSU + BATAC CDRRMO)
+          ========================================================================= */}
+      <div className="bg-white border-b border-slate-200 py-3.5 px-4 sm:px-8 shadow-sm">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="h-16 w-16 rounded-2xl bg-white p-2 shadow-[0_10px_25px_rgba(37,99,235,0.35)] ring-2 ring-white/30 flex items-center justify-center shrink-0">
+            {/* Clustered Academic and Government Logos */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              <img
+                src="/logo_mmsu.png"
+                alt="Mariano Marcos State University Logo"
+                className="h-12 sm:h-14 w-auto object-contain"
+              />
+              <img
+                src="/logo_ccis.png"
+                alt="CCIS Logo"
+                className="h-12 sm:h-14 w-auto object-contain"
+              />
               <img
                 src="/ndrrmc-logo.png"
-                alt="NDRRMC Logo"
-                className="h-full w-full object-contain"
+                alt="CDRRMO Logo"
+                className="h-11 sm:h-13 w-auto object-contain hidden sm:block"
               />
             </div>
-            <div className="space-y-1">
-              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-blue-500/20 border border-blue-400/30 text-[11px] font-semibold text-blue-300 shadow-sm">
-                <ShieldCheck className="h-3.5 w-3.5 text-blue-300" aria-hidden="true" />
-                Republic of the Philippines
-              </div>
-              <p className="text-base sm:text-lg font-bold tracking-tight text-white leading-tight">
-                Disaster Relief &amp; Resource Management
+            <div className="border-l border-slate-300 pl-4 space-y-0.5">
+              <p className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[#0038A8]">
+                Mariano Marcos State University • College of Computing and Information Sciences
               </p>
-              <p className="text-xs text-slate-300">
-                National Disaster Risk Reduction &amp; Management Council
+              <h1 className="text-base sm:text-lg font-extrabold text-slate-900 tracking-tight leading-snug">
+                Disaster Relief &amp; Resource Management System
+              </h1>
+              <p className="text-xs text-slate-600 font-medium">
+                City Disaster Risk Reduction and Management Office (CDRRMO) — City of Batac, Ilocos Norte
               </p>
             </div>
           </div>
 
-          {/* Hero Headline */}
-          <div className="pt-3 lg:pt-5">
-            <h1 className="text-2xl sm:text-3xl xl:text-4xl font-extrabold tracking-tight text-white leading-tight">
-              Centralized Humanitarian Relief Coordination
-            </h1>
-          </div>
-
-          {/* Value Pillars (Interactive shortcuts, clean icon + title) */}
-          <div ref={pillarsRef} className="stagger-grid grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+          <div className="hidden md:flex items-center gap-2">
             <button
               type="button"
               onClick={() => setShowTracker(true)}
-              className="interactive-lift text-left rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-blue-400/40 p-3.5 backdrop-blur-md transition-[background-color,border-color,transform] duration-200 shadow-lg group flex items-center gap-3 sm:block"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold border border-slate-300 transition-colors shadow-sm"
             >
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-blue-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
-                <PackageCheck className="h-4.5 w-4.5" aria-hidden="true" />
-              </div>
-              <h2 className="text-xs font-bold text-white">Verified Aid Tracking</h2>
+              <Search className="h-3.5 w-3.5 text-[#0038A8]" />
+              <span>Public Aid Delivery Tracker</span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setMode("register");
-                setRegStep("form");
-                setRegRole("Volunteer");
-                setErrorMsg("");
-                setSuccessMsg("");
-              }}
-              className="interactive-lift text-left rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-emerald-400/40 p-3.5 backdrop-blur-md transition-[background-color,border-color,transform] duration-200 shadow-lg group flex items-center gap-3 sm:block"
-            >
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
-                <Truck className="h-4.5 w-4.5" aria-hidden="true" />
-              </div>
-              <h2 className="text-xs font-bold text-white">Volunteer Dispatch</h2>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setMode("register");
-                setRegStep("form");
-                setRegRole("Organization");
-                setErrorMsg("");
-                setSuccessMsg("");
-              }}
-              className="interactive-lift text-left rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/10 hover:border-amber-400/40 p-3.5 backdrop-blur-md transition-[background-color,border-color,transform] duration-200 shadow-lg group flex items-center gap-3 sm:block"
-            >
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-amber-500/30 group-hover:scale-105 transition-transform shrink-0 sm:mb-2">
-                <Building2 className="h-4.5 w-4.5" aria-hidden="true" />
-              </div>
-              <h2 className="text-xs font-bold text-white">LGU Requisitions</h2>
-            </button>
-          </div>
-
-          {/* Live DRRM Operational Metrics Strip (Matches the Live Dashboard Stats!) */}
-          <div className="pt-2">
-            <div ref={metricsRef} className="stagger-grid grid grid-cols-4 gap-2 rounded-2xl bg-white/[0.06] border border-white/15 p-3 backdrop-blur-md shadow-inner">
-              <div className="text-center">
-                <p className="text-base sm:text-lg font-black text-rose-400 tabular-nums">
-                  <AnimatedNumber value={5} />
-                </p>
-                <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Calamities</p>
-              </div>
-              <div className="text-center border-l border-white/10">
-                <p className="text-base sm:text-lg font-black text-blue-400 tabular-nums">
-                  <AnimatedNumber value={13} />
-                </p>
-                <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Pledges</p>
-              </div>
-              <div className="text-center border-l border-white/10">
-                <p className="text-base sm:text-lg font-black text-amber-400 tabular-nums">
-                  <AnimatedNumber value={10} />
-                </p>
-                <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Stock Items</p>
-              </div>
-              <div className="text-center border-l border-white/10">
-                <p className="text-base sm:text-lg font-black text-emerald-400 tabular-nums">
-                  <AnimatedNumber value={10} />
-                </p>
-                <p className="text-[10px] uppercase tracking-wider text-slate-300 font-semibold">Fleet Units</p>
-              </div>
-            </div>
-
-            {/* Public Transparency Aid Tracker Launch Bar */}
-            <div className="mt-3 w-full rounded-2xl bg-gradient-to-r from-blue-600/30 via-indigo-600/30 to-emerald-600/25 border border-blue-400/35 px-3.5 py-3 flex items-center justify-between gap-3 backdrop-blur-md shadow-lg">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="h-9 w-9 rounded-xl bg-blue-500/30 border border-blue-300/40 flex items-center justify-center text-blue-200 shrink-0">
-                  <Search className="h-4 w-4" aria-hidden="true" />
-                </div>
-                <span className="text-xs font-extrabold text-white leading-snug">
-                  Public Relief Shipment &amp; Donation Tracker
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTracker(true)}
-                className="track-aid-btn shrink-0 min-h-[38px] rounded-xl bg-emerald-500 hover:bg-emerald-400 active:scale-[0.97] border border-emerald-300/70 px-4 py-2 text-xs font-bold text-slate-950 shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-400/30 transition-[background-color,box-shadow,transform] duration-150"
-              >
-                Track Aid
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Hotline Strip */}
-        <div className="relative z-10 pt-5 mt-6 border-t border-slate-800/80">
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-slate-300 text-[11px]">
-              <PhoneCall className="h-3.5 w-3.5 text-rose-400" aria-hidden="true" />
-              <span>National Emergency Hotline: <strong className="text-white">911</strong></span>
-              <span className="text-slate-600">|</span>
-              <span>NDRRMC Operations: <strong className="text-white">(02) 8911-5061</strong></span>
-            </div>
-            <span className="text-[11px] text-slate-400 font-medium">RA 10121 Mandated</span>
           </div>
         </div>
       </div>
 
-      {/* RIGHT PANEL: Authentication Form with 3D Card Flip */}
-      <div className="flex-1 bg-gradient-to-br from-[#F8FAFC] via-[#EEF4FF] to-[#F1F5F9] flex flex-col justify-center items-center p-6 sm:p-10 lg:p-12 relative overflow-y-auto">
-        {/* Soft background ambient blurs */}
-        <div className="pointer-events-none absolute -top-32 -right-32 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" />
-
-        {/* Subtle background watermark on right side */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden opacity-[0.035] select-none"
-        >
-          <img
-            src="/ndrrmc-logo.png"
-            alt=""
-            className="w-[500px] object-contain select-none"
-          />
-        </div>
-
-        <div className="w-full max-w-[460px] relative z-10 space-y-5 my-auto">
-          {/* Header */}
-          <div className="text-center lg:text-left">
-            <h2 className="text-2xl font-extrabold tracking-tight text-slate-900">
-              {mode === "login" ? "Sign In to Stakeholder Portal" : "Create Stakeholder Account"}
+      {/* =========================================================================
+          3. MAIN CONTENT: 2-COLUMN INSTITUTIONAL LAYOUT
+          ========================================================================= */}
+      <main className="max-w-7xl mx-auto w-full flex-1 px-4 sm:px-8 py-8 sm:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* LEFT COLUMN: Institutional Notices & Public Advisory (Cols 1-7) */}
+        <div className="lg:col-span-7 space-y-5">
+          <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm space-y-3.5">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-[#0038A8] text-xs font-bold">
+              <ShieldCheck className="h-4 w-4 text-[#0038A8]" />
+              Republic Act No. 10121 • Information Management Framework
+            </div>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug">
+              Centralized Disaster Relief Logistics &amp; Resource Allocation Portal
             </h2>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Welcome to the official operational portal of the <strong>City of Batac Disaster Relief Coordination Unit</strong>. 
+              This system provides an authoritative, Third Normal Form (3NF) single source of truth connecting the City Government, 
+              the <strong>43 official Barangays of Batac</strong>, accredited humanitarian non-governmental organizations, 
+              citizen and corporate donors, and field dispatch volunteers.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
+                  <Warehouse className="h-4 w-4 text-[#0038A8]" />
+                  <span>Central Logistics Depot</span>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Batac City Evacuation Center (Quiling Sur) and Government Center Auxiliary Logistics Depot.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1">
+                <div className="flex items-center gap-2 text-slate-800 font-bold text-xs">
+                  <Building2 className="h-4 w-4 text-emerald-700" />
+                  <span>43 Accredited Barangays</span>
+                </div>
+                <p className="text-xs text-slate-600">
+                  Real-time emergency requisitions for flood-prone and rural communities across Batac City.
+                </p>
+              </div>
+            </div>
           </div>
 
-          {/* 3D Flip Card Container */}
-          <div className="perspective-1200 w-full">
-            <div
-              className={`w-full flip-card-inner relative ${
-                mode === "register" ? "rotate-y-180" : ""
-              }`}
+          {/* Operational Advisory & Hotline Notice */}
+          <div className="bg-amber-50 rounded-xl border border-amber-200/80 p-4.5 text-xs text-amber-950 space-y-2">
+            <div className="flex items-center gap-2 font-bold text-amber-900 text-sm">
+              <AlertCircle className="h-4 w-4 text-amber-700 shrink-0" />
+              <span>Official Emergency Coordination Advisory</span>
+            </div>
+            <p className="leading-relaxed text-amber-900/90 text-xs">
+              During declared calamities (e.g. Quiaoit River swelling or localized typhoon emergencies), barangay officials are requested 
+              to submit relief requisitions directly via their assigned <strong>Brgy. Council accounts</strong>. In-kind donors can review real-time 
+              warehouse replenishment thresholds prior to dispatching relief goods.
+            </p>
+            <div className="pt-0.5 flex flex-wrap items-center gap-4 text-amber-900 font-medium text-[11px]">
+              <span>📞 CDRRMO Operations Desk: <strong>(077) 792-3049</strong></span>
+              <span>📱 Hotlines: <strong>0917-000-0001 / 0918-100-0001</strong></span>
+            </div>
+          </div>
+
+          {/* Public Aid Tracker Quick Banner for Mobile / Non-Auth Users */}
+          <div className="bg-[#0B192C] text-white rounded-xl p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2 font-bold text-sm text-amber-400">
+                <Search className="h-4 w-4" />
+                <span>Public Relief Shipment Tracker</span>
+              </div>
+              <p className="text-xs text-slate-300 max-w-md">
+                Track the transit and delivery status of ongoing humanitarian relief convoys without logging in.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowTracker(true)}
+              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition shadow shrink-0"
             >
-              {/* FRONT FACE: Sign In */}
-              <div
-                ref={frontFaceRef}
-                aria-hidden={mode !== "login"}
-                className={`w-full bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_-10px_rgba(30,58,138,0.12),0_1px_3px_rgba(0,0,0,0.05)] p-7 sm:p-8 space-y-5 backface-hidden ${
-                  mode === "register"
-                    ? "absolute top-0 left-0 pointer-events-none"
-                    : "relative pointer-events-auto"
-                }`}
-              >
-                {/* Mode Switch: Sign In on LEFT, Create Account on RIGHT */}
-                <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100/90 p-1.5 border border-slate-200/80 shadow-inner">
-                  <button
-                    type="button"
-                    aria-pressed={mode === "login"}
-                    className="rounded-xl py-2.5 text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 transition-all"
-                  >
-                    Sign In
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={mode === "register"}
-                    onClick={() => {
-                      setMode("register");
-                      setErrorMsg("");
-                      setSuccessMsg("");
-                    }}
-                    className="rounded-xl py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 active:scale-[0.98] transition-all"
-                  >
-                    Create Account
-                  </button>
+              Verify Shipment
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN: Official Government Login / Registration Card (Cols 8-12) */}
+        <div className="lg:col-span-5 w-full">
+          <div className="bg-white rounded-xl border border-slate-300 shadow-sm p-6 sm:p-7 space-y-5">
+            {/* Header / Mode Switch Tabs */}
+            <div className="space-y-3.5">
+              <div className="border-b border-slate-200 pb-3">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">
+                  {mode === "login" ? "Authorized Portal Access" : "Register Stakeholder Account"}
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {mode === "login" 
+                    ? "Please enter your official credentials to proceed." 
+                    : "Create an accredited account for disaster response coordination."}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("login");
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                  }}
+                  className={`py-2 text-xs font-bold rounded-md transition-colors ${
+                    mode === "login"
+                      ? "bg-[#0038A8] text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("register");
+                    setErrorMsg("");
+                    setSuccessMsg("");
+                  }}
+                  className={`py-2 text-xs font-bold rounded-md transition-colors ${
+                    mode === "register"
+                      ? "bg-[#0038A8] text-white shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  New Registration
+                </button>
+              </div>
+            </div>
+
+            {/* Error & Success Alerts */}
+            {errorMsg && (
+              <div role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-start gap-2.5">
+                <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{errorMsg}</span>
+              </div>
+            )}
+
+            {successMsg && (
+              <div role="status" className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{successMsg}</span>
+              </div>
+            )}
+
+            {/* =============================================================
+                MODE 1: SECURE LOGIN FORM
+                ============================================================= */}
+            {mode === "login" && (
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label htmlFor="login-username" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Username or Verified Email
+                  </label>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <input
+                      id="login-username"
+                      type="text"
+                      required
+                      autoComplete="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="e.g. admin or org1"
+                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-[#0038A8] focus:ring-1 focus:ring-[#0038A8] outline-none transition bg-white text-slate-900"
+                    />
+                  </div>
                 </div>
 
-                {errorMsg && (
-                  <div
-                    role="alert"
-                    aria-live="assertive"
-                    className="toast-enter rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
-                  >
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" aria-hidden="true" />
-                    <span>{errorMsg}</span>
-                  </div>
-                )}
-
-                {successMsg && (
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    className="toast-enter rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
-                  >
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
-                    <span>{successMsg}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="login-username"
-                      className="block text-xs font-semibold text-slate-700 mb-1.5"
-                    >
-                      Username or Email
-                    </label>
-                    <div className="relative">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <User className="h-4 w-4" aria-hidden="true" />
-                      </div>
-                      <input
-                        id="login-username"
-                        name="username"
-                        type="text"
-                        required
-                        autoComplete="username"
-                        autoCorrect="off"
-                        autoCapitalize="off"
-                        spellCheck={false}
-                        enterKeyHint="next"
-                        value={username}
-                        onChange={(e) => {
-                          setUsername(e.target.value);
-                          if (errorMsg) setErrorMsg("");
-                        }}
-                        placeholder="Enter username or verified email"
-                        className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-3.5 py-2.5 text-base sm:text-sm text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label
-                      htmlFor="login-password"
-                      className="block text-xs font-semibold text-slate-700 mb-1.5"
-                    >
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label htmlFor="login-password" className="block text-xs font-semibold text-slate-700">
                       Password
                     </label>
-                    <div className="relative">
-                      <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        <Lock className="h-4 w-4" aria-hidden="true" />
-                      </div>
-                      <input
-                        id="login-password"
-                        name="password"
-                        type={showLoginPass ? "text" : "password"}
-                        required
-                        autoComplete="current-password"
-                        enterKeyHint="done"
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          if (errorMsg) setErrorMsg("");
-                        }}
-                        placeholder="Enter password"
-                        className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-11 py-2.5 text-base sm:text-sm text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                      />
+                  </div>
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                      <Lock className="h-4 w-4" />
+                    </div>
+                    <input
+                      id="login-password"
+                      type={showLoginPass ? "text" : "password"}
+                      required
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Enter password"
+                      className="w-full pl-9 pr-10 py-2 text-xs sm:text-sm rounded-lg border border-slate-300 focus:border-[#0038A8] focus:ring-1 focus:ring-[#0038A8] outline-none transition bg-white text-slate-900"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginPass(!showLoginPass)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-700"
+                      tabIndex={-1}
+                    >
+                      {showLoginPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="rounded border-slate-300 text-[#0038A8] focus:ring-[#0038A8]"
+                    />
+                    <span>Remember session on this computer</span>
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-2.5 px-4 rounded-lg bg-[#0038A8] hover:bg-[#002776] text-white text-xs sm:text-sm font-bold shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {submitting ? "Authenticating..." : "Sign In to DRRMS Portal"}
+                </button>
+
+                {/* Academic Evaluation Accordion (Clean & Human-designed for Defense) */}
+                <details className="mt-4 pt-3 border-t border-slate-200 text-xs text-slate-600 group">
+                  <summary className="cursor-pointer font-semibold text-slate-700 hover:text-[#0038A8] select-none flex items-center justify-between list-none">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Info className="h-3.5 w-3.5 text-[#0038A8]" />
+                      <span>Academic Evaluation &amp; Seed Accounts</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+                  </summary>
+                  <div className="mt-2.5 p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2 text-[11px]">
+                    <p className="text-slate-500">Click any role to populate credentials:</p>
+                    <div className="grid grid-cols-2 gap-1.5">
                       <button
                         type="button"
-                        aria-pressed={showLoginPass}
-                        aria-label={showLoginPass ? "Hide password" : "Show password"}
-                        onClick={() => setShowLoginPass((v) => !v)}
-                        className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700"
+                        onClick={() => fillQuickAccount("admin", "admin123")}
+                        className="text-left p-2 rounded bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition text-slate-800 font-medium"
                       >
-                        {showLoginPass ? (
-                          <EyeOff className="h-4 w-4" aria-hidden="true" />
-                        ) : (
-                          <Eye className="h-4 w-4" aria-hidden="true" />
-                        )}
+                        <strong className="text-[#0038A8] block">System Admin</strong>
+                        <code>admin</code> / <code>admin123</code>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => fillQuickAccount("org19", "pass123")}
+                        className="text-left p-2 rounded bg-white hover:bg-amber-50 border border-slate-200 hover:border-amber-300 transition text-slate-800 font-medium"
+                      >
+                        <strong className="text-amber-800 block">Brgy. Quiling Sur (MMSU)</strong>
+                        <code>org19</code> / <code>pass123</code>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => fillQuickAccount("donor1", "pass123")}
+                        className="text-left p-2 rounded bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300 transition text-slate-800 font-medium"
+                      >
+                        <strong className="text-rose-700 block">Citizen Donor</strong>
+                        <code>donor1</code> / <code>pass123</code>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => fillQuickAccount("vol1", "pass123")}
+                        className="text-left p-2 rounded bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 transition text-slate-800 font-medium"
+                      >
+                        <strong className="text-emerald-800 block">Field Volunteer</strong>
+                        <code>vol1</code> / <code>pass123</code>
                       </button>
                     </div>
                   </div>
+                </details>
+              </form>
+            )}
 
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 hover:shadow-blue-500/40 transition-all flex items-center justify-center"
-                  >
-                    <span>{submitting ? "Signing in..." : "Sign In to Portal"}</span>
-                  </button>
-                </form>
+            {/* =============================================================
+                MODE 2: STAKEHOLDER REGISTRATION
+                ============================================================= */}
+            {mode === "register" && regStep === "form" && (
+              <form onSubmit={handleRegister} className="space-y-3.5">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Username</label>
+                    <input
+                      type="text"
+                      required
+                      value={regUsername}
+                      onChange={(e) => setRegUsername(e.target.value)}
+                      placeholder="e.g. jdelacruz"
+                      className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Email Address</label>
+                    <input
+                      type="email"
+                      required
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="name@domain.com"
+                      className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8] outline-none"
+                    />
+                  </div>
+                </div>
 
-                {/* Role Demo Switcher */}
-                <div className="pt-4 border-t border-slate-100">
-                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">
-                    1-Click Role Switcher
-                  </p>
-                  <div ref={switcherRef} className="stagger-grid grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Full Name / Contact Person</label>
+                    <input
+                      type="text"
+                      required
+                      value={regFullName}
+                      onChange={(e) => setRegFullName(e.target.value)}
+                      placeholder="Full Name"
+                      className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Contact Number</label>
+                    <input
+                      type="text"
+                      required
+                      value={regContactInfo}
+                      onChange={(e) => setRegContactInfo(e.target.value)}
+                      placeholder="0917-xxx-xxxx"
+                      className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8] outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Password (min 6 chars)</label>
+                  <div className="relative">
+                    <input
+                      type={showRegPass ? "text" : "password"}
+                      required
+                      value={regPassword}
+                      onChange={(e) => setRegPassword(e.target.value)}
+                      className="w-full pl-3 pr-8 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8] outline-none"
+                    />
                     <button
                       type="button"
-                      disabled={submitting}
-                      onClick={() => handleQuickDemo("admin", "admin123")}
-                      className="interactive-lift group flex flex-col items-center gap-1.5 rounded-xl border border-blue-200/90 bg-gradient-to-b from-blue-50/80 to-blue-100/50 hover:from-blue-100 hover:to-blue-200/70 hover:border-blue-500 hover:shadow-md hover:shadow-blue-500/10 disabled:opacity-50 py-2.5 px-1"
+                      onClick={() => setShowRegPass(!showRegPass)}
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-700"
                     >
-                      <div className="h-8 w-8 rounded-lg bg-blue-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                        <ShieldCheck className="h-4 w-4" aria-hidden="true" />
-                      </div>
-                      <span className="block text-[11px] font-bold text-slate-800">
-                        Admin
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => handleQuickDemo("donor1", "pass123")}
-                      className="interactive-lift group flex flex-col items-center gap-1.5 rounded-xl border border-rose-200/90 bg-gradient-to-b from-rose-50/80 to-rose-100/50 hover:from-rose-100 hover:to-rose-200/70 hover:border-rose-500 hover:shadow-md hover:shadow-rose-500/10 disabled:opacity-50 py-2.5 px-1"
-                    >
-                      <div className="h-8 w-8 rounded-lg bg-rose-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                        <HeartHandshake className="h-4 w-4" aria-hidden="true" />
-                      </div>
-                      <span className="block text-[11px] font-bold text-slate-800">
-                        Donor
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => handleQuickDemo("org1", "pass123")}
-                      className="interactive-lift group flex flex-col items-center gap-1.5 rounded-xl border border-amber-200/90 bg-gradient-to-b from-amber-50/80 to-amber-100/50 hover:from-amber-100 hover:to-amber-200/70 hover:border-amber-500 hover:shadow-md hover:shadow-amber-500/10 disabled:opacity-50 py-2.5 px-1"
-                    >
-                      <div className="h-8 w-8 rounded-lg bg-amber-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                        <Building2 className="h-4 w-4" aria-hidden="true" />
-                      </div>
-                      <span className="block text-[11px] font-bold text-slate-800">
-                        Org / LGU
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      disabled={submitting}
-                      onClick={() => handleQuickDemo("vol1", "pass123")}
-                      className="interactive-lift group flex flex-col items-center gap-1.5 rounded-xl border border-emerald-200/90 bg-gradient-to-b from-emerald-50/80 to-emerald-100/50 hover:from-emerald-100 hover:to-emerald-200/70 hover:border-emerald-500 hover:shadow-md hover:shadow-emerald-500/10 disabled:opacity-50 py-2.5 px-1"
-                    >
-                      <div className="h-8 w-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform">
-                        <Truck className="h-4 w-4" aria-hidden="true" />
-                      </div>
-                      <span className="block text-[11px] font-bold text-slate-800">
-                        Volunteer
-                      </span>
+                      {showRegPass ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                     </button>
                   </div>
                 </div>
-              </div>
 
-              {/* BACK FACE: Create Account / Verify OTP */}
-              <div
-                ref={backFaceRef}
-                aria-hidden={mode !== "register"}
-                className={`w-full bg-white/95 backdrop-blur-xl rounded-3xl border border-slate-200/90 shadow-[0_20px_50px_-10px_rgba(30,58,138,0.12),0_1px_3px_rgba(0,0,0,0.05)] p-7 sm:p-8 space-y-5 backface-hidden flip-card-back ${
-                  mode === "register"
-                    ? "relative pointer-events-auto"
-                    : "absolute top-0 left-0 pointer-events-none"
-                }`}
-              >
-                {/* Mode Switch: Sign In on LEFT, Create Account on RIGHT */}
-                <div className="grid grid-cols-2 gap-1 rounded-2xl bg-slate-100/90 p-1.5 border border-slate-200/80 shadow-inner">
-                  <button
-                    type="button"
-                    aria-pressed={mode === "login"}
-                    onClick={() => {
-                      setMode("login");
-                      setErrorMsg("");
-                      setSuccessMsg("");
-                    }}
-                    className="rounded-xl py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 active:scale-[0.98] transition-all"
+                {/* Role Selection */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Stakeholder Classification</label>
+                  <select
+                    value={regRole}
+                    onChange={(e: any) => setRegRole(e.target.value)}
+                    className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 bg-white focus:border-[#0038A8] outline-none"
                   >
-                    Sign In
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={mode === "register"}
-                    className="rounded-xl py-2.5 text-xs font-bold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/25 transition-all"
-                  >
-                    Create Account
-                  </button>
+                    <option value="Donor">Citizen / Corporate Donor</option>
+                    <option value="Organization">Barangay Council / Partner NGO</option>
+                    <option value="Volunteer">Registered Logistics Volunteer</option>
+                  </select>
                 </div>
 
-                {errorMsg && (
-                  <div
-                    role="alert"
-                    aria-live="assertive"
-                    className="toast-enter rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
-                  >
-                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" aria-hidden="true" />
-                    <span>{errorMsg}</span>
+                {/* Conditional Fields based on Role */}
+                {regRole === "Donor" && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Donor Entity Type</label>
+                    <select
+                      value={regDonorType}
+                      onChange={(e: any) => setRegDonorType(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 bg-white focus:border-[#0038A8] outline-none"
+                    >
+                      <option value="Individual">Individual Citizen</option>
+                      <option value="Corporate">Corporate / Business Donor</option>
+                    </select>
                   </div>
                 )}
 
-                {successMsg && (
-                  <div
-                    role="status"
-                    aria-live="polite"
-                    className="toast-enter rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs font-medium text-emerald-700 flex items-center gap-2"
-                  >
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
-                    <span>{successMsg}</span>
-                  </div>
-                )}
-
-                {regStep === "verify" ? (
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <div className="rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50/80 to-indigo-50/60 p-4 flex items-start gap-3 shadow-sm">
-                      <div className="rounded-xl bg-blue-600 text-white p-2.5 shrink-0 shadow-md shadow-blue-500/30">
-                        <MailCheck className="h-5 w-5" aria-hidden="true" />
-                      </div>
-                      <div className="text-xs text-slate-700 leading-relaxed">
-                        <p className="font-bold text-slate-900 text-sm">
-                          Step 2 of 2: Verify Your Email
-                        </p>
-                        <p className="mt-0.5 text-slate-600">
-                          Code sent to{" "}
-                          <span className="font-semibold text-blue-700 break-all">
-                            {pendingEmail}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-
+                {regRole === "Organization" && (
+                  <div className="grid grid-cols-2 gap-2.5">
                     <div>
-                      <label
-                        htmlFor="otp-input"
-                        className="block text-xs font-semibold text-slate-700 mb-1"
-                      >
-                        Verification Code
-                      </label>
-                      <p
-                        id="otp-format-hint"
-                        className="text-[11px] text-slate-500 mb-2"
-                      >
-                        Enter the 6-digit code sent to your email (check Spam folder if not in Inbox).
-                      </p>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Organization / Council Name</label>
                       <input
-                        id="otp-input"
-                        name="otp"
                         type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        pattern="\d{6}"
-                        maxLength={6}
-                        spellCheck={false}
-                        enterKeyHint="done"
-                        required
-                        autoFocus
-                        aria-describedby="otp-format-hint"
-                        aria-errormessage="otp-error"
-                        value={otpCode}
-                        onChange={(e) => {
-                          const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
-                          setOtpCode(digits);
-                          if (errorMsg) setErrorMsg("");
-                          if (e.currentTarget.hasAttribute("aria-invalid")) {
-                            syncAriaValidity(e.currentTarget);
-                          }
-                        }}
-                        onBlur={handleFieldBlur}
-                        placeholder="000000"
-                        className="auth-input w-full min-h-[50px] rounded-xl border border-slate-300 bg-slate-50/80 focus:bg-white px-4 py-2.5 text-center font-mono text-lg font-black tracking-[0.4em] text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
+                        value={regOrgName}
+                        onChange={(e) => setRegOrgName(e.target.value)}
+                        placeholder="e.g. Brgy. Council"
+                        className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8] outline-none"
                       />
-                      <div id="otp-error" className="field-error-msg">
-                        Please enter the 6-digit numeric verification code.
-                      </div>
                     </div>
-
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center"
-                    >
-                      <span>
-                        {submitting
-                          ? "Verifying..."
-                          : "Verify Email & Create Account"}
-                      </span>
-                    </button>
-
-                    <div className="flex items-center justify-between gap-2 pt-1 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRegStep("form");
-                          setErrorMsg("");
-                          setSuccessMsg("");
-                        }}
-                        className="inline-flex items-center font-semibold text-slate-600 hover:text-slate-900 active:scale-[0.98] transition"
-                      >
-                        <span>Edit Email / Details</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        disabled={resending || resendCooldown > 0}
-                        className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-700 active:scale-[0.98] disabled:text-slate-400 transition"
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>
-                          {resending
-                            ? "Sending..."
-                            : resendCooldown > 0
-                              ? `Resend Code (${resendCooldown}s)`
-                              : "Resend Code"}
-                        </span>
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <form onSubmit={handleRegister} className="space-y-3.5">
                     <div>
-                      <label
-                        htmlFor="reg-role"
-                        className="block text-xs font-semibold text-slate-700 mb-1"
-                      >
-                        Account Role
-                      </label>
-                      <select
-                        id="reg-role"
-                        name="role"
-                        value={regRole}
-                        onChange={(e) => setRegRole(e.target.value as any)}
-                        className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 px-3.5 py-2 text-xs font-semibold text-slate-800 transition shadow-sm"
-                      >
-                        <option value="Donor">Donor (Citizen / Corporate Contributor)</option>
-                        <option value="Organization">Organization / LGU (Relief Operations)</option>
-                        <option value="Volunteer">Volunteer Driver (Logistics Fleet)</option>
-                      </select>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">Location / Barangay</label>
+                      <input
+                        type="text"
+                        value={regLocation}
+                        onChange={(e) => setRegLocation(e.target.value)}
+                        placeholder="City of Batac, Ilocos Norte"
+                        className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8] outline-none"
+                      />
                     </div>
-
-                    <div>
-                      <label
-                        htmlFor="reg-email"
-                        className="block text-xs font-semibold text-slate-700 mb-0.5"
-                      >
-                        Email Address
-                      </label>
-                      <span
-                        id="reg-email-hint"
-                        className="block text-[11px] text-slate-500 mb-1"
-                      >
-                        A 6-digit verification code will be sent here.
-                      </span>
-                      <div className="relative">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                          <Mail className="h-4 w-4" aria-hidden="true" />
-                        </div>
-                        <input
-                          id="reg-email"
-                          name="email"
-                          type="email"
-                          required
-                          autoComplete="email"
-                          spellCheck={false}
-                          enterKeyHint="next"
-                          aria-describedby="reg-email-hint"
-                          aria-errormessage="reg-email-error"
-                          value={regEmail}
-                          onChange={(e) => {
-                            setRegEmail(e.target.value);
-                            if (e.currentTarget.hasAttribute("aria-invalid")) {
-                              syncAriaValidity(e.currentTarget);
-                            }
-                          }}
-                          onBlur={handleFieldBlur}
-                          placeholder="you@example.com"
-                          className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-10 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                        />
-                      </div>
-                      <div id="reg-email-error" className="field-error-msg">
-                        Please enter a valid email address.
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label
-                          htmlFor="reg-username"
-                          className="block text-xs font-semibold text-slate-700 mb-0.5"
-                        >
-                          Username
-                        </label>
-                        <span
-                          id="reg-username-hint"
-                          className="block text-[10px] text-slate-400 mb-1"
-                        >
-                          3-50 chars, no spaces.
-                        </span>
-                        <div className="relative">
-                          <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                            <User className="h-3.5 w-3.5" aria-hidden="true" />
-                          </div>
-                          <input
-                            id="reg-username"
-                            name="username"
-                            type="text"
-                            required
-                            minLength={3}
-                            maxLength={50}
-                            pattern="[^\s@]{3,50}"
-                            autoComplete="username"
-                            autoCorrect="off"
-                            autoCapitalize="off"
-                            spellCheck={false}
-                            enterKeyHint="next"
-                            aria-describedby="reg-username-hint"
-                            aria-errormessage="reg-username-error"
-                            value={regUsername}
-                            onChange={(e) => {
-                              setRegUsername(e.target.value);
-                              if (e.currentTarget.hasAttribute("aria-invalid")) {
-                                syncAriaValidity(e.currentTarget);
-                              }
-                            }}
-                            onBlur={handleFieldBlur}
-                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                          />
-                        </div>
-                        <div id="reg-username-error" className="field-error-msg">
-                          3-50 chars without spaces.
-                        </div>
-                      </div>
-                      <div>
-                        <label
-                          htmlFor="reg-password"
-                          className="block text-xs font-semibold text-slate-700 mb-0.5"
-                        >
-                          Password
-                        </label>
-                        <span
-                          id="reg-password-help"
-                          className="block text-[10px] text-slate-400 mb-1"
-                        >
-                          At least 6 characters.
-                        </span>
-                        <div className="relative">
-                          <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
-                          </div>
-                          <input
-                            id="reg-password"
-                            name="password"
-                            type={showRegPass ? "text" : "password"}
-                            required
-                            minLength={6}
-                            autoComplete="new-password"
-                            enterKeyHint="next"
-                            aria-describedby="reg-password-help"
-                            aria-errormessage="reg-password-error"
-                            value={regPassword}
-                            onChange={(e) => {
-                              setRegPassword(e.target.value);
-                              if (e.currentTarget.hasAttribute("aria-invalid")) {
-                                syncAriaValidity(e.currentTarget);
-                              }
-                            }}
-                            onBlur={handleFieldBlur}
-                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-9 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                          />
-                          <button
-                            type="button"
-                            aria-pressed={showRegPass}
-                            aria-label={
-                              showRegPass ? "Hide password" : "Show password"
-                            }
-                            onClick={() => setShowRegPass((v) => !v)}
-                            className="absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-400 hover:text-slate-700"
-                          >
-                            {showRegPass ? (
-                              <EyeOff className="h-3.5 w-3.5" aria-hidden="true" />
-                            ) : (
-                              <Eye className="h-3.5 w-3.5" aria-hidden="true" />
-                            )}
-                          </button>
-                        </div>
-                        <div id="reg-password-error" className="field-error-msg">
-                          Minimum 6 characters required.
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label
-                          htmlFor="reg-fullname"
-                          className="block text-xs font-semibold text-slate-700 mb-1"
-                        >
-                          Full Name
-                        </label>
-                        <input
-                          id="reg-fullname"
-                          name="fullName"
-                          type="text"
-                          required
-                          autoComplete="name"
-                          enterKeyHint="next"
-                          value={regFullName}
-                          onChange={(e) => setRegFullName(e.target.value)}
-                          onBlur={handleFieldBlur}
-                          className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white px-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                        />
-                      </div>
-                      <div>
-                        <label
-                          htmlFor="reg-contact"
-                          className="block text-xs font-semibold text-slate-700 mb-1"
-                        >
-                          Phone Number
-                        </label>
-                        <div className="relative">
-                          <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                            <Phone className="h-3.5 w-3.5" aria-hidden="true" />
-                          </div>
-                          <input
-                            id="reg-contact"
-                            name="contactInfo"
-                            type="tel"
-                            autoComplete="tel"
-                            enterKeyHint="next"
-                            placeholder="0917-000-0000"
-                            value={regContactInfo}
-                            onChange={(e) => setRegContactInfo(e.target.value)}
-                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {regRole === "Donor" && (
-                      <div>
-                        <label
-                          htmlFor="reg-donor-type"
-                          className="block text-xs font-semibold text-slate-700 mb-1"
-                        >
-                          Donor Type
-                        </label>
-                        <select
-                          id="reg-donor-type"
-                          name="donorType"
-                          value={regDonorType}
-                          onChange={(e) => setRegDonorType(e.target.value)}
-                          className="w-full min-h-[40px] rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white focus:border-blue-600 px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-sm"
-                        >
-                          <option value="Individual">Individual Donor</option>
-                          <option value="Corporate">Corporate / Foundation Sponsor</option>
-                        </select>
-                      </div>
-                    )}
-
-                    {regRole === "Organization" && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label
-                            htmlFor="reg-org-name"
-                            className="block text-xs font-semibold text-slate-700 mb-1"
-                          >
-                            Organization Name
-                          </label>
-                          <input
-                            id="reg-org-name"
-                            name="orgName"
-                            type="text"
-                            required
-                            value={regOrgName}
-                            onChange={(e) => setRegOrgName(e.target.value)}
-                            onBlur={handleFieldBlur}
-                            className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white px-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                          />
-                        </div>
-                        <div>
-                          <label
-                            htmlFor="reg-location"
-                            className="block text-xs font-semibold text-slate-700 mb-1"
-                          >
-                            Location
-                          </label>
-                          <div className="relative">
-                            <div className="pointer-events-none absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                              <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                            </div>
-                            <input
-                              id="reg-location"
-                              name="location"
-                              type="text"
-                              required
-                              value={regLocation}
-                              onChange={(e) => setRegLocation(e.target.value)}
-                              onBlur={handleFieldBlur}
-                              className="auth-input w-full rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white pl-9 pr-3.5 py-2 text-base sm:text-xs text-slate-900 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition shadow-sm"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {regRole === "Volunteer" && (
-                      <div>
-                        <label
-                          htmlFor="reg-vehicle"
-                          className="block text-xs font-semibold text-slate-700 mb-1"
-                        >
-                          Vehicle
-                        </label>
-                        <select
-                          id="reg-vehicle"
-                          name="vehicleType"
-                          value={regVehicleType}
-                          onChange={(e) => setRegVehicleType(e.target.value)}
-                          className="w-full min-h-[40px] rounded-xl border border-slate-200/90 bg-slate-50/70 focus:bg-white focus:border-blue-600 px-3.5 py-2 text-xs font-semibold text-slate-800 shadow-sm"
-                        >
-                          <option value="Truck">Relief Truck (Heavy Cargo)</option>
-                          <option value="Van">Logistics Van</option>
-                          <option value="Pickup / 4x4">Pickup / 4x4 (Rough Terrain)</option>
-                          <option value="Motorcycle">Motorcycle (Express Dispatch)</option>
-                          <option value="Boat / Watercraft">Boat / Rescue Watercraft</option>
-                        </select>
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full min-h-[46px] rounded-xl bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-[0.98] disabled:opacity-60 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center"
-                    >
-                      <span>
-                        {submitting
-                          ? "Sending Verification Code..."
-                          : "Send Verification Code"}
-                      </span>
-                    </button>
-
-                    <div className="text-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMode("login");
-                          setErrorMsg("");
-                          setSuccessMsg("");
-                        }}
-                        className="text-xs text-blue-600 hover:text-blue-800 active:scale-[0.98] font-bold transition"
-                      >
-                        Already have an account? Sign In
-                      </button>
-                    </div>
-                  </form>
+                  </div>
                 )}
-              </div>
-            </div>
+
+                {regRole === "Volunteer" && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Logistics Vehicle Mode</label>
+                    <select
+                      value={regVehicleType}
+                      onChange={(e) => setRegVehicleType(e.target.value)}
+                      className="w-full px-3 py-1.5 text-xs rounded border border-slate-300 bg-white focus:border-[#0038A8] outline-none"
+                    >
+                      <option value="Pickup Truck">Pickup Truck</option>
+                      <option value="Cargo Van">Cargo Van</option>
+                      <option value="Multicab">Multicab</option>
+                      <option value="Light Truck">Light Truck</option>
+                      <option value="Motorcycle">Motorcycle (Rapid Courier)</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="text-[11px] text-slate-500 pt-1">
+                  By registering, you agree to provide accurate information under Republic Act No. 10173 (Data Privacy Act of 2012).
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-2.5 px-4 rounded-lg bg-[#0038A8] hover:bg-[#002776] text-white text-xs sm:text-sm font-bold shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {submitting ? "Submitting Application..." : "Register Accredited Account"}
+                </button>
+              </form>
+            )}
+
+            {/* =============================================================
+                MODE 2 STEP 2: EMAIL OTP VERIFICATION
+                ============================================================= */}
+            {mode === "register" && regStep === "otp" && (
+              <form onSubmit={handleVerifyOtp} className="space-y-4">
+                <div className="p-3.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-900 space-y-1">
+                  <p className="font-bold">Two-Factor Identity Verification</p>
+                  <p className="text-slate-600">
+                    A 6-digit confirmation code has been dispatched to <strong>{pendingEmail}</strong>. Please input the code below.
+                  </p>
+                </div>
+
+                <div>
+                  <label htmlFor="otp-code" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    6-Digit Verification Code
+                  </label>
+                  <input
+                    id="otp-code"
+                    type="text"
+                    maxLength={6}
+                    required
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value)}
+                    placeholder="123456"
+                    className="w-full py-2.5 text-center text-xl font-mono tracking-widest rounded-lg border border-slate-300 focus:border-[#0038A8] focus:ring-1 focus:ring-[#0038A8] outline-none bg-white text-slate-900"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full py-2.5 px-4 rounded-lg bg-[#0038A8] hover:bg-[#002776] text-white text-xs sm:text-sm font-bold shadow-sm transition-colors disabled:opacity-50"
+                >
+                  {submitting ? "Verifying..." : "Confirm & Enter Portal"}
+                </button>
+
+                <div className="flex items-center justify-between text-xs text-slate-500 pt-2">
+                  <button
+                    type="button"
+                    disabled={resendCooldown > 0 || resending}
+                    onClick={handleResendOtp}
+                    className="text-[#0038A8] hover:underline disabled:text-slate-400 font-semibold"
+                  >
+                    {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : "Resend code"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRegStep("form")}
+                    className="text-slate-600 hover:underline"
+                  >
+                    Edit Registration Details
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
-      </div>
+      </main>
 
-      {showTracker && (
-        <PublicAidTrackerModal onClose={() => setShowTracker(false)} />
-      )}
-    </main>
+      {/* =========================================================================
+          4. OFFICIAL PHILIPPINE GOVERNMENT FOOTER (GOVPH STANDARD)
+          ========================================================================= */}
+      <footer className="bg-white border-t border-slate-200 mt-auto py-5 px-4 sm:px-8 text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+          <div className="space-y-0.5">
+            <p className="font-bold text-slate-700">
+              Disaster Relief &amp; Resource Management System (DRRMS) — Phase 1 Information Management
+            </p>
+            <p className="text-slate-500 text-[11px]">
+              Mariano Marcos State University • College of Computing and Information Sciences • City of Batac, Ilocos Norte 2906
+            </p>
+          </div>
+          <div className="text-[11px] text-slate-500 leading-snug md:text-right max-w-md">
+            Compliant with <strong>Republic Act No. 10173</strong> (Data Privacy Act of 2012) and <strong>Republic Act No. 10121</strong> (Philippine Disaster Risk Reduction and Management Act).
+          </div>
+        </div>
+      </footer>
+
+      {/* Public Aid Tracker Modal */}
+      {showTracker && <PublicAidTrackerModal onClose={() => setShowTracker(false)} />}
+    </div>
   );
 }

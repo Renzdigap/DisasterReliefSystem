@@ -17,12 +17,12 @@ public class LoginFrame extends JFrame {
     private JPasswordField txtPassword;
 
     public LoginFrame() {
-        setTitle("NDRDMS - Enterprise Login Portal");
+        setTitle("DRRMS - City of Batac Disaster Relief Portal");
         setSize(1000, 640);
         setMinimumSize(new Dimension(850, 550));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        getContentPane().setBackground(UITheme.BG_CANVAS);
+        getContentPane().setBackground(new Color(248, 250, 252));
         initUI();
     }
 
@@ -30,12 +30,12 @@ public class LoginFrame extends JFrame {
         setLayout(new BorderLayout());
 
         // Top subtle branding bar
-        JPanel headerBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 24, 14));
-        headerBar.setBackground(UITheme.BG_CARD);
-        headerBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UITheme.BORDER_SUBTLE));
-        JLabel lblHeaderBrand = new JLabel("DISASTER RELIEF & LOGISTICS MANAGEMENT SYSTEM — CITY OF BATAC");
-        lblHeaderBrand.setFont(UITheme.FONT_BODY_BOLD);
-        lblHeaderBrand.setForeground(UITheme.COLOR_PRIMARY);
+        JPanel headerBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 24, 12));
+        headerBar.setBackground(Color.WHITE);
+        headerBar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(226, 232, 240)));
+        JLabel lblHeaderBrand = new JLabel("MARIANO MARCOS STATE UNIVERSITY • CITY OF BATAC CDRRMO");
+        lblHeaderBrand.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        lblHeaderBrand.setForeground(new Font("Segoe UI", Font.BOLD, 12) != null ? new Color(0, 56, 168) : Color.BLUE);
         headerBar.add(lblHeaderBrand);
         add(headerBar, BorderLayout.NORTH);
 
@@ -43,25 +43,30 @@ public class LoginFrame extends JFrame {
         JPanel centerPanel = new JPanel(new GridBagLayout());
         centerPanel.setOpaque(false);
 
-        // Elevated GlowCardPanel for the login form
-        GlowCardPanel loginCard = new GlowCardPanel(GlowCardPanel.GlowStyle.BLUE, 12, 32);
+        // Clean, solid institutional card (no sci-fi neon glow)
+        JPanel loginCard = new JPanel();
+        loginCard.setBackground(Color.WHITE);
+        loginCard.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(203, 213, 225), 1),
+                new EmptyBorder(32, 36, 32, 36)
+        ));
         loginCard.setPreferredSize(new Dimension(420, 480));
         loginCard.setLayout(new BoxLayout(loginCard, BoxLayout.Y_AXIS));
 
         // System title inside card
-        JLabel lblLogo = new JLabel("NDRDMS");
+        JLabel lblLogo = new JLabel("DRRMS");
         lblLogo.setFont(new Font("Segoe UI", Font.BOLD, 26));
-        lblLogo.setForeground(UITheme.COLOR_PRIMARY);
+        lblLogo.setForeground(new Color(0, 56, 168));
         lblLogo.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel lblTitle = new JLabel("Sign In to Portal");
-        lblTitle.setFont(UITheme.FONT_HEADER_LARGE);
-        lblTitle.setForeground(UITheme.TEXT_PRIMARY);
+        JLabel lblTitle = new JLabel("Authorized Portal Access");
+        lblTitle.setFont(new Font("Segoe UI", Font.BOLD, 18));
+        lblTitle.setForeground(new Color(15, 23, 42));
         lblTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
 
-        JLabel lblSub = new JLabel("Authorized Operations & Management Access");
-        lblSub.setFont(UITheme.FONT_SMALL);
-        lblSub.setForeground(UITheme.TEXT_MUTED);
+        JLabel lblSub = new JLabel("City Disaster Risk Reduction & Management Office");
+        lblSub.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        lblSub.setForeground(new Color(100, 116, 139));
         lblSub.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // Form Fields
@@ -139,12 +144,12 @@ public class LoginFrame extends JFrame {
         form.add(txtPassword);
 
         // Custom Action Button
-        CustomButton btnLogin = new CustomButton("Authenticate & Enter", UITheme.COLOR_PRIMARY, Color.WHITE);
+        CustomButton btnLogin = new CustomButton("Sign In to Portal", UITheme.COLOR_PRIMARY, Color.WHITE);
         btnLogin.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
         btnLogin.setAlignmentX(Component.CENTER_ALIGNMENT);
 
         // Hint for evaluation
-        JLabel lblHint = new JLabel("Seed Credentials: admin / admin123");
+        JLabel lblHint = new JLabel("For Academic Evaluation: admin / admin123");
         lblHint.setFont(UITheme.FONT_SMALL);
         lblHint.setForeground(UITheme.TEXT_MUTED);
         lblHint.setAlignmentX(Component.CENTER_ALIGNMENT);
