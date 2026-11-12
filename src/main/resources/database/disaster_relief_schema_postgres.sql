@@ -28,30 +28,36 @@ CREATE TABLE UserAccount (
     username VARCHAR(50) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     role VARCHAR(20) NOT NULL CHECK (role IN ('Admin', 'Donor', 'Organization', 'Volunteer', 'Manager')),
-    full_name VARCHAR(100),
+    full_name VARCHAR(100) NOT NULL,
     contact_info VARCHAR(100),
+    email VARCHAR(255),
+    is_verified BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE UNIQUE INDEX idx_useraccount_email_unique
+    ON UserAccount (LOWER(email))
+    WHERE email IS NOT NULL;
 
 -- ==============================================================================
 -- 2. STAKEHOLDER PROFILE SUBTYPES (1:1 with UserAccount)
 -- ==============================================================================
 CREATE TABLE Donor (
     donor_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES UserAccount(user_id) ON DELETE CASCADE,
-    donor_type VARCHAR(20) NOT NULL CHECK (donor_type IN ('Individual', 'Corporate', 'NGO', 'Government'))
+    user_id INT NOT NULL UNIQUE REFERENCES UserAccount(user_id) ON DELETE CASCADE,
+    donor_type VARCHAR(20) NOT NULL DEFAULT 'Individual' CHECK (donor_type IN ('Individual', 'Corporate', 'NGO', 'Government'))
 );
 
 CREATE TABLE Organization (
     org_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES UserAccount(user_id) ON DELETE CASCADE,
+    user_id INT NOT NULL UNIQUE REFERENCES UserAccount(user_id) ON DELETE CASCADE,
     org_name VARCHAR(100) NOT NULL,
     location VARCHAR(150) NOT NULL
 );
 
 CREATE TABLE Volunteer (
     volunteer_id SERIAL PRIMARY KEY,
-    user_id INT NOT NULL REFERENCES UserAccount(user_id) ON DELETE CASCADE,
+    user_id INT NOT NULL UNIQUE REFERENCES UserAccount(user_id) ON DELETE CASCADE,
     vehicle_type VARCHAR(50),
     is_available BOOLEAN DEFAULT true
 );
@@ -60,10 +66,10 @@ CREATE TABLE Volunteer (
 -- 3. MASTER CATALOGS (DisasterEvent, ReliefGood, Inventory)
 -- ==============================================================================
 CREATE TABLE DisasterEvent (
-    disaster_id SERIAL PRIMARY KEY,
+    event_id SERIAL PRIMARY KEY,
     event_name VARCHAR(100) NOT NULL,
     location VARCHAR(150) NOT NULL,
-    status VARCHAR(20) NOT NULL CHECK (status IN ('Active', 'Resolved', 'Monitoring')),
+    status VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Active', 'Resolved', 'Monitoring')),
     start_date DATE NOT NULL,
     end_date DATE
 );
@@ -77,7 +83,7 @@ CREATE TABLE ReliefGood (
 
 CREATE TABLE Inventory (
     inventory_id SERIAL PRIMARY KEY,
-    good_id INT NOT NULL REFERENCES ReliefGood(good_id) ON DELETE CASCADE,
+    good_id INT NOT NULL UNIQUE REFERENCES ReliefGood(good_id) ON DELETE CASCADE,
     current_stock INT NOT NULL DEFAULT 0 CHECK (current_stock >= 0),
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -88,13 +94,13 @@ CREATE TABLE Inventory (
 CREATE TABLE Donation (
     donation_id SERIAL PRIMARY KEY,
     donor_id INT NOT NULL REFERENCES Donor(donor_id) ON DELETE CASCADE,
-    event_id INT REFERENCES DisasterEvent(disaster_id) ON DELETE SET NULL,
+    event_id INT REFERENCES DisasterEvent(event_id) ON DELETE SET NULL,
     donation_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL CHECK (status IN ('Pending', 'Approved', 'Distributed', 'Cancelled'))
+    status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Distributed', 'Cancelled'))
 );
 
 CREATE TABLE DonationItem (
-    donation_item_id SERIAL PRIMARY KEY,
+    item_id SERIAL PRIMARY KEY,
     donation_id INT NOT NULL REFERENCES Donation(donation_id) ON DELETE CASCADE,
     good_id INT NOT NULL REFERENCES ReliefGood(good_id) ON DELETE CASCADE,
     quantity INT NOT NULL CHECK (quantity > 0)
@@ -106,9 +112,9 @@ CREATE TABLE DonationItem (
 CREATE TABLE ReliefRequest (
     request_id SERIAL PRIMARY KEY,
     org_id INT NOT NULL REFERENCES Organization(org_id) ON DELETE CASCADE,
-    event_id INT NOT NULL REFERENCES DisasterEvent(disaster_id) ON DELETE CASCADE,
+    event_id INT NOT NULL REFERENCES DisasterEvent(event_id) ON DELETE CASCADE,
     request_date DATE NOT NULL,
-    status VARCHAR(20) NOT NULL CHECK (status IN ('Pending', 'Approved', 'Fulfilled', 'Rejected'))
+    status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (status IN ('Pending', 'Approved', 'Fulfilled', 'Rejected'))
 );
 
 CREATE TABLE RequestItem (
@@ -124,9 +130,9 @@ CREATE TABLE RequestItem (
 CREATE TABLE Delivery (
     delivery_id SERIAL PRIMARY KEY,
     request_id INT NOT NULL REFERENCES ReliefRequest(request_id) ON DELETE CASCADE,
-    volunteer_id INT NOT NULL REFERENCES Volunteer(volunteer_id) ON DELETE CASCADE,
-    dispatch_date DATE NOT NULL,
-    delivery_status VARCHAR(20) NOT NULL CHECK (delivery_status IN ('Scheduled', 'In Transit', 'Delivered', 'Cancelled'))
+    volunteer_id INT REFERENCES Volunteer(volunteer_id) ON DELETE SET NULL,
+    dispatch_date DATE DEFAULT CURRENT_DATE,
+    delivery_status VARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (delivery_status IN ('Pending', 'Scheduled', 'In Transit', 'Delivered', 'Cancelled'))
 );
 
 CREATE TABLE Notification (
@@ -134,19 +140,22 @@ CREATE TABLE Notification (
     user_id INT NOT NULL REFERENCES UserAccount(user_id) ON DELETE CASCADE,
     message TEXT NOT NULL,
     is_read BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    date_sent TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==============================================================================
 -- 7. EMAIL REGISTRATION VERIFICATION (Next.js Web Portal OTP)
 -- ==============================================================================
 CREATE TABLE PendingVerification (
-    id SERIAL PRIMARY KEY,
-    email VARCHAR(255) NOT NULL,
-    otp VARCHAR(6) NOT NULL,
-    registration_data JSONB NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    verification_id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    username VARCHAR(50) NOT NULL,
+    code_hash VARCHAR(128) NOT NULL,
+    payload_json TEXT NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==============================================================================
@@ -358,7 +367,7 @@ INSERT INTO Donation (donor_id, event_id, donation_date, status) VALUES
 (1, NULL, '2024-08-10', 'Approved'),
 (2, 7, '2024-11-11', 'Approved');
 
--- 9. Donation Items (15 Split-Transaction Line Items)
+-- 9. Donation Items (16 Split-Transaction Line Items)
 INSERT INTO DonationItem (donation_id, good_id, quantity) VALUES
 (1, 1, 500),
 (1, 2, 50),
@@ -374,7 +383,8 @@ INSERT INTO DonationItem (donation_id, good_id, quantity) VALUES
 (8, 3, 500),
 (9, 8, 50),
 (10, 6, 300),
-(11, 9, 20);
+(11, 9, 20),
+(12, 10, 50);
 
 -- 10. Relief Requests (15 Sample Requests from Batac Barangays)
 INSERT INTO ReliefRequest (org_id, event_id, request_date, status) VALUES
@@ -394,7 +404,7 @@ INSERT INTO ReliefRequest (org_id, event_id, request_date, status) VALUES
 (14, 7, '2024-11-11', 'Approved'),  -- Brgy. 12 Palpalicong
 (15, 7, '2024-11-12', 'Pending');   -- Brgy. 13 Baay
 
--- 11. Request Items (18 Split-Transaction Line Items)
+-- 11. Request Items (19 Split-Transaction Line Items)
 INSERT INTO RequestItem (request_id, good_id, quantity) VALUES
 (1, 1, 400),
 (1, 2, 30),
@@ -413,7 +423,8 @@ INSERT INTO RequestItem (request_id, good_id, quantity) VALUES
 (12, 7, 120),
 (13, 2, 50),
 (13, 3, 400),
-(14, 4, 100);
+(14, 4, 100),
+(15, 1, 250);
 
 -- 12. Deliveries (10 Dispatch Records to Batac Barangays)
 INSERT INTO Delivery (request_id, volunteer_id, dispatch_date, delivery_status) VALUES

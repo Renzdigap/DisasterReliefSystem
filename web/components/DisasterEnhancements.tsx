@@ -826,31 +826,31 @@ const SAMPLE_TRACKING_RECORDS: TrackingRecord[] = [
   {
     code: "DRRMS-WB-2024-00001",
     shortId: "#1",
-    campaign: "Typhoon Carina Flood Response",
-    recipient: "Philippine Red Cross Manila",
-    destination: "Port Area Evacuation Complex, Manila",
-    items: "500 Bottles Drinking Water (1L), 120 Sacks Rice (25kg)",
+    campaign: "Typhoon Carina - Quiaoit River Flash Flood",
+    recipient: "Brgy. 1-N Ricarte (Nalasin) Council",
+    destination: "Brgy. 1-N Ricarte Evacuation Staging Area, City of Batac",
+    items: "400 Bottles Drinking Water (1L), 30 Sacks Rice (25kg)",
     status: "Delivered",
     currentStage: 4,
     steps: [
       {
         label: "Pledge Verified",
-        detail: "Central DRRMS Ledger",
+        detail: "Batac CDRRMO Central Ledger",
         time: "Jul 27, 08:15 AM",
       },
       {
         label: "Warehouse Allocated",
-        detail: "Camp Aguinaldo Logistics Base",
+        detail: "Batac City Central Relief Depot (Quiling Sur)",
         time: "Jul 27, 01:40 PM",
       },
       {
         label: "Dispatched",
-        detail: "Charlie Driver • Relief Truck (NDL-4921)",
+        detail: "Charlie Driver (Batac Unit) • Pickup Truck",
         time: "Jul 28, 06:10 AM",
       },
       {
         label: "Delivered & Received",
-        detail: "Port Area Evacuation Complex, Manila",
+        detail: "Brgy. 1-N Ricarte Evacuation Staging Area, Batac City",
         time: "Jul 28, 11:45 AM",
       },
     ],
@@ -858,31 +858,31 @@ const SAMPLE_TRACKING_RECORDS: TrackingRecord[] = [
   {
     code: "DRRMS-WB-2024-00008",
     shortId: "#8",
-    campaign: "Tropical Storm Kristine Prep",
-    recipient: "LGU Albay Emergency Command",
-    destination: "Legazpi City Central Evacuation Dome, Albay",
-    items: "600 Bottles Drinking Water (1L), 200 Thermal Blankets",
+    campaign: "Localized Flash Flood Incident - Quiling & Bil-loca",
+    recipient: "Brgy. 30-W Baoa West Council",
+    destination: "Brgy. 30-W Baoa West Hall, City of Batac, Ilocos Norte",
+    items: "35 Sacks Rice (25kg), Hygiene Kits",
     status: "In Transit",
     currentStage: 3,
     steps: [
       {
         label: "Pledge Verified",
-        detail: "Central DRRMS Ledger",
-        time: "Oct 23, 09:30 AM",
+        detail: "Batac CDRRMO Central Ledger",
+        time: "Aug 18, 09:30 AM",
       },
       {
         label: "Warehouse Allocated",
-        detail: "Camp Aguinaldo Logistics Base",
-        time: "Oct 23, 03:15 PM",
+        detail: "Batac City Central Relief Depot (Quiling Sur)",
+        time: "Aug 18, 03:15 PM",
       },
       {
         label: "In Transit",
-        detail: "Marco Reyes • Heavy Cargo Van (VNR-8820)",
-        time: "Oct 24, 05:00 AM",
+        detail: "Karen Joy Cortez (Batac Youth Desk) • Multicab",
+        time: "Aug 19, 05:00 AM",
       },
       {
         label: "Scheduled Delivery",
-        detail: "Legazpi City Central Evacuation Dome, Albay",
+        detail: "Brgy. 30-W Baoa West Hall, City of Batac",
         time: "Est. 04:30 PM",
       },
     ],
@@ -890,22 +890,22 @@ const SAMPLE_TRACKING_RECORDS: TrackingRecord[] = [
   {
     code: "DRRMS-DON-CERT-000003",
     shortId: "#3",
-    campaign: "Central Luzon Monsoon Inundation",
-    recipient: "Pampanga Provincial Disaster Office",
-    destination: "San Fernando Mega Evacuation Center, Pampanga",
-    items: "250 Hygiene Kits, 100 Boxes Paracetamol (500mg)",
+    campaign: "Typhoon Egay - City-Wide Agricultural Recovery",
+    recipient: "Brgy. 16-S Quiling Sur Council (MMSU)",
+    destination: "Batac City Evacuation Center, Quiling Sur",
+    items: "300 Thermal Blankets & Mats",
     status: "Warehouse Allocated",
     currentStage: 2,
     steps: [
       {
         label: "Pledge Verified",
-        detail: "Central DRRMS Ledger",
-        time: "Oct 25, 10:05 AM",
+        detail: "Batac CDRRMO Central Ledger",
+        time: "Jul 27, 10:05 AM",
       },
       {
         label: "Stocked in Warehouse",
-        detail: "Camp Aguinaldo Hub, Bay 4",
-        time: "Oct 25, 02:20 PM",
+        detail: "Batac City Central Relief Depot, Bay 2",
+        time: "Jul 27, 02:20 PM",
       },
       {
         label: "Fleet Assignment",
@@ -914,7 +914,7 @@ const SAMPLE_TRACKING_RECORDS: TrackingRecord[] = [
       },
       {
         label: "Final Handover",
-        detail: "San Fernando Mega Evacuation Center, Pampanga",
+        detail: "Batac City Evacuation Center, Quiling Sur",
         time: "Pending",
       },
     ],
@@ -1321,11 +1321,11 @@ export function EmergencyBroadcastModal({
   onBroadcastSent,
 }: EmergencyBroadcastModalProps) {
   const [selectedZone, setSelectedZone] = useState(
-    events[0]?.eventName || "Tropical Storm Kristine Prep (Albay)"
+    events[0]?.eventName || "Typhoon Carina - Quiaoit River Flash Flood"
   );
   const [alertTier, setAlertTier] = useState("CRITICAL FLEET MOBILIZATION");
   const [customNote, setCustomNote] = useState(
-    "Report to Camp Aguinaldo Loading Bay 2 for immediate relief convoy dispatch. Bring rain-tarpaulin truck covers."
+    "Report to Batac CDRRMO Central Logistics Depot (Quiling Sur) Loading Bay for immediate relief convoy dispatch. Bring rain-tarpaulin truck covers."
   );
   const [sending, setSending] = useState(false);
   const [sentDone, setSentDone] = useState(false);
