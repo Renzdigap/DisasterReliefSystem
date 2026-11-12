@@ -21,6 +21,36 @@ import { apiFetch, saveSession, UserSession } from "@/lib/api";
 import { PublicAidTrackerModal } from "@/components/DisasterEnhancements";
 import { useSiblingStagger } from "@/components/InteractiveMotion";
 
+interface PasswordStrength {
+  score: number;
+  label: string;
+  color: string;
+  textColor: string;
+  feedback: string;
+}
+
+function getPasswordStrength(pass: string): PasswordStrength {
+  if (!pass) {
+    return { score: 0, label: "", color: "bg-slate-200", textColor: "text-slate-400", feedback: "" };
+  }
+  let score = 0;
+  if (pass.length >= 6) score++;
+  if (pass.length >= 8) score++;
+  if (/[a-z]/.test(pass) && /[A-Z]/.test(pass)) score++;
+  if (/\d/.test(pass)) score++;
+  if (/[^a-zA-Z0-9]/.test(pass)) score++;
+
+  if (score <= 1) {
+    return { score: 1, label: "Weak", color: "bg-red-500", textColor: "text-red-600", feedback: "Use at least 8 characters with mixed case & numbers" };
+  } else if (score === 2) {
+    return { score: 2, label: "Fair", color: "bg-amber-500", textColor: "text-amber-600", feedback: "Add numbers or uppercase letters" };
+  } else if (score === 3 || score === 4) {
+    return { score: 3, label: "Good", color: "bg-blue-600", textColor: "text-blue-600", feedback: "Strong password. Add a symbol for maximum security" };
+  } else {
+    return { score: 4, label: "Strong", color: "bg-emerald-600", textColor: "text-emerald-600", feedback: "Very secure password" };
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -66,13 +96,18 @@ export default function LoginPage() {
   const [regUsername, setRegUsername] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [regConfirmPassword, setRegConfirmPassword] = useState("");
   const [showRegPass, setShowRegPass] = useState(false);
+  const [showRegConfirmPass, setShowRegConfirmPass] = useState(false);
   const [regFirstName, setRegFirstName] = useState("");
   const [regMiddleName, setRegMiddleName] = useState("");
   const [regLastName, setRegLastName] = useState("");
   const [noMiddleName, setNoMiddleName] = useState(false);
   const [regContactInfo, setRegContactInfo] = useState("");
   const [regRole, setRegRole] = useState<"Donor" | "Organization" | "Volunteer">("Donor");
+
+  // Real-time password strength score
+  const passStrength = getPasswordStrength(regPassword);
   const [regDonorType, setRegDonorType] = useState<"Individual" | "Corporate">("Individual");
   const [regOrgName, setRegOrgName] = useState("");
   const [regLocation, setRegLocation] = useState("City of Batac, Ilocos Norte");
@@ -158,6 +193,14 @@ export default function LoginPage() {
     }
     if (regPassword.length < 6) {
       setErrorMsg("Password must be at least 6 characters long.");
+      return;
+    }
+    if (!regConfirmPassword) {
+      setErrorMsg("Please confirm your password.");
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setErrorMsg("Passwords do not match. Please ensure both password fields are identical.");
       return;
     }
     if (!trimmedFirst) {
@@ -745,28 +788,106 @@ export default function LoginPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label htmlFor="reg-password" className="block text-[11px] font-semibold text-slate-700 mb-1">Password (min 6 chars)</label>
-                  <div className="relative">
-                    <input
-                      id="reg-password"
-                      type={showRegPass ? "text" : "password"}
-                      required
-                      minLength={6}
-                      value={regPassword}
-                      onChange={(e) => setRegPassword(e.target.value)}
-                      className="auth-input w-full pl-3 pr-8 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowRegPass(!showRegPass)}
-                      aria-label={showRegPass ? "Hide password" : "Show password"}
-                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-700 transition-colors"
-                    >
-                      {showRegPass ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
-                    </button>
+                {/* Password and Confirm Password */}
+                <div className="grid grid-cols-2 gap-2.5">
+                  <div>
+                    <label htmlFor="reg-password" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Password (min 6 chars) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="reg-password"
+                        type={showRegPass ? "text" : "password"}
+                        required
+                        minLength={6}
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="auth-input w-full pl-3 pr-8 py-1.5 text-xs rounded border border-slate-300 focus:border-[#0038A8]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPass(!showRegPass)}
+                        aria-label={showRegPass ? "Hide password" : "Show password"}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-700 transition-colors"
+                      >
+                        {showRegPass ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="reg-confirm-password" className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Confirm Password <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="reg-confirm-password"
+                        type={showRegConfirmPass ? "text" : "password"}
+                        required
+                        minLength={6}
+                        value={regConfirmPassword}
+                        onChange={(e) => setRegConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className={`auth-input w-full pl-3 pr-8 py-1.5 text-xs rounded border focus:border-[#0038A8] ${
+                          regConfirmPassword
+                            ? regPassword === regConfirmPassword
+                              ? "border-emerald-500 bg-emerald-50/20"
+                              : "border-rose-500 bg-rose-50/20"
+                            : "border-slate-300"
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegConfirmPass(!showRegConfirmPass)}
+                        aria-label={showRegConfirmPass ? "Hide confirm password" : "Show confirm password"}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-700 transition-colors"
+                      >
+                        {showRegConfirmPass ? <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> : <Eye className="h-3.5 w-3.5" aria-hidden="true" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
+
+                {/* Password Strength & Match Status Indicator */}
+                {(regPassword || regConfirmPassword) && (
+                  <div className="space-y-1.5 p-2 rounded-lg bg-slate-50 border border-slate-200">
+                    {regPassword && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-slate-600 font-medium">Password Strength:</span>
+                          <span className={`font-bold ${passStrength.textColor}`}>
+                            {passStrength.label}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5 h-1.5 w-full">
+                          <div className={`h-full rounded-full transition-all duration-300 ${passStrength.score >= 1 ? passStrength.color : "bg-slate-200"}`} />
+                          <div className={`h-full rounded-full transition-all duration-300 ${passStrength.score >= 2 ? passStrength.color : "bg-slate-200"}`} />
+                          <div className={`h-full rounded-full transition-all duration-300 ${passStrength.score >= 3 ? passStrength.color : "bg-slate-200"}`} />
+                          <div className={`h-full rounded-full transition-all duration-300 ${passStrength.score >= 4 ? passStrength.color : "bg-slate-200"}`} />
+                        </div>
+                        {passStrength.feedback && (
+                          <p className="text-[10px] text-slate-500">{passStrength.feedback}</p>
+                        )}
+                      </div>
+                    )}
+                    {regConfirmPassword && (
+                      <div className="pt-1 border-t border-slate-200/70">
+                        {regPassword === regConfirmPassword ? (
+                          <p className="text-[10.5px] font-semibold text-emerald-700 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3 text-emerald-600 inline shrink-0" />
+                            Passwords match
+                          </p>
+                        ) : (
+                          <p className="text-[10.5px] font-semibold text-rose-600 flex items-center gap-1">
+                            <AlertCircle className="h-3 w-3 text-rose-500 inline shrink-0" />
+                            Passwords do not match
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Role Selection */}
                 <div>
