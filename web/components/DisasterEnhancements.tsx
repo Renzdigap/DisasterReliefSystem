@@ -1106,7 +1106,7 @@ export function PublicAidTrackerModal({
           <div className="h-9 w-9 rounded-xl bg-white p-1 flex items-center justify-center shrink-0">
             <img
               src="/ndrrmc-logo.png"
-              alt="NDRRMC"
+              alt="Batac CDRRMO"
               className="h-full w-full object-contain"
             />
           </div>
@@ -1114,7 +1114,7 @@ export function PublicAidTrackerModal({
             id={titleId}
             className="text-base sm:text-lg font-bold tracking-tight leading-snug"
           >
-            NDRRMC Shipment Tracker
+            Batac CDRRMO Aid Shipment Tracker
           </h2>
         </div>
         <button

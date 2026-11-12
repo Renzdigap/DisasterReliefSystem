@@ -290,7 +290,7 @@ export default function LoginPage() {
               />
               <img
                 src="/ndrrmc-logo.png"
-                alt="CDRRMO Logo"
+                alt="Batac CDRRMO Emblem"
                 className="h-11 sm:h-13 w-auto object-contain hidden sm:block"
               />
             </div>

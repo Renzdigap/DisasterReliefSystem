@@ -2943,17 +2943,29 @@ export default function AdminPortalPage() {
             <div className="hidden print:block mb-6 border-b-2 border-slate-900 pb-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <img
-                    src="/ndrrmc-logo.png"
-                    alt="NDRRMC Seal"
-                    className="h-16 w-16 object-contain"
-                  />
+                  <div className="flex items-center -space-x-1.5 shrink-0">
+                    <img
+                      src="/logo_mmsu.png"
+                      alt="MMSU Seal"
+                      className="h-12 w-12 object-contain rounded-full bg-white p-0.5 border border-slate-200"
+                    />
+                    <img
+                      src="/logo_ccis.png"
+                      alt="CCIS Logo"
+                      className="h-12 w-12 object-contain rounded-full bg-white p-0.5 border border-slate-200"
+                    />
+                    <img
+                      src="/ndrrmc-logo.png"
+                      alt="Batac CDRRMO Logo"
+                      className="h-12 w-12 object-contain rounded-full bg-white p-0.5 border border-slate-200"
+                    />
+                  </div>
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                      Republic of the Philippines &bull; Office of Civil Defense
+                      Republika ng Pilipinas &bull; Lungsod ng Batac, Ilocos Norte
                     </div>
                     <h1 className="text-lg font-black text-slate-900 leading-tight">
-                      National Disaster Risk Reduction &amp; Management Council
+                      City Disaster Risk Reduction &amp; Management Office (CDRRMO)
                     </h1>
                     <p className="text-xs font-semibold text-blue-900">
                       Disaster Relief &amp; Resource Management System (DRRMS) &bull; Central Decision-Support Operations
